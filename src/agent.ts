@@ -9,6 +9,7 @@ import {
 import { Type, type Static } from "typebox";
 import { log } from "./log.ts";
 import { FACTORY_SYSTEM_PROMPT } from "./system-prompt.ts";
+import { containsMalformedToolCall, toSingleLine } from "./text.ts";
 
 const reportSchema = Type.Object({
   outcome: Type.Union([
@@ -36,14 +37,6 @@ function describeTool(name: string, args: Record<string, unknown>) {
     default:
       return `Using ${name}`;
   }
-}
-
-function summarize(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function containsMalformedToolCall(text: string) {
-  return /functions\.[\w-]+:\d+\s*\{/.test(text);
 }
 
 export async function runAgent(prompt: string): Promise<AgentReport | undefined> {
@@ -153,7 +146,7 @@ export async function runAgent(prompt: string): Promise<AgentReport | undefined>
 
     return {
       outcome: "completed",
-      summary: summarize(finalText),
+      summary: toSingleLine(finalText),
     };
   }
 }
