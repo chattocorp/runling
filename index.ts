@@ -1,8 +1,10 @@
 import {
   agent,
   cli,
+  concat,
   FactoryError,
   run,
+  withRetries,
   workflow,
   workingTreeHash,
 } from "./src/index.ts";
@@ -12,7 +14,7 @@ const agentInstructions = ["Write tests for new or changed features."];
 const maxTestAttempts = 3;
 
 async function runTests() {
-  for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
+  await withRetries(maxTestAttempts, async (attempt) => {
     const tests = await run.check(
       `Running tests (attempt ${attempt}/${maxTestAttempts})`,
     )`bun test`;
@@ -21,28 +23,25 @@ async function runTests() {
       return;
     }
 
-    const output = [tests.stdout.toString(), tests.stderr.toString()]
-      .filter((text) => text.trim() !== "")
-      .join("\n")
-      .trim();
+    const output = concat(tests.stdout.toString(), tests.stderr.toString()).trim();
 
-    if (attempt === maxTestAttempts) {
-      throw new FactoryError(
-        `Tests still failing after ${maxTestAttempts} attempts\n${output}`,
-        3,
+    if (attempt < maxTestAttempts) {
+      await agent(
+        concat(
+          "The test suite is failing. Fix the implementation and tests so that `bun test` passes.",
+          "",
+          "Failing test output:",
+          output,
+        ),
+        { model, instructions: agentInstructions },
       );
     }
 
-    await agent(
-      [
-        "The test suite is failing. Fix the implementation and tests so that `bun test` passes.",
-        "",
-        "Failing test output:",
-        output,
-      ].join("\n"),
-      { model, instructions: agentInstructions },
+    throw new FactoryError(
+      `Tests still failing after ${attempt} attempts\n${output}`,
+      3,
     );
-  }
+  });
 }
 
 async function implement(prompt: string) {
