@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 const fakeModel = {
   id: "claude-opus-4-5",
@@ -6,29 +6,48 @@ const fakeModel = {
   provider: "anthropic",
 };
 
-let agentStartHandler: ((event: { type: string }) => void) | undefined;
+let eventHandler: ((event: any) => void) | undefined;
+let promptImplementation: ((prompt: string) => Promise<void>) | undefined;
+let sessionOptions: any;
+let resourceOptions: any;
+let promptCalls = 0;
+let abortCalls = 0;
+let disposed = false;
+let modelAvailable = true;
 
 mock.module("@earendil-works/pi-coding-agent", () => {
   return {
     ModelRuntime: {
       create: async () => ({
-        getModel: () => fakeModel,
+        getModel: () => (modelAvailable ? fakeModel : undefined),
       }),
     },
     DefaultResourceLoader: class {
+      constructor(options: unknown) {
+        resourceOptions = options;
+      }
       async reload() {}
     },
     getAgentDir: () => "/tmp/agent-dir",
     SessionManager: {
       inMemory: () => ({}),
     },
-    createAgentSession: async () => {
+    createAgentSession: async (options: unknown) => {
+      sessionOptions = options;
       const session = {
-        subscribe(handler: (event: { type: string }) => void) {
-          agentStartHandler = handler;
+        subscribe(handler: (event: any) => void) {
+          eventHandler = handler;
         },
-        prompt: async () => {},
-        dispose: () => {},
+        prompt: async (prompt: string) => {
+          promptCalls++;
+          await promptImplementation?.(prompt);
+        },
+        abort: async () => {
+          abortCalls++;
+        },
+        dispose: () => {
+          disposed = true;
+        },
       };
       return { session };
     },
@@ -36,9 +55,38 @@ mock.module("@earendil-works/pi-coding-agent", () => {
   };
 });
 
-const { describeTool, requireCompletedReport, runAgent } = await import(
-  "./agent.ts"
-);
+const {
+  agent,
+  AgentOutcomeError,
+  describeTool,
+  requireCompletedReport,
+  runAgent,
+} = await import("./agent.ts");
+
+beforeEach(() => {
+  eventHandler = undefined;
+  promptImplementation = undefined;
+  sessionOptions = undefined;
+  resourceOptions = undefined;
+  promptCalls = 0;
+  abortCalls = 0;
+  disposed = false;
+  modelAvailable = true;
+});
+
+async function reportOutcome(report: {
+  outcome: "completed" | "blocked" | "failed";
+  summary: string;
+}) {
+  await sessionOptions.customTools[0].execute("tool-call", report);
+}
+
+function emitAssistantText(text: string) {
+  eventHandler?.({
+    type: "message_end",
+    message: { role: "assistant", content: [{ type: "text", text }] },
+  });
+}
 
 describe("describeTool", () => {
   test("describes known tools", () => {
@@ -71,8 +119,8 @@ describe("runAgent", () => {
     try {
       await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
 
-      expect(agentStartHandler).toBeDefined();
-      agentStartHandler?.({ type: "agent_start" });
+      expect(eventHandler).toBeDefined();
+      eventHandler?.({ type: "agent_start" });
     } finally {
       console.log = originalLog;
     }
@@ -83,6 +131,142 @@ describe("runAgent", () => {
       ),
     ).toBe(true);
   });
+
+  test("returns the structured outcome reported by the agent", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "blocked", summary: "Need access" });
+    };
+
+    await expect(
+      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+    ).resolves.toEqual({ outcome: "blocked", summary: "Need access" });
+    expect(disposed).toBe(true);
+  });
+
+  test("does not treat an unreported plain-text response as success", async () => {
+    promptImplementation = async () => emitAssistantText("I could not finish");
+
+    await expect(
+      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+    ).resolves.toEqual({
+      outcome: "failed",
+      summary: "Agent finished without a valid outcome report",
+    });
+    expect(promptCalls).toBe(2);
+  });
+
+  test("recovers a malformed tool call with one corrective turn", async () => {
+    promptImplementation = async () => {
+      if (promptCalls === 1) {
+        emitAssistantText('functions.report_outcome:0{"outcome":"completed"}');
+      } else {
+        await reportOutcome({ outcome: "completed", summary: "Done" });
+      }
+    };
+
+    await expect(
+      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+    ).resolves.toEqual({ outcome: "completed", summary: "Done" });
+    expect(promptCalls).toBe(2);
+  });
+
+  test("disposes the session when prompting fails", async () => {
+    promptImplementation = async () => {
+      throw new Error("Provider unavailable");
+    };
+
+    await expect(
+      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+    ).rejects.toThrow("Provider unavailable");
+    expect(disposed).toBe(true);
+  });
+
+  test("rejects unavailable models before creating a session", async () => {
+    modelAvailable = false;
+
+    await expect(
+      runAgent("Do the thing", { model: "anthropic/missing" }),
+    ).rejects.toThrow("Model anthropic/missing is unavailable");
+    expect(sessionOptions).toBeUndefined();
+  });
+
+  test("applies execution and resource boundaries", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Reviewed" });
+    };
+
+    await runAgent("Review", {
+      model: "anthropic/claude-opus-4-5",
+      cwd: "/tmp/project",
+      tools: ["read"],
+      resources: {
+        agentDir: "/tmp/agent",
+        extensions: false,
+        skills: false,
+        promptTemplates: false,
+        themes: false,
+        contextFiles: false,
+      },
+    });
+
+    expect(sessionOptions.cwd).toBe("/tmp/project");
+    expect(sessionOptions.tools).toEqual(["read", "report_outcome"]);
+    expect(resourceOptions).toMatchObject({
+      cwd: "/tmp/project",
+      agentDir: "/tmp/agent",
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
+      noContextFiles: true,
+    });
+    expect(resourceOptions.appendSystemPromptOverride(["Base prompt"])).toEqual([
+      "Base prompt",
+      expect.stringContaining("non-interactive software factory"),
+    ]);
+  });
+
+  test("aborts and disposes an active session", async () => {
+    const controller = new AbortController();
+    promptImplementation = async () => controller.abort("Stopped");
+
+    await expect(
+      runAgent("Do the thing", {
+        model: "anthropic/claude-opus-4-5",
+        signal: controller.signal,
+      }),
+    ).rejects.toBe("Stopped");
+    expect(abortCalls).toBe(1);
+    expect(disposed).toBe(true);
+  });
+});
+
+describe("agent", () => {
+  test("returns completed reports", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await expect(
+      agent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+    ).resolves.toEqual({ outcome: "completed", summary: "Done" });
+  });
+
+  test("throws an outcome error for unsuccessful reports", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "failed", summary: "Could not finish" });
+    };
+
+    try {
+      await agent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+      throw new Error("Expected agent to reject");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AgentOutcomeError);
+      expect((error as InstanceType<typeof AgentOutcomeError>).report.outcome).toBe(
+        "failed",
+      );
+    }
+  });
 });
 
 describe("requireCompletedReport", () => {
@@ -91,21 +275,17 @@ describe("requireCompletedReport", () => {
     expect(requireCompletedReport(report)).toBe(report);
   });
 
-  test("rejects missing reports", () => {
-    try {
-      requireCompletedReport(undefined);
-      throw new Error("Expected validation to fail");
-    } catch (error) {
-      expect(error).toBe("Agent finished without a valid outcome report");
-    }
-  });
-
-  test("rejects unsuccessful reports with their summary", () => {
+  test("rejects unsuccessful reports while preserving their outcome", () => {
     try {
       requireCompletedReport({ outcome: "blocked", summary: "Need input" });
       throw new Error("Expected validation to fail");
     } catch (error) {
-      expect(error).toBe("Need input");
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe("Need input");
+      expect((error as { report: unknown }).report).toEqual({
+        outcome: "blocked",
+        summary: "Need input",
+      });
     }
   });
 });

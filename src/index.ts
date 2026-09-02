@@ -1,6 +1,11 @@
 export {
   agent,
+  AgentOutcomeError,
   type AgentReport,
+  type AgentResourceOptions,
+  type CompletedAgentReport,
+  requireCompletedReport,
+  runAgent,
   type RunAgentOptions,
 } from "./agent.ts";
 export { cli, type CliArguments } from "./cli.ts";

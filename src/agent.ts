@@ -24,34 +24,58 @@ const reportSchema = Type.Object({
   ]),
   summary: Type.String({
     description: "A concise, single-line summary of the outcome",
+    minLength: 1,
+    maxLength: 500,
+    pattern: "^[^\\r\\n]+$",
   }),
 });
 
 export type AgentReport = Static<typeof reportSchema>;
+export type CompletedAgentReport = AgentReport & { outcome: "completed" };
+
+export interface AgentResourceOptions {
+  /** Directory containing global pi configuration and resources. */
+  agentDir?: string;
+  extensions?: boolean;
+  skills?: boolean;
+  promptTemplates?: boolean;
+  themes?: boolean;
+  contextFiles?: boolean;
+}
 
 export interface RunAgentOptions {
   model: string;
   instructions?: readonly string[];
+  cwd?: string;
+  /** Built-in and extension tools to expose. `report_outcome` is always added. */
+  tools?: readonly string[];
+  resources?: AgentResourceOptions;
+  /** Abort an active model turn. */
+  signal?: AbortSignal;
+}
+
+export class AgentOutcomeError extends Error {
+  override readonly name = "AgentOutcomeError";
+
+  constructor(readonly report: AgentReport) {
+    super(report.summary);
+  }
 }
 
 export function requireCompletedReport(
-  report: AgentReport | undefined,
-): AgentReport {
-  if (report === undefined) {
-    throw "Agent finished without a valid outcome report";
-  }
-
+  report: AgentReport,
+): CompletedAgentReport {
   if (report.outcome !== "completed") {
-    throw report.summary;
+    throw new AgentOutcomeError(report);
   }
 
-  return report;
+  return report as CompletedAgentReport;
 }
 
 export async function agent(
   prompt: string,
   options: RunAgentOptions,
-): Promise<AgentReport> {
+): Promise<CompletedAgentReport> {
   return requireCompletedReport(await runAgent(prompt, options));
 }
 
@@ -73,7 +97,9 @@ export function describeTool(name: string, args: Record<string, unknown>) {
 export async function runAgent(
   prompt: string,
   options: RunAgentOptions,
-): Promise<AgentReport | undefined> {
+): Promise<AgentReport> {
+  options.signal?.throwIfAborted();
+
   let report: AgentReport | undefined;
   let finalText: string | undefined;
 
@@ -97,6 +123,7 @@ export async function runAgent(
     },
   });
 
+  const cwd = options.cwd ?? process.cwd();
   const modelRuntime = await ModelRuntime.create();
   const modelReference = parseModelReference(options.model);
   const model = modelRuntime.getModel(modelReference.provider, modelReference.id);
@@ -109,9 +136,15 @@ export async function runAgent(
     options.instructions ?? [],
   );
 
+  const resources = options.resources;
   const resourceLoader = new DefaultResourceLoader({
-    cwd: process.cwd(),
-    agentDir: getAgentDir(),
+    cwd,
+    agentDir: resources?.agentDir ?? getAgentDir(),
+    noExtensions: resources?.extensions === false,
+    noSkills: resources?.skills === false,
+    noPromptTemplates: resources?.promptTemplates === false,
+    noThemes: resources?.themes === false,
+    noContextFiles: resources?.contextFiles === false,
     appendSystemPromptOverride: (base) => [
       ...base,
       FACTORY_SYSTEM_PROMPT,
@@ -121,13 +154,18 @@ export async function runAgent(
   await resourceLoader.reload();
 
   const { session } = await createAgentSession({
-    cwd: process.cwd(),
+    cwd,
     model,
     modelRuntime,
     resourceLoader,
     sessionManager: SessionManager.inMemory(),
     customTools: [reportOutcome],
-    tools: ["read", "bash", "edit", "write", "report_outcome"],
+    tools: [
+      ...new Set([
+        ...(options.tools ?? ["read", "bash", "edit", "write"]),
+        "report_outcome",
+      ]),
+    ],
   });
 
   session.subscribe((event) => {
@@ -154,21 +192,35 @@ export async function runAgent(
     }
   });
 
-  try {
-    await session.prompt(prompt);
+  const abort = () => {
+    void session.abort().catch((error) => {
+      log.error(
+        `Failed to abort agent: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+  };
 
-    if (
-      report === undefined &&
-      finalText !== undefined &&
-      containsMalformedToolCall(finalText)
-    ) {
-      log.info("Retrying malformed tool call");
+  options.signal?.addEventListener("abort", abort, { once: true });
+
+  try {
+    options.signal?.throwIfAborted();
+    await session.prompt(prompt);
+    options.signal?.throwIfAborted();
+
+    if (report === undefined) {
+      log.info(
+        finalText !== undefined && containsMalformedToolCall(finalText)
+          ? "Retrying malformed outcome report"
+          : "Retrying missing outcome report",
+      );
       finalText = undefined;
       await session.prompt(
-        "Continue the original task. Your previous response encoded a tool call as plain text. Use native tool calling and finish the task.",
+        "Finish the original task by calling report_outcome with the truthful outcome. Use native tool calling; do not respond with plain text.",
       );
+      options.signal?.throwIfAborted();
     }
   } finally {
+    options.signal?.removeEventListener("abort", abort);
     session.dispose();
   }
 
@@ -177,17 +229,11 @@ export async function runAgent(
   }
 
   if (finalText !== undefined && finalText.trim() !== "") {
-    if (containsMalformedToolCall(finalText)) {
-      log.debug("Discarding final text: it still looks like a malformed tool call");
-      return undefined;
-    }
-
-    return {
-      outcome: "completed",
-      summary: toSingleLine(finalText),
-    };
+    log.debug(`Discarding unreported final text: ${toSingleLine(finalText)}`);
   }
 
-  log.debug("Agent produced neither an outcome report nor usable final text");
-  return undefined;
+  return {
+    outcome: "failed",
+    summary: "Agent finished without a valid outcome report",
+  };
 }
