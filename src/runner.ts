@@ -7,6 +7,12 @@ import {
   type FactoryWorkflow,
   type WorkflowInvocation,
 } from "./runtime.ts";
+import {
+  formatTokenUsage,
+  getRecordedTokenUsage,
+  resetTokenUsage,
+  totalTokens,
+} from "./usage.ts";
 
 export function formatDuration(ms: number): string {
   if (ms < 1000) {
@@ -44,6 +50,7 @@ export async function executeWorkflow(
 async function reportExecution(
   run: () => Promise<string | undefined | void> | string | undefined | void,
 ): Promise<void> {
+  resetTokenUsage();
   const start = performance.now();
   try {
     const summary = await run();
@@ -54,6 +61,10 @@ async function reportExecution(
     log.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   } finally {
+    const totals = getRecordedTokenUsage();
+    if (totalTokens(totals) > 0) {
+      log.info(`Total token usage: ${formatTokenUsage(totals)}`);
+    }
     log.info(`Finished in ${formatDuration(performance.now() - start)}`);
   }
 }

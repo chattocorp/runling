@@ -6,6 +6,8 @@ const fakeModel = {
   provider: "anthropic",
 };
 
+const emptyUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+
 let eventHandler: ((event: any) => void) | undefined;
 let promptImplementation: ((prompt: string) => Promise<void>) | undefined;
 let sessionOptions: any;
@@ -62,6 +64,7 @@ const {
   requireCompletedReport,
   runAgent,
 } = await import("./agent.ts");
+const { getRecordedTokenUsage, resetTokenUsage } = await import("./usage.ts");
 
 beforeEach(() => {
   eventHandler = undefined;
@@ -72,6 +75,7 @@ beforeEach(() => {
   abortCalls = 0;
   disposed = false;
   modelAvailable = true;
+  resetTokenUsage();
 });
 
 async function reportOutcome(report: {
@@ -85,6 +89,22 @@ function emitAssistantText(text: string) {
   eventHandler?.({
     type: "message_end",
     message: { role: "assistant", content: [{ type: "text", text }] },
+  });
+}
+
+function emitAssistantUsage(usage: {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}) {
+  eventHandler?.({
+    type: "message_end",
+    message: {
+      role: "assistant",
+      content: [],
+      usage,
+    },
   });
 }
 
@@ -165,7 +185,11 @@ describe("runAgent", () => {
 
     await expect(
       runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
-    ).resolves.toEqual({ outcome: "blocked", summary: "Need access" });
+    ).resolves.toEqual({
+      outcome: "blocked",
+      summary: "Need access",
+      usage: emptyUsage,
+    });
     expect(disposed).toBe(true);
   });
 
@@ -177,6 +201,7 @@ describe("runAgent", () => {
     ).resolves.toEqual({
       outcome: "failed",
       summary: "Agent finished without a valid outcome report",
+      usage: emptyUsage,
     });
     expect(promptCalls).toBe(2);
   });
@@ -192,8 +217,81 @@ describe("runAgent", () => {
 
     await expect(
       runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
-    ).resolves.toEqual({ outcome: "completed", summary: "Done" });
+    ).resolves.toEqual({
+      outcome: "completed",
+      summary: "Done",
+      usage: emptyUsage,
+    });
     expect(promptCalls).toBe(2);
+  });
+
+  test("returns and logs accumulated token usage including cached tokens", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+    promptImplementation = async () => {
+      emitAssistantUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 });
+      emitAssistantUsage({ input: 50, output: 25, cacheRead: 550, cacheWrite: 15 });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    try {
+      await expect(
+        runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      ).resolves.toEqual({
+        outcome: "completed",
+        summary: "Done",
+        usage: {
+          input: 150,
+          output: 45,
+          cacheRead: 1050,
+          cacheWrite: 25,
+        },
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(
+      logs.some((line) =>
+        line.includes(
+          "Token usage: in 150, out 45, cache read 1,050, cache write 25",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  test("records usage into the workflow-wide totals", async () => {
+    promptImplementation = async () => {
+      emitAssistantUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+
+    expect(getRecordedTokenUsage()).toEqual({
+      input: 10,
+      output: 5,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
+  });
+
+  test("returns token usage even when no outcome is reported", async () => {
+    promptImplementation = async () => {
+      if (promptCalls === 1) {
+        emitAssistantUsage({ input: 7, output: 3, cacheRead: 0, cacheWrite: 0 });
+        emitAssistantText("I could not finish");
+      }
+    };
+
+    await expect(
+      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+    ).resolves.toEqual({
+      outcome: "failed",
+      summary: "Agent finished without a valid outcome report",
+      usage: { input: 7, output: 3, cacheRead: 0, cacheWrite: 0 },
+    });
   });
 
   test("disposes the session when prompting fails", async () => {
@@ -275,7 +373,11 @@ describe("agent", () => {
 
     await expect(
       agent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
-    ).resolves.toEqual({ outcome: "completed", summary: "Done" });
+    ).resolves.toEqual({
+      outcome: "completed",
+      summary: "Done",
+      usage: emptyUsage,
+    });
   });
 
   test("throws an outcome error for unsuccessful reports", async () => {
@@ -297,13 +399,21 @@ describe("agent", () => {
 
 describe("requireCompletedReport", () => {
   test("returns completed reports", () => {
-    const report = { outcome: "completed" as const, summary: "Done" };
+    const report = {
+      outcome: "completed" as const,
+      summary: "Done",
+      usage: emptyUsage,
+    };
     expect(requireCompletedReport(report)).toBe(report);
   });
 
   test("rejects unsuccessful reports while preserving their outcome", () => {
     try {
-      requireCompletedReport({ outcome: "blocked", summary: "Need input" });
+      requireCompletedReport({
+        outcome: "blocked",
+        summary: "Need input",
+        usage: emptyUsage,
+      });
       throw new Error("Expected validation to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
@@ -311,6 +421,7 @@ describe("requireCompletedReport", () => {
       expect((error as { report: unknown }).report).toEqual({
         outcome: "blocked",
         summary: "Need input",
+        usage: emptyUsage,
       });
     }
   });

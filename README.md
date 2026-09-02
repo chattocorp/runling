@@ -106,9 +106,20 @@ The invocation contains the quoted `prompt`, the current working directory as
 invocation values that the workflow needs. Workflow modules may also export
 their implementation functions when another workflow needs to compose them.
 
+Every report also carries a `usage` object with the agent's accumulated token
+counts: `input`, `output`, `cacheRead`, and `cacheWrite`. Each interaction logs
+its token usage, and the workflow runner prints workflow-wide totals when it
+finishes:
+
+```
+● [quiet-rivers-1234] Token usage: in 1,200, out 340, cache read 45,678, cache write 890
+● Total token usage: in 3,400, out 980, cache read 120,456, cache write 1,780
+● Finished in 2m31s
+```
+
 Use `agent` as a convenience when anything other than completion should stop the
 workflow. It returns a completed report or throws an `AgentOutcomeError` that
-retains the original report.
+retains the original report and its `usage`.
 
 Agents must finish with the `report_outcome` tool. If an agent fails to do so,
 the runner requests a valid report once more. A second missing report produces a

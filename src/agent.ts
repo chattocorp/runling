@@ -16,6 +16,13 @@ import {
   formatAgentInstructions,
 } from "./system-prompt.ts";
 import { containsMalformedToolCall, toSingleLine } from "./text.ts";
+import {
+  accumulateTokenUsage,
+  emptyTokenUsage,
+  formatTokenUsage,
+  recordTokenUsage,
+  type TokenUsage,
+} from "./usage.ts";
 
 const reportSchema = Type.Object({
   outcome: Type.Union([
@@ -32,7 +39,9 @@ const reportSchema = Type.Object({
 });
 
 export type AgentReport = Static<typeof reportSchema>;
-export type CompletedAgentReport = AgentReport & { outcome: "completed" };
+/** A report enriched with the token usage of the agent interaction. */
+export type AgentResult = AgentReport & { usage: TokenUsage };
+export type CompletedAgentReport = AgentResult & { outcome: "completed" };
 
 export interface AgentResourceOptions {
   /** Directory containing global pi configuration and resources. */
@@ -58,13 +67,13 @@ export interface RunAgentOptions {
 export class AgentOutcomeError extends Error {
   override readonly name = "AgentOutcomeError";
 
-  constructor(readonly report: AgentReport) {
+  constructor(readonly report: AgentResult) {
     super(report.summary);
   }
 }
 
 export function requireCompletedReport(
-  report: AgentReport,
+  report: AgentResult,
 ): CompletedAgentReport {
   if (report.outcome !== "completed") {
     throw new AgentOutcomeError(report);
@@ -98,13 +107,14 @@ export function describeTool(name: string, args: Record<string, unknown>) {
 export async function runAgent(
   prompt: string,
   options: RunAgentOptions,
-): Promise<AgentReport> {
+): Promise<AgentResult> {
   options.signal?.throwIfAborted();
 
   const agentId = randomId();
   const prefixLog = (message: string) => `[${agentId}] ${message}`;
   let report: AgentReport | undefined;
   let finalText: string | undefined;
+  const usage = emptyTokenUsage();
 
   const reportOutcome = defineTool({
     name: "report_outcome",
@@ -194,6 +204,9 @@ export async function runAgent(
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("\n");
+
+      accumulateTokenUsage(usage, event.message.usage);
+      log.debug(prefixLog(`Tokens: ${formatTokenUsage(usage)}`));
     }
   });
 
@@ -233,8 +246,11 @@ export async function runAgent(
     session.dispose();
   }
 
+  log.info(prefixLog(`Token usage: ${formatTokenUsage(usage)}`));
+  recordTokenUsage(usage);
+
   if (report !== undefined) {
-    return report;
+    return { ...report, usage };
   }
 
   if (finalText !== undefined && finalText.trim() !== "") {
@@ -246,5 +262,6 @@ export async function runAgent(
   return {
     outcome: "failed",
     summary: "Agent finished without a valid outcome report",
+    usage,
   };
 }

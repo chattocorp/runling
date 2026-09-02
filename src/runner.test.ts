@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { executeWorkflow, formatDuration } from "./runner.ts";
+import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
 
 const initialExitCode = process.exitCode;
 
 afterEach(() => {
   process.exitCode = initialExitCode ?? 0;
+  resetTokenUsage();
 });
 
 describe("executeWorkflow", () => {
@@ -81,6 +83,66 @@ describe("executeWorkflow", () => {
     }
 
     expect(logs.some((line) => line.includes("Finished in "))).toBe(true);
+  });
+
+  test("logs accumulated token usage from agent interactions", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+
+    try {
+      await executeWorkflow(async () => {
+        recordTokenUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 });
+        recordTokenUsage({ input: 50, output: 25, cacheRead: 550, cacheWrite: 15 });
+      }, invocation);
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(
+      logs.some((line) =>
+        line.includes(
+          "Total token usage: in 150, out 45, cache read 1,050, cache write 25",
+        ),
+      ),
+    ).toBe(true);
+    expect(logs.some((line) => line.includes("Finished in "))).toBe(true);
+  });
+
+  test("omits the token usage line when no tokens were recorded", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+
+    try {
+      await executeWorkflow(async () => undefined, invocation);
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(logs.some((line) => line.includes("Total token usage"))).toBe(false);
+  });
+
+  test("resets token usage totals between executions", async () => {
+    recordTokenUsage({ input: 999, output: 999, cacheRead: 999, cacheWrite: 999 });
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+
+    try {
+      await executeWorkflow(async () => {
+        recordTokenUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
+      }, invocation);
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(
+      logs.some((line) =>
+        line.includes("Total token usage: in 10, out 5"),
+      ),
+    ).toBe(true);
+    expect(logs.some((line) => line.includes("999"))).toBe(false);
   });
 });
 
