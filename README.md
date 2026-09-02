@@ -9,15 +9,17 @@ workflow script owns the policy: loops, retries, validation commands, model
 choices, and decisions based on agent outcomes all belong in the script.
 
 The root `workflow.ts` is an example that uses the framework to develop this
-repository. It asks an agent to make a change, detects whether the agent changed
-the working tree, runs the tests, and gives an agent up to two opportunities to
-repair test failures.
+repository. It creates an isolated Git worktree and branch, asks an agent to
+make the requested change there, runs the project checks, and gives an agent up
+to two opportunities to repair failures. A successful run commits and pushes
+the change, opens a pull request, and prints its URL.
 
 ## Requirements
 
 - [Bun](https://bun.com) 1.4.0
 - `pi` 0.84.4 with credentials for the model selected by the workflow
-- Git
+- Git with an `origin` push remote
+- [GitHub CLI](https://cli.github.com) authenticated for that remote
 
 The tool versions are declared in `mise.toml`. Install the dependencies with:
 
@@ -28,6 +30,12 @@ bun install
 
 The example currently uses `openrouter/z-ai/glm-5.3-flash`, so pi must be able to
 authenticate with OpenRouter before that workflow can run.
+
+The worktree parent directory is configured by `worktreesDirectory` near the
+top of `workflow.ts`. Its default is `../factory-worktrees`, relative to the
+directory where the workflow is started. The workflow removes a worktree after
+successfully opening its pull request. A failed run retains its worktree so the
+partial change and failure can be inspected.
 
 ## Running the example
 
