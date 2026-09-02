@@ -7,6 +7,11 @@ export type LogLevel = "info" | "debug";
 
 export const log = {
   level: "info" as LogLevel,
+  debug: (message: string) => {
+    if (log.level === "debug") {
+      console.log(`${paint("gray", "·")} ${message}`);
+    }
+  },
   info: (message: string) =>
     console.log(`${paint("dodgerblue", "●")} ${message}`),
   success: (message: string) =>

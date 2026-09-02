@@ -188,6 +188,7 @@ export async function runAgent(
 
   if (finalText !== undefined && finalText.trim() !== "") {
     if (containsMalformedToolCall(finalText)) {
+      log.debug("Discarding final text: it still looks like a malformed tool call");
       return undefined;
     }
 
@@ -196,4 +197,7 @@ export async function runAgent(
       summary: toSingleLine(finalText),
     };
   }
+
+  log.debug("Agent produced neither an outcome report nor usable final text");
+  return undefined;
 }
