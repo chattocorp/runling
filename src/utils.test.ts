@@ -51,6 +51,24 @@ describe("withRetries", () => {
     expect(attempts).toEqual([1, 2, 3]);
   });
 
+  test("runs the retry hook only before another attempt", async () => {
+    const failures: string[] = [];
+
+    await expect(
+      withRetries(
+        3,
+        (attempt) => {
+          throw new Error(`failure ${attempt}`);
+        },
+        (error, attempt) => {
+          failures.push(`${attempt}:${(error as Error).message}`);
+        },
+      ),
+    ).rejects.toThrow("failure 3");
+
+    expect(failures).toEqual(["1:failure 1", "2:failure 2"]);
+  });
+
   test("rethrows the final error after exhausting all attempts", async () => {
     const finalError = new Error("still broken");
 

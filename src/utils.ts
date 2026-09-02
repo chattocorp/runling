@@ -24,6 +24,7 @@ export function concat(...parts: ConcatPart[]): string {
 export async function withRetries<T>(
   times: number,
   fn: (attempt: number) => T | Promise<T>,
+  onRetry?: (error: unknown, attempt: number) => unknown | Promise<unknown>,
 ): Promise<T> {
   if (!Number.isInteger(times) || times < 1) {
     throw new RangeError("times must be a positive integer");
@@ -36,6 +37,10 @@ export async function withRetries<T>(
       return await fn(attempt);
     } catch (error) {
       lastError = error;
+
+      if (attempt < times) {
+        await onRetry?.(error, attempt);
+      }
     }
   }
 
