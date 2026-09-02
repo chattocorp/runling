@@ -1,18 +1,15 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-  cli,
-  concat,
-  createShell,
-  log,
-  randomId,
-  workflow,
+import type {
+  FactoryRuntime,
+  FactoryWorkflow,
+  WorkflowInvocation,
 } from "../src/index.ts";
 import { implement } from "./implement.ts";
 
 const worktreesDirectory = "../factory-worktrees";
 
-function createBranchName(prompt: string) {
+function createBranchName(prompt: string, randomId: FactoryRuntime["randomId"]) {
   const slug = prompt
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -23,21 +20,28 @@ function createBranchName(prompt: string) {
   return `factory/${slug || "change"}-${randomId()}`;
 }
 
-await workflow(async () => {
-  const { prompt, verbose } = cli();
+async function makePullRequest(
+  factory: FactoryRuntime,
+  invocation: WorkflowInvocation,
+): Promise<string> {
+  const { concat, createShell, log, randomId } = factory;
+  const { cwd, prompt, verbose } = invocation;
   const $ = createShell({ verbose });
-  await $`gh auth status`;
+  await $`gh auth status`.cwd(cwd);
 
-  const branchName = createBranchName(prompt);
-  const worktreesPath = resolve(worktreesDirectory);
+  const branchName = createBranchName(prompt, randomId);
+  const worktreesPath = resolve(cwd, worktreesDirectory);
   const worktreePath = resolve(worktreesPath, branchName.replaceAll("/", "-"));
 
   await mkdir(worktreesPath, { recursive: true });
-  await $`git worktree add -b ${branchName} ${worktreePath}`;
+  await $`git worktree add -b ${branchName} ${worktreePath}`.cwd(cwd);
   log.info(`Working in ${worktreePath}`);
 
   await $`bun install --frozen-lockfile`.cwd(worktreePath);
-  const summary = await implement(prompt, { cwd: worktreePath, verbose });
+  const summary = await implement(factory, {
+    ...invocation,
+    cwd: worktreePath,
+  });
 
   await $`git add --all`.cwd(worktreePath);
   await $`git commit -m ${summary}`.cwd(worktreePath);
@@ -61,4 +65,6 @@ await workflow(async () => {
   await $`git worktree remove ${worktreePath}`;
 
   return pullRequestUrl;
-});
+}
+
+export default makePullRequest satisfies FactoryWorkflow;

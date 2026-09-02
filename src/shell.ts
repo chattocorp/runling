@@ -1,5 +1,7 @@
 import { $ } from "bun";
 
+export const ShellError = $.ShellError;
+
 export interface CreateShellOptions {
   verbose?: boolean;
 }

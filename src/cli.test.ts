@@ -3,41 +3,44 @@ import { cli } from "./cli.ts";
 import { log } from "./log.ts";
 
 describe("cli", () => {
-  test("parses a prompt with quiet output by default", () => {
-    expect(cli(["make the change"])).toEqual({
+  test("parses a workflow and prompt with quiet output by default", () => {
+    expect(cli(["workflows/implement.ts", "make the change"])).toEqual({
+      workflowPath: "workflows/implement.ts",
       prompt: "make the change",
       verbose: false,
     });
   });
 
   test("accepts both verbose flags", () => {
-    expect(cli(["-v", "make the change"]).verbose).toBe(true);
+    expect(cli(["-v", "workflow.ts", "make the change"]).verbose).toBe(true);
     expect(log.level).toBe("debug");
-    expect(cli(["--verbose", "make the change"]).verbose).toBe(true);
+    expect(cli(["workflow.ts", "--verbose", "make the change"]).verbose).toBe(
+      true,
+    );
     expect(log.level).toBe("debug");
   });
 
   test("reports missing prompts", () => {
     try {
-      cli([], "bun run workflows/implement.ts");
+      cli([], "factory");
       throw new Error("Expected parsing to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe(
-        "Usage: bun run workflows/implement.ts [-v|--verbose] <prompt>",
+        "Usage: factory [-v|--verbose] <workflow.ts> <prompt>",
       );
     }
   });
 
   test("rejects silently truncated prompts", () => {
-    expect(() => cli(["make", "the change"])).toThrow(
+    expect(() => cli(["workflow.ts", "make", "the change"])).toThrow(
       "The prompt must be passed as a single quoted argument",
     );
   });
 
   test("reports invalid options", () => {
     try {
-      cli(["--unknown", "make the change"]);
+      cli(["--unknown", "workflow.ts", "make the change"]);
       throw new Error("Expected parsing to fail");
     } catch (error) {
       expect(String(error)).toContain("Unknown option");

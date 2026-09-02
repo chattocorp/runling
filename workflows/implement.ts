@@ -1,31 +1,28 @@
-import { $ as bunShell } from "bun";
-import {
-  agent,
-  cli,
-  concat,
-  createShell,
-  getPwd,
-  type Shell,
-  workflow,
+import type {
+  FactoryRuntime,
+  FactoryWorkflow,
+  Shell,
+  WorkflowInvocation,
 } from "../src/index.ts";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
 const agentInstructions = ["Write tests for new or changed features."];
 const maxTestAttempts = 3;
 
-export interface ImplementOptions {
-  cwd?: string;
-  verbose?: boolean;
-}
+async function runChecks(
+  factory: FactoryRuntime,
+  cwd: string,
+  shell: Shell,
+) {
+  const { agent, concat, ShellError } = factory;
 
-async function runChecks(cwd: string, shell: Shell) {
   for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
     try {
       await shell`bun run check`.cwd(cwd);
       return;
     } catch (error) {
       if (
-        !(error instanceof bunShell.ShellError) ||
+        !(error instanceof ShellError) ||
         attempt === maxTestAttempts
       ) {
         throw error;
@@ -46,11 +43,10 @@ async function runChecks(cwd: string, shell: Shell) {
 }
 
 export async function implement(
-  prompt: string,
-  options: ImplementOptions = {},
-) {
-  const cwd = options.cwd ?? process.cwd();
-  const verbose = options.verbose ?? false;
+  factory: FactoryRuntime,
+  { cwd, prompt, verbose }: WorkflowInvocation,
+): Promise<string> {
+  const { agent, createShell, getPwd } = factory;
   const $ = createShell({ verbose });
 
   const pwd = await getPwd(cwd);
@@ -65,7 +61,7 @@ export async function implement(
     throw new Error("Agent completed without changing the worktree");
   }
 
-  await runChecks(cwd, $);
+  await runChecks(factory, cwd, $);
   if (!(await pwd.hasChanges)) {
     throw new Error("The validated worktree no longer contains any changes");
   }
@@ -73,9 +69,4 @@ export async function implement(
   return report.summary;
 }
 
-if (import.meta.main) {
-  await workflow(async () => {
-    const { prompt, verbose } = cli();
-    return implement(prompt, { verbose });
-  });
-}
+export default implement satisfies FactoryWorkflow;

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { formatDuration, workflow } from "./workflow.ts";
+import { executeWorkflow, formatDuration } from "./runner.ts";
 
 const initialExitCode = process.exitCode;
 
@@ -7,14 +7,28 @@ afterEach(() => {
   process.exitCode = initialExitCode ?? 0;
 });
 
-describe("workflow", () => {
+describe("executeWorkflow", () => {
+  const invocation = {
+    cwd: "/project",
+    prompt: "Make the change",
+    verbose: false,
+  };
+
+  test("injects the runtime and invocation", async () => {
+    await executeWorkflow(async (factory, receivedInvocation) => {
+      expect(factory.agent).toBeFunction();
+      expect(factory.createShell).toBeFunction();
+      expect(receivedInvocation).toEqual(invocation);
+    }, invocation);
+  });
+
   test("logs a workflow summary", async () => {
     const logs: string[] = [];
     const originalLog = console.log;
     console.log = (message: string) => logs.push(message);
 
     try {
-      await workflow(async () => "Made the change");
+      await executeWorkflow(async () => "Made the change", invocation);
     } finally {
       console.log = originalLog;
     }
@@ -28,9 +42,9 @@ describe("workflow", () => {
     console.error = (message: string) => errors.push(message);
 
     try {
-      await workflow(async () => {
+      await executeWorkflow(async () => {
         throw "Tests failed";
-      });
+      }, invocation);
     } finally {
       console.error = originalError;
     }
@@ -45,7 +59,7 @@ describe("workflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await workflow(async () => undefined);
+      await executeWorkflow(async () => undefined, invocation);
     } finally {
       console.log = originalLog;
     }
@@ -55,19 +69,15 @@ describe("workflow", () => {
 
   test("logs the elapsed time after a failed run", async () => {
     const logs: string[] = [];
-    const errors: string[] = [];
     const originalLog = console.log;
-    const originalError = console.error;
     console.log = (message: string) => logs.push(message);
-    console.error = (message: string) => errors.push(message);
 
     try {
-      await workflow(async () => {
+      await executeWorkflow(async () => {
         throw "Tests failed";
-      });
+      }, invocation);
     } finally {
       console.log = originalLog;
-      console.error = originalError;
     }
 
     expect(logs.some((line) => line.includes("Finished in "))).toBe(true);
