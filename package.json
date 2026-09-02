@@ -1,6 +1,6 @@
 {
   "name": "factory",
-  "module": "index.ts",
+  "module": "workflow.ts",
   "type": "module",
   "private": true,
   "scripts": {

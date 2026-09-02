@@ -22,7 +22,7 @@ describe("cli", () => {
       cli([]);
       throw new Error("Expected parsing to fail");
     } catch (error) {
-      expect(error).toBe("Usage: bun index.ts [-v|--verbose] <prompt>");
+      expect(error).toBe("Usage: bun workflow.ts [-v|--verbose] <prompt>");
     }
   });
 

@@ -32,7 +32,7 @@ export function cli(argv: readonly string[] = Bun.argv.slice(2)): CliArguments {
 
   const [prompt] = parsed.positionals;
   if (prompt === undefined) {
-    throw "Usage: bun index.ts [-v|--verbose] <prompt>";
+    throw "Usage: bun workflow.ts [-v|--verbose] <prompt>";
   }
 
   const verbose = parsed.values.verbose ?? false;
