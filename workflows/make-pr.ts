@@ -1,6 +1,13 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { cli, concat, createShell, log, workflow } from "../src/index.ts";
+import {
+  cli,
+  concat,
+  createShell,
+  log,
+  randomId,
+  workflow,
+} from "../src/index.ts";
 import { implement } from "./implement.ts";
 
 const worktreesDirectory = "../factory-worktrees";
@@ -13,7 +20,7 @@ function createBranchName(prompt: string) {
     .slice(0, 40)
     .replace(/-$/g, "");
 
-  return `factory/${slug || "change"}-${crypto.randomUUID().slice(0, 8)}`;
+  return `factory/${slug || "change"}-${randomId()}`;
 }
 
 await workflow(async () => {

@@ -10,6 +10,7 @@ export {
 } from "./agent.ts";
 export { cli, type CliArguments } from "./cli.ts";
 export { getPwd, WorkingDirectory, workingTreeHash } from "./git.ts";
+export { randomId } from "./id.ts";
 export { log, type LogLevel } from "./log.ts";
 export {
   createShell,

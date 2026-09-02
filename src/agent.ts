@@ -6,9 +6,8 @@ import {
   ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { randomInt } from "node:crypto";
-import { adjectives, nouns } from "human-id";
 import { Type, type Static } from "typebox";
+import { randomId } from "./id.ts";
 import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
 import { displayPath, displayText } from "./paths.ts";
@@ -102,9 +101,7 @@ export async function runAgent(
 ): Promise<AgentReport> {
   options.signal?.throwIfAborted();
 
-  const adjective = adjectives[randomInt(adjectives.length)];
-  const noun = nouns[randomInt(nouns.length)];
-  const agentId = `${adjective}-${noun}-${randomInt(1_000, 10_000)}`;
+  const agentId = randomId();
   const prefixLog = (message: string) => `[${agentId}] ${message}`;
   let report: AgentReport | undefined;
   let finalText: string | undefined;

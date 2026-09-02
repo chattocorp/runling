@@ -137,6 +137,7 @@ contract.
   nonzero process exit code.
 - `createShell(options)` creates a Bun shell tag that buffers command output by
   default and streams it in verbose mode.
+- `randomId()` generates a human-friendly adjective–noun–number identifier.
 - `concat(...parts)` assembles multiline prompts.
 
 ## Validation
