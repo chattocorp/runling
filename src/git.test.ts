@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, unlink } from "node:fs/promises";
+import { chmod, mkdtemp, rm, symlink, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getPwd, workingTreeHash } from "./git.ts";
@@ -70,6 +70,46 @@ describe("workingTreeHash", () => {
 
     await unlink(path);
     expect(await workingTreeHash(cwd)).toBe(clean);
+  });
+
+  test("includes untracked file modes", async () => {
+    const path = join(cwd, "script.sh");
+    await Bun.write(path, "#!/bin/sh\n");
+    const before = await workingTreeHash(cwd);
+
+    await chmod(path, 0o755);
+
+    expect(await workingTreeHash(cwd)).not.toBe(before);
+  });
+
+  test("includes untracked symlink targets", async () => {
+    await Bun.write(join(cwd, "first.txt"), "same contents\n");
+    await Bun.write(join(cwd, "second.txt"), "same contents\n");
+    const path = join(cwd, "link.txt");
+    await symlink("first.txt", path);
+    const before = await workingTreeHash(cwd);
+
+    await unlink(path);
+    await symlink("second.txt", path);
+
+    expect(await workingTreeHash(cwd)).not.toBe(before);
+  });
+
+  test("supports repositories without a commit", async () => {
+    const freshCwd = await mkdtemp(join(tmpdir(), "factory-unborn-test-"));
+
+    try {
+      await git(freshCwd, "init", "--quiet");
+      await Bun.write(join(freshCwd, "new.txt"), "staged\n");
+      await git(freshCwd, "add", "new.txt");
+      const pwd = await getPwd(freshCwd);
+
+      await Bun.write(join(freshCwd, "new.txt"), "changed\n");
+
+      expect(await pwd.hasChanges).toBe(true);
+    } finally {
+      await rm(freshCwd, { recursive: true, force: true });
+    }
   });
 
   test("working directory snapshots report unchanged state", async () => {

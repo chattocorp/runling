@@ -1,3 +1,5 @@
+import { createReadStream } from "node:fs";
+import { lstat, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
 
 async function git(cwd: string, args: string[]) {
@@ -19,9 +21,59 @@ async function git(cwd: string, args: string[]) {
   return stdout;
 }
 
+async function hasHead(cwd: string) {
+  const process = Bun.spawn(["git", "rev-parse", "--verify", "HEAD"], {
+    cwd,
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  return (await process.exited) === 0;
+}
+
+function updateField(
+  hasher: Bun.CryptoHasher,
+  value: string | ArrayBuffer | Uint8Array,
+) {
+  const bytes =
+    typeof value === "string" ? new TextEncoder().encode(value) : value;
+  hasher.update(`${bytes.byteLength}:`);
+  hasher.update(bytes);
+}
+
+async function updateUntrackedFile(
+  hasher: Bun.CryptoHasher,
+  cwd: string,
+  path: string,
+) {
+  const absolutePath = resolve(cwd, path);
+  const stat = await lstat(absolutePath);
+
+  updateField(hasher, path);
+  updateField(hasher, String(stat.mode));
+
+  if (stat.isSymbolicLink()) {
+    updateField(hasher, await readlink(absolutePath));
+    return;
+  }
+
+  if (!stat.isFile()) {
+    return;
+  }
+
+  updateField(hasher, String(stat.size));
+  for await (const chunk of createReadStream(absolutePath)) {
+    hasher.update(chunk);
+  }
+}
+
 export async function workingTreeHash(cwd = process.cwd()) {
   const hasher = new Bun.CryptoHasher("sha256");
-  hasher.update(await git(cwd, ["diff", "--binary", "HEAD"]));
+  if (await hasHead(cwd)) {
+    updateField(hasher, await git(cwd, ["diff", "--binary", "HEAD"]));
+  } else {
+    updateField(hasher, await git(cwd, ["diff", "--binary", "--cached"]));
+    updateField(hasher, await git(cwd, ["diff", "--binary"]));
+  }
 
   const untrackedFiles = new TextDecoder()
     .decode(
@@ -32,10 +84,7 @@ export async function workingTreeHash(cwd = process.cwd()) {
     .sort();
 
   for (const path of untrackedFiles) {
-    hasher.update(path);
-    hasher.update("\0");
-    hasher.update(await Bun.file(resolve(cwd, path)).arrayBuffer());
-    hasher.update("\0");
+    await updateUntrackedFile(hasher, cwd, path);
   }
 
   return hasher.digest("hex");

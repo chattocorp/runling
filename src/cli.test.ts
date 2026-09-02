@@ -22,8 +22,17 @@ describe("cli", () => {
       cli([]);
       throw new Error("Expected parsing to fail");
     } catch (error) {
-      expect(error).toBe("Usage: bun workflow.ts [-v|--verbose] <prompt>");
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(
+        "Usage: bun workflow.ts [-v|--verbose] <prompt>",
+      );
     }
+  });
+
+  test("rejects silently truncated prompts", () => {
+    expect(() => cli(["make", "the change"])).toThrow(
+      "The prompt must be passed as a single quoted argument",
+    );
   });
 
   test("reports invalid options", () => {

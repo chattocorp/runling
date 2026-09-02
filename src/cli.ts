@@ -27,12 +27,15 @@ export function cli(argv: readonly string[] = Bun.argv.slice(2)): CliArguments {
   try {
     parsed = parseCliArguments(argv);
   } catch (error) {
-    throw error instanceof Error ? error.message : String(error);
+    throw error instanceof Error ? error : new Error(String(error));
   }
 
-  const [prompt] = parsed.positionals;
+  const [prompt, ...extraPositionals] = parsed.positionals;
   if (prompt === undefined) {
-    throw "Usage: bun workflow.ts [-v|--verbose] <prompt>";
+    throw new Error("Usage: bun workflow.ts [-v|--verbose] <prompt>");
+  }
+  if (extraPositionals.length > 0) {
+    throw new Error("The prompt must be passed as a single quoted argument");
   }
 
   const verbose = parsed.values.verbose ?? false;
