@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { workingTreeHash } from "./git.ts";
+import { getPwd, workingTreeHash } from "./git.ts";
 
 async function git(cwd: string, ...args: string[]) {
   const process = Bun.spawn(["git", ...args], {
@@ -70,5 +70,16 @@ describe("workingTreeHash", () => {
 
     await unlink(path);
     expect(await workingTreeHash(cwd)).toBe(clean);
+  });
+
+  test("working directory snapshots report unchanged state", async () => {
+    const pwd = await getPwd(cwd);
+    expect(await pwd.changed).toBe(false);
+  });
+
+  test("working directory snapshots report later changes", async () => {
+    const pwd = await getPwd(cwd);
+    await Bun.write(join(cwd, "tracked.txt"), "changed\n");
+    expect(await pwd.changed).toBe(true);
   });
 });

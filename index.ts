@@ -3,10 +3,10 @@ import {
   cli,
   concat,
   FactoryError,
+  getPwd,
   run,
   withRetries,
   workflow,
-  workingTreeHash,
 } from "./src/index.ts";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
@@ -53,11 +53,11 @@ async function implement(prompt: string) {
 
 await workflow(async () => {
   const { prompt } = cli();
-  const treeBefore = await workingTreeHash();
+  const pwd = await getPwd();
 
   const report = await implement(prompt);
 
-  if (treeBefore !== (await workingTreeHash())) {
+  if (await pwd.changed) {
     await runTests();
   }
 

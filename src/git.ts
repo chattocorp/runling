@@ -40,3 +40,24 @@ export async function workingTreeHash(cwd = process.cwd()) {
 
   return hasher.digest("hex");
 }
+
+export class WorkingDirectory {
+  private constructor(
+    readonly path: string,
+    private readonly initialHash: string,
+  ) {}
+
+  static async create(path = process.cwd()) {
+    return new WorkingDirectory(path, await workingTreeHash(path));
+  }
+
+  get changed(): Promise<boolean> {
+    return workingTreeHash(this.path).then(
+      (currentHash) => currentHash !== this.initialHash,
+    );
+  }
+}
+
+export function getPwd(path = process.cwd()) {
+  return WorkingDirectory.create(path);
+}
