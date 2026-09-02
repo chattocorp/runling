@@ -11,6 +11,7 @@ export {
 export { getPwd, WorkingDirectory, workingTreeHash } from "./git.ts";
 export { randomId } from "./id.ts";
 export { log, type LogLevel } from "./log.ts";
+export { step, type StepWork } from "./step.ts";
 export {
   createShell,
   type CreateShellOptions,

@@ -24,7 +24,7 @@ async function makePullRequest(
   factory: FactoryRuntime,
   invocation: WorkflowInvocation,
 ): Promise<string> {
-  const { concat, createShell, log, randomId } = factory;
+  const { concat, createShell, log, randomId, step } = factory;
   const { cwd, prompt, verbose } = invocation;
   const $ = createShell({ verbose });
   await $`gh auth status`.cwd(cwd);
@@ -38,10 +38,10 @@ async function makePullRequest(
   log.info(`Working in ${worktreePath}`);
 
   await $`bun install --frozen-lockfile`.cwd(worktreePath);
-  const summary = await implement(factory, {
-    ...invocation,
-    cwd: worktreePath,
-  });
+  const summary = await step(
+    `Implementing change in ${worktreePath}`,
+    () => implement(factory, { ...invocation, cwd: worktreePath }),
+  );
 
   await $`git add --all`.cwd(worktreePath);
   await $`git commit -m ${summary}`.cwd(worktreePath);

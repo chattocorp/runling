@@ -8,6 +8,7 @@ import { getPwd, workingTreeHash } from "./git.ts";
 import { randomId } from "./id.ts";
 import { log } from "./log.ts";
 import { createShell, ShellError } from "./shell.ts";
+import { step } from "./step.ts";
 import { concat } from "./utils.ts";
 
 export interface WorkflowInvocation {
@@ -25,6 +26,7 @@ export const factoryRuntime = Object.freeze({
   workingTreeHash,
   randomId,
   log,
+  step,
   createShell,
   ShellError,
   concat,

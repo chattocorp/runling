@@ -20,6 +20,7 @@ describe("executeWorkflow", () => {
     await executeWorkflow(async (factory, receivedInvocation) => {
       expect(factory.agent).toBeFunction();
       expect(factory.createShell).toBeFunction();
+      expect(factory.step).toBeFunction();
       expect(receivedInvocation).toEqual(invocation);
     }, invocation);
   });
@@ -36,6 +37,34 @@ describe("executeWorkflow", () => {
     }
 
     expect(logs.some((line) => line.includes("Made the change"))).toBe(true);
+  });
+
+  test("indents workflow log output below the factory greeting", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+
+    try {
+      await executeWorkflow(async ({ log }) => {
+        log.info("inside the workflow");
+        return "Made the change";
+      }, invocation);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const greeting = logs.find((line) => line.includes("Factory starting"));
+    const inside = logs.find((line) => line.includes("inside the workflow"));
+    const summary = logs.find((line) => line.includes("Made the change"));
+    const finished = logs.find((line) => line.includes("Finished in "));
+
+    expect(greeting).toBeDefined();
+    expect(greeting).not.toMatch(/^\s/);
+    expect(inside).toBeDefined();
+    expect(inside).toMatch(/^ {2}/);
+    expect(summary).toBeDefined();
+    expect(summary).not.toMatch(/^\s/);
+    expect(finished).not.toMatch(/^\s/);
   });
 
   test("logs failures and applies a nonzero exit code", async () => {

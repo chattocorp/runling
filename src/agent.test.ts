@@ -131,6 +131,32 @@ describe("describeTool", () => {
 });
 
 describe("runAgent", () => {
+  test("indents agent log output under its step label", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+    promptImplementation = async () => {
+      eventHandler?.({ type: "agent_start" });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    try {
+      await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+    } finally {
+      console.log = originalLog;
+    }
+
+    const label = logs.find((line) =>
+      /Agent [a-z]+-[a-z]+-\d{4}$/.test(line),
+    );
+    const started = logs.find((line) => line.includes("Agent started"));
+
+    expect(label).toBeDefined();
+    expect(label).not.toMatch(/^\s/);
+    expect(started).toBeDefined();
+    expect(started).toMatch(/^ {2}/);
+  });
+
   test("prefixes every log line with one human-friendly agent ID", async () => {
     const logs: string[] = [];
     const errors: string[] = [];

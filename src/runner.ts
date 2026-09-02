@@ -44,7 +44,9 @@ export async function executeWorkflow(
   workflow: FactoryWorkflow,
   invocation: WorkflowInvocation,
 ): Promise<void> {
-  await reportExecution(() => workflow(factoryRuntime, invocation));
+  await reportExecution(() =>
+    log.indented(() => workflow(factoryRuntime, invocation)),
+  );
 }
 
 async function reportExecution(
@@ -52,6 +54,7 @@ async function reportExecution(
 ): Promise<void> {
   resetTokenUsage();
   const start = performance.now();
+  log.info("Factory starting");
   try {
     const summary = await run();
     if (summary !== undefined) {
@@ -85,6 +88,8 @@ export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
     const { workflowPath, prompt, verbose } = cli(argv, "factory");
     const cwd = process.cwd();
     const workflow = await loadWorkflow(workflowPath);
-    return workflow(factoryRuntime, { cwd, prompt, verbose });
+    return log.indented(() =>
+      workflow(factoryRuntime, { cwd, prompt, verbose }),
+    );
   });
 }

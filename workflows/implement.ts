@@ -14,11 +14,14 @@ async function runChecks(
   cwd: string,
   shell: Shell,
 ) {
-  const { agent, concat, ShellError } = factory;
+  const { agent, concat, ShellError, step } = factory;
 
   for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
     try {
-      await shell`bun run check`.cwd(cwd);
+      await step(
+        `Running checks (attempt ${attempt}/${maxTestAttempts})`,
+        () => shell`bun run check`.cwd(cwd),
+      );
       return;
     } catch (error) {
       if (
@@ -28,15 +31,19 @@ async function runChecks(
         throw error;
       }
 
-      await agent(
-        concat(
-          "The project checks are failing. Fix the implementation and tests so that `bun run check` passes.",
-          "",
-          "Failing check output:",
-          error.stdout.toString(),
-          error.stderr.toString(),
-        ),
-        { cwd, model, instructions: agentInstructions },
+      await step(
+        `Fixing failing checks (attempt ${attempt}/${maxTestAttempts})`,
+        () =>
+          agent(
+            concat(
+              "The project checks are failing. Fix the implementation and tests so that `bun run check` passes.",
+              "",
+              "Failing check output:",
+              error.stdout.toString(),
+              error.stderr.toString(),
+            ),
+            { cwd, model, instructions: agentInstructions },
+          ),
       );
     }
   }
@@ -46,16 +53,18 @@ export async function implement(
   factory: FactoryRuntime,
   { cwd, prompt, verbose }: WorkflowInvocation,
 ): Promise<string> {
-  const { agent, createShell, getPwd } = factory;
+  const { agent, createShell, getPwd, step } = factory;
   const $ = createShell({ verbose });
 
   const pwd = await getPwd(cwd);
 
-  const report = await agent(prompt, {
-    cwd,
-    model,
-    instructions: agentInstructions,
-  });
+  const report = await step("Implementing requested change", () =>
+    agent(prompt, {
+      cwd,
+      model,
+      instructions: agentInstructions,
+    }),
+  );
 
   if (!(await pwd.hasChanges)) {
     throw new Error("Agent completed without changing the worktree");

@@ -11,6 +11,7 @@ import { randomId } from "./id.ts";
 import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
 import { displayPath, displayText } from "./paths.ts";
+import { step } from "./step.ts";
 import {
   FACTORY_SYSTEM_PROMPT,
   formatAgentInstructions,
@@ -108,9 +109,19 @@ export async function runAgent(
   prompt: string,
   options: RunAgentOptions,
 ): Promise<AgentResult> {
+  const agentId = randomId();
+  return step(`Agent ${agentId}`, () =>
+    runAgentSession(agentId, prompt, options),
+  );
+}
+
+async function runAgentSession(
+  agentId: string,
+  prompt: string,
+  options: RunAgentOptions,
+): Promise<AgentResult> {
   options.signal?.throwIfAborted();
 
-  const agentId = randomId();
   const prefixLog = (message: string) => `[${agentId}] ${message}`;
   let report: AgentReport | undefined;
   let finalText: string | undefined;
