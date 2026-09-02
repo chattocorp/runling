@@ -19,12 +19,12 @@ describe("cli", () => {
 
   test("reports missing prompts", () => {
     try {
-      cli([]);
+      cli([], "bun run workflows/implement.ts");
       throw new Error("Expected parsing to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe(
-        "Usage: bun workflow.ts [-v|--verbose] <prompt>",
+        "Usage: bun run workflows/implement.ts [-v|--verbose] <prompt>",
       );
     }
   });

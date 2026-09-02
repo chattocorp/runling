@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { log } from "./log.ts";
+import { displayPath } from "./paths.ts";
 
 export interface CliArguments {
   prompt: string;
@@ -21,7 +22,10 @@ function parseCliArguments(argv: readonly string[]) {
   });
 }
 
-export function cli(argv: readonly string[] = Bun.argv.slice(2)): CliArguments {
+export function cli(
+  argv: readonly string[] = Bun.argv.slice(2),
+  command = `bun run ${displayPath(Bun.main)}`,
+): CliArguments {
   let parsed: ReturnType<typeof parseCliArguments>;
 
   try {
@@ -32,7 +36,7 @@ export function cli(argv: readonly string[] = Bun.argv.slice(2)): CliArguments {
 
   const [prompt, ...extraPositionals] = parsed.positionals;
   if (prompt === undefined) {
-    throw new Error("Usage: bun workflow.ts [-v|--verbose] <prompt>");
+    throw new Error(`Usage: ${command} [-v|--verbose] <prompt>`);
   }
   if (extraPositionals.length > 0) {
     throw new Error("The prompt must be passed as a single quoted argument");

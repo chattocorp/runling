@@ -8,11 +8,13 @@ workspace state, parsing command-line input, and reporting workflow results. A
 workflow script owns the policy: loops, retries, validation commands, model
 choices, and decisions based on agent outcomes all belong in the script.
 
-The root `workflow.ts` is an example that uses the framework to develop this
-repository. It creates an isolated Git worktree and branch, asks an agent to
-make the requested change there, runs the project checks, and gives an agent up
-to two opportunities to repair failures. A successful run commits and pushes
-the change, opens a pull request, and prints its URL.
+The example workflows in `workflows/` use the framework to develop this
+repository. Both files are executable entrypoints. `workflows/implement.ts`
+asks an agent to make a requested change in the current working directory,
+runs the project checks, and gives an agent up to two opportunities to repair
+failures. `workflows/make-pr.ts` creates an isolated Git worktree and branch,
+calls the same implementation workflow there, then commits and pushes the
+change, opens a pull request, and prints its URL.
 
 ## Requirements
 
@@ -32,17 +34,24 @@ The example currently uses `openrouter/z-ai/glm-5.3-flash`, so pi must be able t
 authenticate with OpenRouter before that workflow can run.
 
 The worktree parent directory is configured by `worktreesDirectory` near the
-top of `workflow.ts`. Its default is `../factory-worktrees`, relative to the
-directory where the workflow is started. The workflow removes a worktree after
-successfully opening its pull request. A failed run retains its worktree so the
-partial change and failure can be inspected.
+top of `workflows/make-pr.ts`. Its default is `../factory-worktrees`, relative
+to the directory where the workflow is started. The workflow removes a
+worktree after successfully opening its pull request. A failed run retains its
+worktree so the partial change and failure can be inspected.
 
-## Running the example
+## Running the workflows
 
-Pass the prompt as one quoted command-line argument:
+Pass the prompt as one quoted command-line argument. To implement and validate
+the change directly in the current working directory:
 
 ```bash
-bun run workflow.ts "Add a focused feature and test it"
+bun run workflows/implement.ts "Add a focused feature and test it"
+```
+
+To implement the change in an isolated worktree and open a pull request:
+
+```bash
+bun run workflows/make-pr.ts "Add a focused feature and test it"
 ```
 
 By default, raw command output is suppressed while workflow progress and the
@@ -50,7 +59,7 @@ final result remain visible. Use `--verbose` or `-v` to include debug logging
 and command output:
 
 ```bash
-bun run workflow.ts --verbose "Investigate and fix the failing test"
+bun run workflows/make-pr.ts --verbose "Investigate and fix the failing test"
 ```
 
 ## Writing a workflow
