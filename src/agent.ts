@@ -9,6 +9,7 @@ import {
 import { Type, type Static } from "typebox";
 import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
+import { displayPath, displayText } from "./paths.ts";
 import {
   FACTORY_SYSTEM_PROMPT,
   formatAgentInstructions,
@@ -33,18 +34,27 @@ export interface RunAgentOptions {
   instructions?: readonly string[];
 }
 
-function describeTool(name: string, args: Record<string, unknown>) {
+const toolEmojis: Record<string, string> = {
+  read: "📖",
+  edit: "✏️",
+  write: "📝",
+  bash: "🐚",
+  report_outcome: "📋",
+};
+
+export function describeTool(name: string, args: Record<string, unknown>) {
+  const emoji = toolEmojis[name] ?? "🔧";
   switch (name) {
     case "read":
-      return `Reading ${args.path}`;
+      return `${emoji} Reading ${displayPath(String(args.path))}`;
     case "edit":
-      return `Editing ${args.path}`;
+      return `${emoji} Editing ${displayPath(String(args.path))}`;
     case "write":
-      return `Writing ${args.path}`;
+      return `${emoji} Writing ${displayPath(String(args.path))}`;
     case "bash":
-      return `Running ${String(args.command).replaceAll("\n", " ")}`;
+      return `${emoji} Running ${displayText(String(args.command).replaceAll("\n", " "))}`;
     default:
-      return `Using ${name}`;
+      return `${emoji} Using ${name}`;
   }
 }
 
