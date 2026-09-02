@@ -6,6 +6,7 @@ import {
   ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { humanId } from "human-id";
 import { Type, type Static } from "typebox";
 import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
@@ -100,6 +101,8 @@ export async function runAgent(
 ): Promise<AgentReport> {
   options.signal?.throwIfAborted();
 
+  const agentId = humanId({ separator: "-", capitalize: false });
+  const prefixLog = (message: string) => `[${agentId}] ${message}`;
   let report: AgentReport | undefined;
   let finalText: string | undefined;
 
@@ -170,18 +173,20 @@ export async function runAgent(
 
   session.subscribe((event) => {
     if (event.type === "agent_start") {
-      log.info(`Agent started (model: ${model.provider}/${model.id})`);
+      log.info(
+        prefixLog(`Agent started (model: ${model.provider}/${model.id})`),
+      );
     }
 
     if (
       event.type === "tool_execution_start" &&
       event.toolName !== "report_outcome"
     ) {
-      log.info(describeTool(event.toolName, event.args));
+      log.info(prefixLog(describeTool(event.toolName, event.args)));
     }
 
     if (event.type === "tool_execution_end" && event.isError) {
-      log.error(`${event.toolName} failed`);
+      log.error(prefixLog(`${event.toolName} failed`));
     }
 
     if (event.type === "message_end" && event.message.role === "assistant") {
@@ -195,7 +200,9 @@ export async function runAgent(
   const abort = () => {
     void session.abort().catch((error) => {
       log.error(
-        `Failed to abort agent: ${error instanceof Error ? error.message : String(error)}`,
+        prefixLog(
+          `Failed to abort agent: ${error instanceof Error ? error.message : String(error)}`,
+        ),
       );
     });
   };
@@ -209,9 +216,11 @@ export async function runAgent(
 
     if (report === undefined) {
       log.info(
-        finalText !== undefined && containsMalformedToolCall(finalText)
-          ? "Retrying malformed outcome report"
-          : "Retrying missing outcome report",
+        prefixLog(
+          finalText !== undefined && containsMalformedToolCall(finalText)
+            ? "Retrying malformed outcome report"
+            : "Retrying missing outcome report",
+        ),
       );
       finalText = undefined;
       await session.prompt(
@@ -229,7 +238,9 @@ export async function runAgent(
   }
 
   if (finalText !== undefined && finalText.trim() !== "") {
-    log.debug(`Discarding unreported final text: ${toSingleLine(finalText)}`);
+    log.debug(
+      prefixLog(`Discarding unreported final text: ${toSingleLine(finalText)}`),
+    );
   }
 
   return {

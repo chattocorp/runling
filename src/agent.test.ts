@@ -111,25 +111,51 @@ describe("describeTool", () => {
 });
 
 describe("runAgent", () => {
-  test("logs the model when the agent starts", async () => {
+  test("prefixes every log line with one human-friendly agent ID", async () => {
     const logs: string[] = [];
+    const errors: string[] = [];
     const originalLog = console.log;
+    const originalError = console.error;
     console.log = (message: string) => logs.push(message);
+    console.error = (message: string) => errors.push(message);
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
 
     try {
       await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
 
       expect(eventHandler).toBeDefined();
       eventHandler?.({ type: "agent_start" });
+      eventHandler?.({
+        type: "tool_execution_start",
+        toolName: "read",
+        args: { path: "src/foo.ts" },
+      });
+      eventHandler?.({
+        type: "tool_execution_end",
+        toolName: "bash",
+        isError: true,
+      });
     } finally {
       console.log = originalLog;
+      console.error = originalError;
     }
 
-    expect(
-      logs.some((line) =>
-        line.includes("Agent started (model: anthropic/claude-opus-4-5)"),
-      ),
-    ).toBe(true);
+    const id = logs
+      .find((line) => line.includes("Agent started"))
+      ?.match(/\[([a-z]+-[a-z]+-[a-z]+)\]/)?.[1];
+
+    expect(id).toBeDefined();
+    expect(logs.some((line) => line.includes(`[${id}] Agent started`))).toBe(
+      true,
+    );
+    expect(logs.some((line) => line.includes(`[${id}] Reading src/foo.ts`))).toBe(
+      true,
+    );
+    expect(errors.some((line) => line.includes(`[${id}] bash failed`))).toBe(
+      true,
+    );
   });
 
   test("returns the structured outcome reported by the agent", async () => {
