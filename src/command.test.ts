@@ -20,4 +20,10 @@ describe("run", () => {
       expect((error as FactoryError).exitCode).toBe(3);
     }
   });
+
+  test("returns non-zero results when checking a command", async () => {
+    const result = await run.check("Checking command")`exit 7`;
+
+    expect(result.exitCode).toBe(7);
+  });
 });
