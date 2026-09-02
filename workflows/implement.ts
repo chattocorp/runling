@@ -9,44 +9,37 @@ const model = "openrouter/z-ai/glm-5.3-flash";
 const agentInstructions = ["Write tests for new or changed features."];
 const maxTestAttempts = 3;
 
-async function runChecks(
-  factory: FactoryRuntime,
-  cwd: string,
-  shell: Shell,
-) {
+async function runChecks(factory: FactoryRuntime, cwd: string, shell: Shell) {
   const { agent, concat, ShellError, step } = factory;
 
-  for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
-    try {
+  await step("QA", async () => {
+    for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
       await step(
-        `Running checks (attempt ${attempt}/${maxTestAttempts})`,
-        () => shell`bun run check`.cwd(cwd),
-      );
-      return;
-    } catch (error) {
-      if (
-        !(error instanceof ShellError) ||
-        attempt === maxTestAttempts
-      ) {
-        throw error;
-      }
+        `Running tests (attempt ${attempt}/${maxTestAttempts})`,
+        async () => {
+          try {
+            await shell`bun run check`.cwd(cwd);
+            return;
+          } catch (error) {
+            if (!(error instanceof ShellError) || attempt === maxTestAttempts) {
+              throw error;
+            }
 
-      await step(
-        `Fixing failing checks (attempt ${attempt}/${maxTestAttempts})`,
-        () =>
-          agent(
-            concat(
-              "The project checks are failing. Fix the implementation and tests so that `bun run check` passes.",
-              "",
-              "Failing check output:",
-              error.stdout.toString(),
-              error.stderr.toString(),
-            ),
-            { cwd, model, instructions: agentInstructions },
-          ),
+            await agent(
+              concat(
+                "The project checks are failing. Fix the implementation and tests so that `bun run check` passes.",
+                "",
+                "Failing check output:",
+                error.stdout.toString(),
+                error.stderr.toString(),
+              ),
+              { cwd, model, instructions: agentInstructions },
+            );
+          }
+        },
       );
     }
-  }
+  });
 }
 
 export async function implement(

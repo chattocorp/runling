@@ -11,7 +11,6 @@ import { randomId } from "./id.ts";
 import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
 import { displayPath, displayText } from "./paths.ts";
-import { step } from "./step.ts";
 import {
   FACTORY_SYSTEM_PROMPT,
   formatAgentInstructions,
@@ -130,9 +129,7 @@ export async function runAgent(
   const agentId = randomId();
   const color = takeAgentColor();
   return log.withColor(color, () =>
-    step(`Agent ${agentId}`, () =>
-      runAgentSession(agentId, color, prompt, options),
-    ),
+    runAgentSession(agentId, color, prompt, options),
   );
 }
 
@@ -144,7 +141,8 @@ async function runAgentSession(
 ): Promise<AgentResult> {
   options.signal?.throwIfAborted();
 
-  const prefixLog = (message: string) => `[${agentId}] ${message}`;
+  const prefixLog = (message: string) =>
+    `${log.colorize(`[${agentId}]`)} ${message}`;
   const agentLog = {
     debug: (message: string) =>
       log.withColor(color, () => log.debug(prefixLog(message))),

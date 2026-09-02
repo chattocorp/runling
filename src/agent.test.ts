@@ -134,6 +134,7 @@ describe("describeTool", () => {
 describe("runAgent", () => {
   test("uses a distinct, consistent color for each agent", async () => {
     const withColor = spyOn(log, "withColor");
+    const colorize = spyOn(log, "colorize");
     promptImplementation = async () => {
       eventHandler?.({ type: "agent_start" });
       await reportOutcome({ outcome: "completed", summary: "Done" });
@@ -154,12 +155,19 @@ describe("runAgent", () => {
       expect(new Set(firstAgentColors).size).toBe(1);
       expect(new Set(secondAgentColors).size).toBe(1);
       expect(firstAgentColors[0]).not.toBe(secondAgentColors[0]);
+      expect(colorize).toHaveBeenCalled();
+      expect(
+        colorize.mock.calls.every((call) =>
+          /^\[[a-z]+-[a-z]+-\d{4}\]$/.test(call[0]),
+        ),
+      ).toBe(true);
     } finally {
+      colorize.mockRestore();
       withColor.mockRestore();
     }
   });
 
-  test("indents agent log output under its step label", async () => {
+  test("logs agent events without adding another step or indentation", async () => {
     const logs: string[] = [];
     const originalLog = console.log;
     console.log = (message: string) => logs.push(message);
@@ -174,15 +182,13 @@ describe("runAgent", () => {
       console.log = originalLog;
     }
 
-    const label = logs.find((line) =>
-      /Agent [a-z]+-[a-z]+-\d{4}$/.test(line),
-    );
     const started = logs.find((line) => line.includes("Agent started"));
 
-    expect(label).toBeDefined();
-    expect(label).not.toMatch(/^\s/);
+    expect(
+      logs.some((line) => /Agent [a-z]+-[a-z]+-\d{4}$/.test(line)),
+    ).toBe(false);
     expect(started).toBeDefined();
-    expect(started).toMatch(/^ {2}/);
+    expect(started).not.toMatch(/^\s/);
   });
 
   test("prefixes every log line with one human-friendly agent ID", async () => {

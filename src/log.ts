@@ -41,6 +41,11 @@ export const log = {
     console.log(`${indent()}${marker("limegreen", "✓")} ${message}`),
   error: (message: string) =>
     console.error(`${indent()}${marker("crimson", "✗")} ${message}`),
+  /** Renders `text` in the active contextual color, if there is one. */
+  colorize(text: string): string {
+    const color = colorStorage.getStore();
+    return color === undefined ? text : paint(color, text);
+  },
   /** Runs `work` with log markers rendered in `color`. */
   withColor<T>(color: string, work: LoggedWork<T>): T {
     return colorStorage.run(color, work);
