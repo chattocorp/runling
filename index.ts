@@ -1,67 +1,23 @@
-import { $ } from "bun";
-import { parseArgs } from "node:util";
-import { runAgent } from "./src/agent.ts";
-import { workingTreeHash } from "./src/git.ts";
-import { log } from "./src/log.ts";
+import {
+  agent,
+  cli,
+  run,
+  workflow,
+  workingTreeHash,
+} from "./src/index.ts";
 
-const { values, positionals } = parseArgs({
-  args: Bun.argv.slice(2),
-  options: {
-    verbose: {
-      type: "boolean",
-      short: "v",
-      default: false,
-    },
-  },
-  allowPositionals: true,
-  strict: true,
-});
+await workflow(async () => {
+  const { prompt } = cli();
+  const statusBefore = await workingTreeHash();
 
-const [prompt] = positionals;
-const agentModel = "openrouter/z-ai/glm-5.3-flash";
-const agentInstructions = ["Write tests for new or changed features."];
+  const report = await agent(prompt, {
+    model: "openrouter/z-ai/glm-5.3-flash",
+    instructions: ["Write tests for new or changed features."],
+  });
 
-if (prompt === undefined) {
-  log.error("Usage: bun index.ts [-v|--verbose] <prompt>");
-  process.exit(1);
-}
-
-const statusBefore = await workingTreeHash();
-const report = await runAgent(prompt, {
-  model: agentModel,
-  instructions: agentInstructions,
-}).catch((error: unknown) => {
-  log.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
-
-if (report === undefined) {
-  log.error("Agent finished without a valid outcome report");
-  process.exit(2);
-}
-
-if (report.outcome !== "completed") {
-  log.error(report.summary);
-  process.exit(1);
-}
-
-const statusAfter = await workingTreeHash();
-
-if (statusBefore !== statusAfter) {
-  log.info("Running tests");
-  const tests = values.verbose
-    ? await $`bun test`.nothrow()
-    : await $`bun test`.quiet().nothrow();
-
-  if (tests.exitCode !== 0) {
-    if (!values.verbose) {
-      process.stdout.write(tests.stdout);
-      process.stderr.write(tests.stderr);
-    }
-
-    log.error("Tests failed");
-    process.exit(3);
+  if (statusBefore !== (await workingTreeHash())) {
+    await run("Running tests")`bun test`;
   }
-}
 
-log.success(report.summary);
+  return report.summary;
+});
