@@ -1,12 +1,26 @@
 import { $ } from "bun";
+import { parseArgs } from "node:util";
 import { runAgent } from "./src/agent.ts";
 import { workingTreeHash } from "./src/git.ts";
 import { log } from "./src/log.ts";
 
-const [prompt] = Bun.argv.slice(2);
+const { values, positionals } = parseArgs({
+  args: Bun.argv.slice(2),
+  options: {
+    verbose: {
+      type: "boolean",
+      short: "v",
+      default: false,
+    },
+  },
+  allowPositionals: true,
+  strict: true,
+});
+
+const [prompt] = positionals;
 
 if (prompt === undefined) {
-  log.error("Usage: bun index.ts <prompt>");
+  log.error("Usage: bun index.ts [-v|--verbose] <prompt>");
   process.exit(1);
 }
 
@@ -30,9 +44,16 @@ const statusAfter = await workingTreeHash();
 
 if (statusBefore !== statusAfter) {
   log.info("Running tests");
-  const tests = await $`bun test`.nothrow();
+  const tests = values.verbose
+    ? await $`bun test`.nothrow()
+    : await $`bun test`.quiet().nothrow();
 
   if (tests.exitCode !== 0) {
+    if (!values.verbose) {
+      process.stdout.write(tests.stdout);
+      process.stderr.write(tests.stderr);
+    }
+
     log.error("Tests failed");
     process.exit(3);
   }
