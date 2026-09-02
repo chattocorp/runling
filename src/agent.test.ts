@@ -144,7 +144,7 @@ describe("runAgent", () => {
 
     const id = logs
       .find((line) => line.includes("Agent started"))
-      ?.match(/\[([a-z]+-[a-z]+-[a-z]+)\]/)?.[1];
+      ?.match(/\[([a-z]+-[a-z]+-\d{4})\]/)?.[1];
 
     expect(id).toBeDefined();
     expect(logs.some((line) => line.includes(`[${id}] Agent started`))).toBe(
