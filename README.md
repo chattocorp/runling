@@ -45,7 +45,9 @@ Pass the prompt as one quoted command-line argument:
 bun run workflow.ts "Add a focused feature and test it"
 ```
 
-Use `--verbose` or `-v` to include debug logging:
+By default, raw command output is suppressed while workflow progress and the
+final result remain visible. Use `--verbose` or `-v` to include debug logging
+and command output:
 
 ```bash
 bun run workflow.ts --verbose "Investigate and fix the failing test"

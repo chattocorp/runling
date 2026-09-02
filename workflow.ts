@@ -26,10 +26,10 @@ function createBranchName(prompt: string) {
   return `factory/${slug || "change"}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-async function runChecks(cwd: string) {
+async function runChecks(cwd: string, verbose: boolean) {
   for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
     try {
-      await $`bun run check`.cwd(cwd);
+      await $`bun run check`.cwd(cwd).quiet(!verbose);
       return;
     } catch (error) {
       if (!(error instanceof $.ShellError) || attempt === maxTestAttempts) {
@@ -51,8 +51,8 @@ async function runChecks(cwd: string) {
 }
 
 await workflow(async () => {
-  const { prompt } = cli();
-  await $`gh auth status`;
+  const { prompt, verbose } = cli();
+  await $`gh auth status`.quiet(!verbose);
 
   const branchName = createBranchName(prompt);
   const worktreesPath = resolve(worktreesDirectory);
@@ -62,10 +62,12 @@ await workflow(async () => {
   );
 
   await mkdir(worktreesPath, { recursive: true });
-  await $`git worktree add -b ${branchName} ${worktreePath}`;
+  await $`git worktree add -b ${branchName} ${worktreePath}`.quiet(!verbose);
   log.info(`Working in ${worktreePath}`);
 
-  await $`bun install --frozen-lockfile`.cwd(worktreePath);
+  await $`bun install --frozen-lockfile`
+    .cwd(worktreePath)
+    .quiet(!verbose);
   const pwd = await getPwd(worktreePath);
 
   const report = await agent(prompt, {
@@ -78,14 +80,18 @@ await workflow(async () => {
     throw new Error("Agent completed without changing the worktree");
   }
 
-  await runChecks(worktreePath);
+  await runChecks(worktreePath, verbose);
   if (!(await pwd.hasChanges)) {
     throw new Error("The validated worktree no longer contains any changes");
   }
 
-  await $`git add --all`.cwd(worktreePath);
-  await $`git commit -m ${report.summary}`.cwd(worktreePath);
-  await $`git push --set-upstream origin ${branchName}`.cwd(worktreePath);
+  await $`git add --all`.cwd(worktreePath).quiet(!verbose);
+  await $`git commit -m ${report.summary}`
+    .cwd(worktreePath)
+    .quiet(!verbose);
+  await $`git push --set-upstream origin ${branchName}`
+    .cwd(worktreePath)
+    .quiet(!verbose);
 
   const pullRequestBody = concat(
     "## Summary",
@@ -102,7 +108,7 @@ await workflow(async () => {
       .quiet();
   const pullRequestUrl = pullRequest.stdout.toString().trim();
 
-  await $`git worktree remove ${worktreePath}`;
+  await $`git worktree remove ${worktreePath}`.quiet(!verbose);
 
   return pullRequestUrl;
 });
