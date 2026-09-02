@@ -55,27 +55,18 @@ export async function agent(
   return requireCompletedReport(await runAgent(prompt, options));
 }
 
-const toolEmojis: Record<string, string> = {
-  read: "📖",
-  edit: "✏️",
-  write: "📝",
-  bash: "🐚",
-  report_outcome: "📋",
-};
-
 export function describeTool(name: string, args: Record<string, unknown>) {
-  const emoji = toolEmojis[name] ?? "🔧";
   switch (name) {
     case "read":
-      return `${emoji} Reading ${displayPath(String(args.path))}`;
+      return `Reading ${displayPath(String(args.path))}`;
     case "edit":
-      return `${emoji} Editing ${displayPath(String(args.path))}`;
+      return `Editing ${displayPath(String(args.path))}`;
     case "write":
-      return `${emoji} Writing ${displayPath(String(args.path))}`;
+      return `Writing ${displayPath(String(args.path))}`;
     case "bash":
-      return `${emoji} Running ${displayText(String(args.command).replaceAll("\n", " "))}`;
+      return `Running ${displayText(String(args.command).replaceAll("\n", " "))}`;
     default:
-      return `${emoji} Using ${name}`;
+      return `Using ${name}`;
   }
 }
 

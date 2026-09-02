@@ -41,24 +41,24 @@ const { describeTool, requireCompletedReport, runAgent } = await import(
 );
 
 describe("describeTool", () => {
-  test("prefixes known tools with their emoji", () => {
+  test("describes known tools", () => {
     expect(describeTool("read", { path: "src/foo.ts" })).toBe(
-      "📖 Reading src/foo.ts",
+      "Reading src/foo.ts",
     );
     expect(describeTool("edit", { path: "src/foo.ts" })).toBe(
-      "✏️ Editing src/foo.ts",
+      "Editing src/foo.ts",
     );
     expect(describeTool("write", { path: "src/foo.ts" })).toBe(
-      "📝 Writing src/foo.ts",
+      "Writing src/foo.ts",
     );
     expect(describeTool("bash", { command: "bun test" })).toBe(
-      "🐚 Running bun test",
+      "Running bun test",
     );
-    expect(describeTool("report_outcome", {})).toBe("📋 Using report_outcome");
+    expect(describeTool("report_outcome", {})).toBe("Using report_outcome");
   });
 
-  test("falls back to a wrench for unknown tools", () => {
-    expect(describeTool("grep", { pattern: "foo" })).toBe("🔧 Using grep");
+  test("falls back to a generic message for unknown tools", () => {
+    expect(describeTool("grep", { pattern: "foo" })).toBe("Using grep");
   });
 });
 
