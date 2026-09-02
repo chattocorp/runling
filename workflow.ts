@@ -104,5 +104,8 @@ await workflow(async () => {
 
   await $`git worktree remove ${worktreePath}`;
 
+  const joke = "Why do programmers prefer dark mode? Because light attracts bugs.";
+  await $`cowsay ${joke}`;
+
   return pullRequestUrl;
 });
