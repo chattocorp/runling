@@ -20,6 +20,7 @@ function runtimeWith(
     completedReport,
 ) {
   const labels: string[] = [];
+  const messages: string[] = [];
   const shell = (() => ({ cwd: runCheck })) as unknown as Shell;
   class TestShellError extends Error {
     stdout = Buffer.from("stdout");
@@ -31,6 +32,7 @@ function runtimeWith(
     concat: (...parts: string[]) => parts.join("\n"),
     createShell: () => shell,
     getPwd: async () => ({ hasChanges: Promise.resolve(true) }),
+    log: { info: (message: string) => messages.push(message) },
     ShellError: TestShellError,
     step: <T>(label: string, work: () => T): T => {
       labels.push(label);
@@ -38,13 +40,13 @@ function runtimeWith(
     },
   } as unknown as FactoryRuntime;
 
-  return { factory, labels, TestShellError };
+  return { factory, labels, messages, TestShellError };
 }
 
 describe("implement workflow", () => {
   test("stops checking after the first successful attempt", async () => {
     let checks = 0;
-    const { factory, labels } = runtimeWith(async () => {
+    const { factory, labels, messages } = runtimeWith(async () => {
       checks++;
     });
 
@@ -53,11 +55,8 @@ describe("implement workflow", () => {
     );
 
     expect(checks).toBe(1);
-    expect(labels).toEqual([
-      "Implementing requested change",
-      "QA",
-      "Running tests (attempt 1/3)",
-    ]);
+    expect(labels).toEqual(["Implementing requested change", "QA"]);
+    expect(messages).toEqual(["Running tests (attempt 1/3)"]);
   });
 
   test("awaits a repair before retrying a failed check", async () => {
@@ -87,7 +86,11 @@ describe("implement workflow", () => {
     );
 
     expect(checks).toBe(2);
-    expect(setup.labels).toContain("Fixing failing tests (attempt 1/3)");
-    expect(setup.labels).toContain("Running tests (attempt 2/3)");
+    expect(setup.labels).toEqual(["Implementing requested change", "QA"]);
+    expect(setup.messages).toEqual([
+      "Running tests (attempt 1/3)",
+      "Fixing failing tests (attempt 1/3)",
+      "Running tests (attempt 2/3)",
+    ]);
   });
 });

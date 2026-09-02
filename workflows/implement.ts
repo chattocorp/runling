@@ -10,34 +10,31 @@ const agentInstructions = ["Write tests for new or changed features."];
 const maxTestAttempts = 3;
 
 async function runChecks(factory: FactoryRuntime, cwd: string, shell: Shell) {
-  const { agent, concat, ShellError, step } = factory;
+  const { agent, concat, log, ShellError, step } = factory;
 
   await step("QA", async () => {
     for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
-      await step(
-        `Running tests (attempt ${attempt}/${maxTestAttempts})`,
-        async () => {
-          try {
-            await shell`bun run check`.cwd(cwd);
-            return;
-          } catch (error) {
-            if (!(error instanceof ShellError) || attempt === maxTestAttempts) {
-              throw error;
-            }
+      try {
+        log.info(`Running tests (attempt ${attempt}/${maxTestAttempts})`);
+        await shell`bun run check`.cwd(cwd);
+        return;
+      } catch (error) {
+        if (!(error instanceof ShellError) || attempt === maxTestAttempts) {
+          throw error;
+        }
 
-            await agent(
-              concat(
-                "The project checks are failing. Fix the implementation and tests so that `bun run check` passes.",
-                "",
-                "Failing check output:",
-                error.stdout.toString(),
-                error.stderr.toString(),
-              ),
-              { cwd, model, instructions: agentInstructions },
-            );
-          }
-        },
-      );
+        log.info(`Fixing failing tests (attempt ${attempt}/${maxTestAttempts})`);
+        await agent(
+          concat(
+            "The project checks are failing. Fix the implementation and tests so that `bun run check` passes.",
+            "",
+            "Failing check output:",
+            error.stdout.toString(),
+            error.stderr.toString(),
+          ),
+          { cwd, model, instructions: agentInstructions },
+        );
+      }
     }
   });
 }
