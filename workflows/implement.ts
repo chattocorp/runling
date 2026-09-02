@@ -1,5 +1,13 @@
-import { $ } from "bun";
-import { agent, cli, concat, getPwd, workflow } from "../src/index.ts";
+import { $ as bunShell } from "bun";
+import {
+  agent,
+  cli,
+  concat,
+  createShell,
+  getPwd,
+  type Shell,
+  workflow,
+} from "../src/index.ts";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
 const agentInstructions = ["Write tests for new or changed features."];
@@ -10,13 +18,16 @@ export interface ImplementOptions {
   verbose?: boolean;
 }
 
-async function runChecks(cwd: string, verbose: boolean) {
+async function runChecks(cwd: string, shell: Shell) {
   for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
     try {
-      await $`bun run check`.cwd(cwd).quiet(!verbose);
+      await shell`bun run check`.cwd(cwd);
       return;
     } catch (error) {
-      if (!(error instanceof $.ShellError) || attempt === maxTestAttempts) {
+      if (
+        !(error instanceof bunShell.ShellError) ||
+        attempt === maxTestAttempts
+      ) {
         throw error;
       }
 
@@ -40,6 +51,7 @@ export async function implement(
 ) {
   const cwd = options.cwd ?? process.cwd();
   const verbose = options.verbose ?? false;
+  const shell = createShell({ verbose });
 
   const pwd = await getPwd(cwd);
 
@@ -53,7 +65,7 @@ export async function implement(
     throw new Error("Agent completed without changing the worktree");
   }
 
-  await runChecks(cwd, verbose);
+  await runChecks(cwd, shell);
   if (!(await pwd.hasChanges)) {
     throw new Error("The validated worktree no longer contains any changes");
   }

@@ -11,5 +11,10 @@ export {
 export { cli, type CliArguments } from "./cli.ts";
 export { getPwd, WorkingDirectory, workingTreeHash } from "./git.ts";
 export { log, type LogLevel } from "./log.ts";
+export {
+  createShell,
+  type CreateShellOptions,
+  type Shell,
+} from "./shell.ts";
 export { concat, type ConcatPart } from "./utils.ts";
 export { workflow, type Workflow } from "./workflow.ts";

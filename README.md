@@ -135,6 +135,8 @@ contract.
 - `cli(argv)` parses the example workflow's prompt and verbosity flag.
 - `workflow(run)` logs the final summary or converts an uncaught error into a
   nonzero process exit code.
+- `createShell(options)` creates a Bun shell tag that buffers command output by
+  default and streams it in verbose mode.
 - `concat(...parts)` assembles multiline prompts.
 
 ## Validation
