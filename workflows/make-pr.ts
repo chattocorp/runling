@@ -1,12 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-  cli,
-  concat,
-  createShell,
-  log,
-  workflow,
-} from "../src/index.ts";
+import { cli, concat, createShell, log, workflow } from "../src/index.ts";
 import { implement } from "./implement.ts";
 
 const worktreesDirectory = "../factory-worktrees";
@@ -24,26 +18,23 @@ function createBranchName(prompt: string) {
 
 await workflow(async () => {
   const { prompt, verbose } = cli();
-  const shell = createShell({ verbose });
-  await shell`gh auth status`;
+  const $ = createShell({ verbose });
+  await $`gh auth status`;
 
   const branchName = createBranchName(prompt);
   const worktreesPath = resolve(worktreesDirectory);
-  const worktreePath = resolve(
-    worktreesPath,
-    branchName.replaceAll("/", "-"),
-  );
+  const worktreePath = resolve(worktreesPath, branchName.replaceAll("/", "-"));
 
   await mkdir(worktreesPath, { recursive: true });
-  await shell`git worktree add -b ${branchName} ${worktreePath}`;
+  await $`git worktree add -b ${branchName} ${worktreePath}`;
   log.info(`Working in ${worktreePath}`);
 
-  await shell`bun install --frozen-lockfile`.cwd(worktreePath);
+  await $`bun install --frozen-lockfile`.cwd(worktreePath);
   const summary = await implement(prompt, { cwd: worktreePath, verbose });
 
-  await shell`git add --all`.cwd(worktreePath);
-  await shell`git commit -m ${summary}`.cwd(worktreePath);
-  await shell`git push --set-upstream origin ${branchName}`.cwd(worktreePath);
+  await $`git add --all`.cwd(worktreePath);
+  await $`git commit -m ${summary}`.cwd(worktreePath);
+  await $`git push --set-upstream origin ${branchName}`.cwd(worktreePath);
 
   const pullRequestBody = concat(
     "## Summary",
@@ -55,12 +46,12 @@ await workflow(async () => {
     "- `bun run check`",
   );
   const pullRequest =
-    await shell`gh pr create --head ${branchName} --title ${summary.slice(0, 120)} --body ${pullRequestBody}`
+    await $`gh pr create --head ${branchName} --title ${summary.slice(0, 120)} --body ${pullRequestBody}`
       .cwd(worktreePath)
       .quiet();
   const pullRequestUrl = pullRequest.stdout.toString().trim();
 
-  await shell`git worktree remove ${worktreePath}`;
+  await $`git worktree remove ${worktreePath}`;
 
   return pullRequestUrl;
 });

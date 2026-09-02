@@ -51,7 +51,7 @@ export async function implement(
 ) {
   const cwd = options.cwd ?? process.cwd();
   const verbose = options.verbose ?? false;
-  const shell = createShell({ verbose });
+  const $ = createShell({ verbose });
 
   const pwd = await getPwd(cwd);
 
@@ -65,7 +65,7 @@ export async function implement(
     throw new Error("Agent completed without changing the worktree");
   }
 
-  await runChecks(cwd, shell);
+  await runChecks(cwd, $);
   if (!(await pwd.hasChanges)) {
     throw new Error("The validated worktree no longer contains any changes");
   }
