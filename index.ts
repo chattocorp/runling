@@ -18,6 +18,8 @@ const { values, positionals } = parseArgs({
 });
 
 const [prompt] = positionals;
+const agentModel = "openrouter/z-ai/glm-5.3-flash";
+const agentInstructions = ["Write tests for new or changed features."];
 
 if (prompt === undefined) {
   log.error("Usage: bun index.ts [-v|--verbose] <prompt>");
@@ -25,7 +27,10 @@ if (prompt === undefined) {
 }
 
 const statusBefore = await workingTreeHash();
-const report = await runAgent(prompt).catch((error: unknown) => {
+const report = await runAgent(prompt, {
+  model: agentModel,
+  instructions: agentInstructions,
+}).catch((error: unknown) => {
   log.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

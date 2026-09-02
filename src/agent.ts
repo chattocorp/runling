@@ -8,7 +8,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { log } from "./log.ts";
-import { FACTORY_SYSTEM_PROMPT } from "./system-prompt.ts";
+import { parseModelReference } from "./model.ts";
+import {
+  FACTORY_SYSTEM_PROMPT,
+  formatAgentInstructions,
+} from "./system-prompt.ts";
 import { containsMalformedToolCall, toSingleLine } from "./text.ts";
 
 const reportSchema = Type.Object({
@@ -23,6 +27,11 @@ const reportSchema = Type.Object({
 });
 
 export type AgentReport = Static<typeof reportSchema>;
+
+export interface RunAgentOptions {
+  model: string;
+  instructions?: readonly string[];
+}
 
 function describeTool(name: string, args: Record<string, unknown>) {
   switch (name) {
@@ -39,7 +48,10 @@ function describeTool(name: string, args: Record<string, unknown>) {
   }
 }
 
-export async function runAgent(prompt: string): Promise<AgentReport | undefined> {
+export async function runAgent(
+  prompt: string,
+  options: RunAgentOptions,
+): Promise<AgentReport | undefined> {
   let report: AgentReport | undefined;
   let finalText: string | undefined;
 
@@ -64,14 +76,16 @@ export async function runAgent(prompt: string): Promise<AgentReport | undefined>
   });
 
   const modelRuntime = await ModelRuntime.create();
-  const model = modelRuntime.getModel(
-    "openrouter",
-    "anthropic/claude-haiku-4.5",
-  );
+  const modelReference = parseModelReference(options.model);
+  const model = modelRuntime.getModel(modelReference.provider, modelReference.id);
 
   if (model === undefined) {
-    throw new Error("Model openrouter/anthropic/claude-haiku-4.5 is unavailable");
+    throw new Error(`Model ${options.model} is unavailable`);
   }
+
+  const additionalInstructions = formatAgentInstructions(
+    options.instructions ?? [],
+  );
 
   const resourceLoader = new DefaultResourceLoader({
     cwd: process.cwd(),
@@ -79,6 +93,7 @@ export async function runAgent(prompt: string): Promise<AgentReport | undefined>
     appendSystemPromptOverride: (base) => [
       ...base,
       FACTORY_SYSTEM_PROMPT,
+      ...(additionalInstructions === undefined ? [] : [additionalInstructions]),
     ],
   });
   await resourceLoader.reload();

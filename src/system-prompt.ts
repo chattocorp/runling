@@ -12,3 +12,14 @@ Use outcome "completed" only when the request has been fulfilled. Use
 "blocked" when external input or access is required, and "failed" when the
 work was attempted but could not be completed.
 `.trim();
+
+export function formatAgentInstructions(instructions: readonly string[]) {
+  if (instructions.length === 0) {
+    return undefined;
+  }
+
+  return [
+    "Additional instructions for this run:",
+    ...instructions.map((instruction) => `- ${instruction}`),
+  ].join("\n");
+}
