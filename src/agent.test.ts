@@ -93,6 +93,10 @@ function emitAssistantText(text: string) {
   });
 }
 
+function stripAnsi(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 function emitAssistantUsage(usage: {
   input: number;
   output: number;
@@ -222,20 +226,22 @@ describe("runAgent", () => {
       console.error = originalError;
     }
 
-    const id = logs
+    const plainLogs = logs.map(stripAnsi);
+    const plainErrors = errors.map(stripAnsi);
+    const id = plainLogs
       .find((line) => line.includes("Agent started"))
       ?.match(/\[([a-z]+-[a-z]+-\d{4})\]/)?.[1];
 
     expect(id).toBeDefined();
-    expect(logs.some((line) => line.includes(`[${id}] Agent started`))).toBe(
-      true,
-    );
-    expect(logs.some((line) => line.includes(`[${id}] Reading src/foo.ts`))).toBe(
-      true,
-    );
-    expect(errors.some((line) => line.includes(`[${id}] bash failed`))).toBe(
-      true,
-    );
+    expect(
+      plainLogs.some((line) => line.includes(`[${id}] Agent started`)),
+    ).toBe(true);
+    expect(
+      plainLogs.some((line) => line.includes(`[${id}] Reading src/foo.ts`)),
+    ).toBe(true);
+    expect(
+      plainErrors.some((line) => line.includes(`[${id}] bash failed`)),
+    ).toBe(true);
   });
 
   test("returns the structured outcome reported by the agent", async () => {

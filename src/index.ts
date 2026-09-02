@@ -11,6 +11,13 @@ export {
 export { getPwd, WorkingDirectory, workingTreeHash } from "./git.ts";
 export { randomId } from "./id.ts";
 export { log, type LogLevel } from "./log.ts";
+export {
+  type RetryContext,
+  type RetryFailureContext,
+  type RetryFailureHandler,
+  type RetryWork,
+  withRetries,
+} from "./retries.ts";
 export { step, type StepWork } from "./step.ts";
 export {
   createShell,
@@ -19,6 +26,11 @@ export {
   type Shell,
 } from "./shell.ts";
 export { concat, type ConcatPart } from "./utils.ts";
+export {
+  type NamedWorkflow,
+  workflow,
+  type WorkflowHandler,
+} from "./workflow.ts";
 export {
   type FactoryRuntime,
   type FactoryWorkflow,

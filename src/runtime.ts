@@ -7,6 +7,7 @@ import {
 import { getPwd, workingTreeHash } from "./git.ts";
 import { randomId } from "./id.ts";
 import { log } from "./log.ts";
+import { withRetries } from "./retries.ts";
 import { createShell, ShellError } from "./shell.ts";
 import { step } from "./step.ts";
 import { concat } from "./utils.ts";
@@ -27,6 +28,7 @@ export const factoryRuntime = Object.freeze({
   randomId,
   log,
   step,
+  withRetries,
   createShell,
   ShellError,
   concat,

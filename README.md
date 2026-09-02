@@ -73,15 +73,14 @@ factory workflows/make-pr.ts --verbose "Investigate and fix the failing test"
 
 ## Writing a workflow
 
-Every workflow has a default function export. The executable passes the
-framework runtime as its first argument and the invocation details as its
-second. Framework values require no runtime imports; a type-only import provides
-editor and compiler checking:
+Define workflows with `workflow(name, handler)` and export the result. The
+executable passes the framework runtime as the handler's first argument and the
+invocation details as its second:
 
 ```ts
-import type { FactoryWorkflow } from "factory";
+import { workflow } from "factory";
 
-const review: FactoryWorkflow = async ({ runAgent }, { prompt, cwd }) => {
+export default workflow("Review change", async ({ runAgent }, { prompt, cwd }) => {
   const report = await runAgent(prompt, {
     cwd,
     model: "openrouter/z-ai/glm-5.3-flash",
@@ -96,15 +95,39 @@ const review: FactoryWorkflow = async ({ runAgent }, { prompt, cwd }) => {
     case "failed":
       throw new Error(`Review failed: ${report.summary}`);
   }
-};
-
-export default review;
+});
 ```
 
 The invocation contains the quoted `prompt`, the current working directory as
 `cwd`, and the `verbose` flag. Destructure only the framework primitives and
-invocation values that the workflow needs. Workflow modules may also export
-their implementation functions when another workflow needs to compose them.
+invocation values that the workflow needs. A named workflow is an ordinary
+callable, so larger workflows can compose smaller ones by passing along the
+runtime:
+
+```ts
+import { workflow } from "factory";
+
+const qualityAssurance = workflow(
+  "Quality Assurance",
+  async ({ createShell, log, withRetries }, cwd: string) => {
+    const $ = createShell();
+
+    await withRetries(3, async ({ attempt, attempts }) => {
+      log.info(`Running tests (attempt ${attempt}/${attempts})`);
+      await $`bun test`.cwd(cwd);
+    });
+  },
+);
+
+export default workflow("Implement change", async (factory, { cwd }) => {
+  // Implement the change...
+  await qualityAssurance(factory, cwd);
+});
+```
+
+`withRetries` accepts an optional third callback that runs after a failed
+attempt and before the next one. Use it for workflow-specific remediation;
+the framework only controls the attempt sequence.
 
 Every report also carries a `usage` object with the agent's accumulated token
 counts: `input`, `output`, `cacheRead`, and `cacheWrite`. Each interaction logs
@@ -157,6 +180,10 @@ contract.
 
 ## Framework primitives
 
+- `workflow(name, handler)` defines a named, reusable workflow unit.
+- `step(name, work)` runs an inline operation with nested log indentation.
+- `withRetries(attempts, work, onFailure?)` retries work and awaits optional
+  failure handling between attempts.
 - `runAgent(prompt, options)` runs an agent and returns its structured outcome.
 - `agent(prompt, options)` requires a completed outcome.
 - `workingTreeHash(cwd)` fingerprints tracked and untracked Git state.

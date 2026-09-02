@@ -21,6 +21,7 @@ describe("executeWorkflow", () => {
       expect(factory.agent).toBeFunction();
       expect(factory.createShell).toBeFunction();
       expect(factory.step).toBeFunction();
+      expect(factory.withRetries).toBeFunction();
       expect(receivedInvocation).toEqual(invocation);
     }, invocation);
   });
