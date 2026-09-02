@@ -380,6 +380,29 @@ describe("runAgent", () => {
     expect(sessionOptions).toBeUndefined();
   });
 
+  test("forwards the requested thinking level to the session", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Do the thing", {
+      model: "openai-codex/gpt-5.6-sol",
+      thinkingLevel: "medium",
+    });
+
+    expect(sessionOptions.thinkingLevel).toBe("medium");
+  });
+
+  test("leaves the thinking level to pi defaults when unspecified", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+
+    expect(sessionOptions.thinkingLevel).toBeUndefined();
+  });
+
   test("applies execution and resource boundaries", async () => {
     promptImplementation = async () => {
       await reportOutcome({ outcome: "completed", summary: "Reviewed" });

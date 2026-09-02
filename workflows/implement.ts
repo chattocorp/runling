@@ -6,7 +6,8 @@ import {
   type WorkflowInvocation,
 } from "../src/index.ts";
 
-const model = "openrouter/z-ai/glm-5.3-flash";
+const model = "openai-codex/gpt-5.6-sol";
+const thinkingLevel = "medium";
 const agentInstructions = ["Write tests for new or changed features."];
 const maxTestAttempts = 3;
 
@@ -35,7 +36,7 @@ const runChecks = workflow(
             error.stdout.toString(),
             error.stderr.toString(),
           ),
-          { cwd, model, instructions: agentInstructions },
+          { cwd, model, thinkingLevel, instructions: agentInstructions },
         );
       },
     );
@@ -56,6 +57,7 @@ export const implement = workflow(
     const report = await agent(prompt, {
       cwd,
       model,
+      thinkingLevel,
       instructions: agentInstructions,
     });
 

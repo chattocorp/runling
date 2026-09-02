@@ -39,8 +39,9 @@ global command link in `~/.bun/bin`; make sure that directory is on your
 fish_add_path ~/.bun/bin
 ```
 
-The example currently uses `openrouter/z-ai/glm-5.3-flash`, so pi must be able to
-authenticate with OpenRouter before that workflow can run.
+The example currently uses `openai-codex/gpt-5.6-sol` with medium thinking, so pi must
+be able to authenticate with OpenAI (ChatGPT Plus/Pro Codex auth) before that workflow
+can run.
 
 The worktree parent directory is configured by `worktreesDirectory` near the
 top of `workflows/make-pr.ts`. Its default is `../factory-worktrees`, relative
@@ -83,7 +84,8 @@ import { workflow } from "factory";
 export default workflow("Review change", async ({ runAgent }, { prompt, cwd }) => {
   const report = await runAgent(prompt, {
     cwd,
-    model: "openrouter/z-ai/glm-5.3-flash",
+    model: "openai-codex/gpt-5.6-sol",
+    thinkingLevel: "medium",
     tools: ["read"],
   });
 
@@ -161,7 +163,8 @@ Callers can narrow those boundaries without putting policy in the framework:
 
 ```ts
 const report = await runAgent("Inspect the repository", {
-  model: "openrouter/z-ai/glm-5.3-flash",
+  model: "openai-codex/gpt-5.6-sol",
+  thinkingLevel: "medium",
   cwd: "/path/to/repository",
   tools: ["read"],
   signal: AbortSignal.timeout(60_000),

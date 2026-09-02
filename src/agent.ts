@@ -71,8 +71,23 @@ export interface AgentResourceOptions {
   contextFiles?: boolean;
 }
 
+/**
+ * Reasoning effort for models that support extended thinking. "xhigh" and
+ * "max" are only supported by selected model families.
+ */
+export type ThinkingLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
+
 export interface RunAgentOptions {
   model: string;
+  /** Reasoning effort for the model. Defaults to pi's own settings default. */
+  thinkingLevel?: ThinkingLevel;
   instructions?: readonly string[];
   cwd?: string;
   /** Built-in and extension tools to expose. `report_outcome` is always added. */
@@ -208,6 +223,7 @@ async function runAgentSession(
   const { session } = await createAgentSession({
     cwd,
     model,
+    thinkingLevel: options.thinkingLevel,
     modelRuntime,
     resourceLoader,
     sessionManager: SessionManager.inMemory(),
