@@ -15,9 +15,14 @@ const INDENT_UNIT = "  ";
  * same time) from corrupting each other's indentation level.
  */
 const depthStorage = new AsyncLocalStorage<number>();
+const colorStorage = new AsyncLocalStorage<string>();
 
 function indent(): string {
   return INDENT_UNIT.repeat(depthStorage.getStore() ?? 0);
+}
+
+function marker(defaultColor: string, symbol: string): string {
+  return paint(colorStorage.getStore() ?? defaultColor, symbol);
 }
 
 /** A chunk of work whose log output is indented one level deeper. */
@@ -27,15 +32,19 @@ export const log = {
   level: "info" as LogLevel,
   debug: (message: string) => {
     if (log.level === "debug") {
-      console.log(`${indent()}${paint("gray", "·")} ${message}`);
+      console.log(`${indent()}${marker("gray", "·")} ${message}`);
     }
   },
   info: (message: string) =>
-    console.log(`${indent()}${paint("dodgerblue", "●")} ${message}`),
+    console.log(`${indent()}${marker("dodgerblue", "●")} ${message}`),
   success: (message: string) =>
-    console.log(`${indent()}${paint("limegreen", "✓")} ${message}`),
+    console.log(`${indent()}${marker("limegreen", "✓")} ${message}`),
   error: (message: string) =>
-    console.error(`${indent()}${paint("crimson", "✗")} ${message}`),
+    console.error(`${indent()}${marker("crimson", "✗")} ${message}`),
+  /** Runs `work` with log markers rendered in `color`. */
+  withColor<T>(color: string, work: LoggedWork<T>): T {
+    return colorStorage.run(color, work);
+  },
   /**
    * Runs `work` with all of its log output indented one level deeper than the
    * surrounding log output. The indentation level is restored once `work`

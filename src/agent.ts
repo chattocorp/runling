@@ -39,6 +39,24 @@ const reportSchema = Type.Object({
   }),
 });
 
+const AGENT_COLORS = [
+  "#f59f00",
+  "#40c057",
+  "#15aabf",
+  "#4c6ef5",
+  "#ae3ec9",
+  "#e64980",
+  "#f76707",
+  "#12b886",
+] as const;
+let nextAgentColor = 0;
+
+function takeAgentColor(): string {
+  const color = AGENT_COLORS[nextAgentColor % AGENT_COLORS.length]!;
+  nextAgentColor++;
+  return color;
+}
+
 export type AgentReport = Static<typeof reportSchema>;
 /** A report enriched with the token usage of the agent interaction. */
 export type AgentResult = AgentReport & { usage: TokenUsage };
@@ -110,19 +128,31 @@ export async function runAgent(
   options: RunAgentOptions,
 ): Promise<AgentResult> {
   const agentId = randomId();
-  return step(`Agent ${agentId}`, () =>
-    runAgentSession(agentId, prompt, options),
+  const color = takeAgentColor();
+  return log.withColor(color, () =>
+    step(`Agent ${agentId}`, () =>
+      runAgentSession(agentId, color, prompt, options),
+    ),
   );
 }
 
 async function runAgentSession(
   agentId: string,
+  color: string,
   prompt: string,
   options: RunAgentOptions,
 ): Promise<AgentResult> {
   options.signal?.throwIfAborted();
 
   const prefixLog = (message: string) => `[${agentId}] ${message}`;
+  const agentLog = {
+    debug: (message: string) =>
+      log.withColor(color, () => log.debug(prefixLog(message))),
+    error: (message: string) =>
+      log.withColor(color, () => log.error(prefixLog(message))),
+    info: (message: string) =>
+      log.withColor(color, () => log.info(prefixLog(message))),
+  };
   let report: AgentReport | undefined;
   let finalText: string | undefined;
   const usage = emptyTokenUsage();
@@ -194,20 +224,18 @@ async function runAgentSession(
 
   session.subscribe((event) => {
     if (event.type === "agent_start") {
-      log.info(
-        prefixLog(`Agent started (model: ${model.provider}/${model.id})`),
-      );
+      agentLog.info(`Agent started (model: ${model.provider}/${model.id})`);
     }
 
     if (
       event.type === "tool_execution_start" &&
       event.toolName !== "report_outcome"
     ) {
-      log.info(prefixLog(describeTool(event.toolName, event.args)));
+      agentLog.info(describeTool(event.toolName, event.args));
     }
 
     if (event.type === "tool_execution_end" && event.isError) {
-      log.error(prefixLog(`${event.toolName} failed`));
+      agentLog.error(`${event.toolName} failed`);
     }
 
     if (event.type === "message_end" && event.message.role === "assistant") {
@@ -217,16 +245,14 @@ async function runAgentSession(
         .join("\n");
 
       accumulateTokenUsage(usage, event.message.usage);
-      log.debug(prefixLog(`Tokens: ${formatTokenUsage(usage)}`));
+      agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
     }
   });
 
   const abort = () => {
     void session.abort().catch((error) => {
-      log.error(
-        prefixLog(
-          `Failed to abort agent: ${error instanceof Error ? error.message : String(error)}`,
-        ),
+      agentLog.error(
+        `Failed to abort agent: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   };
@@ -239,12 +265,10 @@ async function runAgentSession(
     options.signal?.throwIfAborted();
 
     if (report === undefined) {
-      log.info(
-        prefixLog(
-          finalText !== undefined && containsMalformedToolCall(finalText)
-            ? "Retrying malformed outcome report"
-            : "Retrying missing outcome report",
-        ),
+      agentLog.info(
+        finalText !== undefined && containsMalformedToolCall(finalText)
+          ? "Retrying malformed outcome report"
+          : "Retrying missing outcome report",
       );
       finalText = undefined;
       await session.prompt(
@@ -257,7 +281,7 @@ async function runAgentSession(
     session.dispose();
   }
 
-  log.info(prefixLog(`Token usage: ${formatTokenUsage(usage)}`));
+  agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
   recordTokenUsage(usage);
 
   if (report !== undefined) {
@@ -265,8 +289,8 @@ async function runAgentSession(
   }
 
   if (finalText !== undefined && finalText.trim() !== "") {
-    log.debug(
-      prefixLog(`Discarding unreported final text: ${toSingleLine(finalText)}`),
+    agentLog.debug(
+      `Discarding unreported final text: ${toSingleLine(finalText)}`,
     );
   }
 

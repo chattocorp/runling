@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
 const fakeModel = {
   id: "claude-opus-4-5",
@@ -65,6 +65,7 @@ const {
   runAgent,
 } = await import("./agent.ts");
 const { getRecordedTokenUsage, resetTokenUsage } = await import("./usage.ts");
+const { log } = await import("./log.ts");
 
 beforeEach(() => {
   eventHandler = undefined;
@@ -131,6 +132,33 @@ describe("describeTool", () => {
 });
 
 describe("runAgent", () => {
+  test("uses a distinct, consistent color for each agent", async () => {
+    const withColor = spyOn(log, "withColor");
+    promptImplementation = async () => {
+      eventHandler?.({ type: "agent_start" });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    try {
+      await runAgent("Do the first thing", {
+        model: "anthropic/claude-opus-4-5",
+      });
+      const firstAgentColors = withColor.mock.calls.map((call) => call[0]);
+      withColor.mockClear();
+
+      await runAgent("Do the second thing", {
+        model: "anthropic/claude-opus-4-5",
+      });
+
+      const secondAgentColors = withColor.mock.calls.map((call) => call[0]);
+      expect(new Set(firstAgentColors).size).toBe(1);
+      expect(new Set(secondAgentColors).size).toBe(1);
+      expect(firstAgentColors[0]).not.toBe(secondAgentColors[0]);
+    } finally {
+      withColor.mockRestore();
+    }
+  });
+
   test("indents agent log output under its step label", async () => {
     const logs: string[] = [];
     const originalLog = console.log;
