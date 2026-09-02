@@ -51,7 +51,7 @@ export class WorkingDirectory {
     return new WorkingDirectory(path, await workingTreeHash(path));
   }
 
-  get changed(): Promise<boolean> {
+  get hasChanges(): Promise<boolean> {
     return workingTreeHash(this.path).then(
       (currentHash) => currentHash !== this.initialHash,
     );

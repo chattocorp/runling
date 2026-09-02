@@ -1,5 +1,4 @@
 import { parseArgs } from "node:util";
-import { FactoryError } from "./errors.ts";
 import { log } from "./log.ts";
 
 export interface CliArguments {
@@ -28,16 +27,12 @@ export function cli(argv: readonly string[] = Bun.argv.slice(2)): CliArguments {
   try {
     parsed = parseCliArguments(argv);
   } catch (error) {
-    throw new FactoryError(
-      error instanceof Error ? error.message : String(error),
-      1,
-      { cause: error },
-    );
+    throw error instanceof Error ? error.message : String(error);
   }
 
   const [prompt] = parsed.positionals;
   if (prompt === undefined) {
-    throw new FactoryError("Usage: bun index.ts [-v|--verbose] <prompt>");
+    throw "Usage: bun index.ts [-v|--verbose] <prompt>";
   }
 
   const verbose = parsed.values.verbose ?? false;

@@ -74,12 +74,12 @@ describe("workingTreeHash", () => {
 
   test("working directory snapshots report unchanged state", async () => {
     const pwd = await getPwd(cwd);
-    expect(await pwd.changed).toBe(false);
+    expect(await pwd.hasChanges).toBe(false);
   });
 
   test("working directory snapshots report later changes", async () => {
     const pwd = await getPwd(cwd);
     await Bun.write(join(cwd, "tracked.txt"), "changed\n");
-    expect(await pwd.changed).toBe(true);
+    expect(await pwd.hasChanges).toBe(true);
   });
 });

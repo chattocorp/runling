@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { cli } from "./cli.ts";
-import { FactoryError } from "./errors.ts";
 import { log } from "./log.ts";
 
 describe("cli", () => {
@@ -18,12 +17,21 @@ describe("cli", () => {
     expect(log.level).toBe("debug");
   });
 
-  test("reports missing prompts as workflow errors", () => {
-    expect(() => cli([])).toThrow(FactoryError);
-    expect(() => cli([])).toThrow("Usage: bun index.ts");
+  test("reports missing prompts", () => {
+    try {
+      cli([]);
+      throw new Error("Expected parsing to fail");
+    } catch (error) {
+      expect(error).toBe("Usage: bun index.ts [-v|--verbose] <prompt>");
+    }
   });
 
-  test("reports invalid options as workflow errors", () => {
-    expect(() => cli(["--unknown", "make the change"])).toThrow(FactoryError);
+  test("reports invalid options", () => {
+    try {
+      cli(["--unknown", "make the change"]);
+      throw new Error("Expected parsing to fail");
+    } catch (error) {
+      expect(String(error)).toContain("Unknown option");
+    }
   });
 });

@@ -7,7 +7,6 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
-import { FactoryError } from "./errors.ts";
 import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
 import { displayPath, displayText } from "./paths.ts";
@@ -39,11 +38,11 @@ export function requireCompletedReport(
   report: AgentReport | undefined,
 ): AgentReport {
   if (report === undefined) {
-    throw new FactoryError("Agent finished without a valid outcome report", 2);
+    throw "Agent finished without a valid outcome report";
   }
 
   if (report.outcome !== "completed") {
-    throw new FactoryError(report.summary);
+    throw report.summary;
   }
 
   return report;

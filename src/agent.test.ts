@@ -39,7 +39,6 @@ mock.module("@earendil-works/pi-coding-agent", () => {
 const { describeTool, requireCompletedReport, runAgent } = await import(
   "./agent.ts"
 );
-const { FactoryError } = await import("./errors.ts");
 
 describe("describeTool", () => {
   test("prefixes known tools with their emoji", () => {
@@ -92,19 +91,21 @@ describe("requireCompletedReport", () => {
     expect(requireCompletedReport(report)).toBe(report);
   });
 
-  test("rejects missing reports with a distinct exit code", () => {
+  test("rejects missing reports", () => {
     try {
       requireCompletedReport(undefined);
       throw new Error("Expected validation to fail");
     } catch (error) {
-      expect(error).toBeInstanceOf(FactoryError);
-      expect((error as InstanceType<typeof FactoryError>).exitCode).toBe(2);
+      expect(error).toBe("Agent finished without a valid outcome report");
     }
   });
 
   test("rejects unsuccessful reports with their summary", () => {
-    expect(() =>
-      requireCompletedReport({ outcome: "blocked", summary: "Need input" }),
-    ).toThrow("Need input");
+    try {
+      requireCompletedReport({ outcome: "blocked", summary: "Need input" });
+      throw new Error("Expected validation to fail");
+    } catch (error) {
+      expect(error).toBe("Need input");
+    }
   });
 });
