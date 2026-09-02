@@ -110,7 +110,7 @@ export async function runAgent(
 
   session.subscribe((event) => {
     if (event.type === "agent_start") {
-      log.info("Agent started");
+      log.info(`Agent started (model: ${model.provider}/${model.id})`);
     }
 
     if (
