@@ -26,6 +26,22 @@ function createBranchName(prompt: string) {
   return `factory/${slug || "change"}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
+async function requestJoke(summary: string) {
+  const report = await agent(
+    concat(
+      "A coding agent just implemented the following change:",
+      "",
+      summary,
+      "",
+      "Come up with a short joke (one or two lines) about this change.",
+      'Call report_outcome with outcome "completed" and put only the joke as the summary.',
+    ),
+    { model },
+  );
+
+  return report.summary;
+}
+
 async function runChecks(cwd: string, verbose: boolean) {
   for (let attempt = 1; attempt <= maxTestAttempts; attempt++) {
     try {
@@ -109,6 +125,9 @@ await workflow(async () => {
   const pullRequestUrl = pullRequest.stdout.toString().trim();
 
   await $`git worktree remove ${worktreePath}`.quiet(!verbose);
+
+  const joke = await requestJoke(report.summary);
+  await $`cowsay ${joke}`;
 
   return pullRequestUrl;
 });
