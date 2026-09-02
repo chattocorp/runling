@@ -7,6 +7,7 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
+import { FactoryError } from "./errors.ts";
 import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
 import { displayPath, displayText } from "./paths.ts";
@@ -32,6 +33,27 @@ export type AgentReport = Static<typeof reportSchema>;
 export interface RunAgentOptions {
   model: string;
   instructions?: readonly string[];
+}
+
+export function requireCompletedReport(
+  report: AgentReport | undefined,
+): AgentReport {
+  if (report === undefined) {
+    throw new FactoryError("Agent finished without a valid outcome report", 2);
+  }
+
+  if (report.outcome !== "completed") {
+    throw new FactoryError(report.summary);
+  }
+
+  return report;
+}
+
+export async function agent(
+  prompt: string,
+  options: RunAgentOptions,
+): Promise<AgentReport> {
+  return requireCompletedReport(await runAgent(prompt, options));
 }
 
 const toolEmojis: Record<string, string> = {

@@ -36,7 +36,10 @@ mock.module("@earendil-works/pi-coding-agent", () => {
   };
 });
 
-const { describeTool, runAgent } = await import("./agent.ts");
+const { describeTool, requireCompletedReport, runAgent } = await import(
+  "./agent.ts"
+);
+const { FactoryError } = await import("./errors.ts");
 
 describe("describeTool", () => {
   test("prefixes known tools with their emoji", () => {
@@ -80,5 +83,28 @@ describe("runAgent", () => {
         line.includes("Agent started (model: anthropic/claude-opus-4-5)"),
       ),
     ).toBe(true);
+  });
+});
+
+describe("requireCompletedReport", () => {
+  test("returns completed reports", () => {
+    const report = { outcome: "completed" as const, summary: "Done" };
+    expect(requireCompletedReport(report)).toBe(report);
+  });
+
+  test("rejects missing reports with a distinct exit code", () => {
+    try {
+      requireCompletedReport(undefined);
+      throw new Error("Expected validation to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(FactoryError);
+      expect((error as InstanceType<typeof FactoryError>).exitCode).toBe(2);
+    }
+  });
+
+  test("rejects unsuccessful reports with their summary", () => {
+    expect(() =>
+      requireCompletedReport({ outcome: "blocked", summary: "Need input" }),
+    ).toThrow("Need input");
   });
 });

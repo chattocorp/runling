@@ -3,7 +3,10 @@ function paint(color: string, text: string) {
   return ansi ? `${ansi}${text}\x1b[0m` : text;
 }
 
+export type LogLevel = "info" | "debug";
+
 export const log = {
+  level: "info" as LogLevel,
   info: (message: string) =>
     console.log(`${paint("dodgerblue", "●")} ${message}`),
   success: (message: string) =>
