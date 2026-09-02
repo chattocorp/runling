@@ -1,11 +1,14 @@
 import {
   createAgentSession,
+  DefaultResourceLoader,
   defineTool,
+  getAgentDir,
   ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { log } from "./log.ts";
+import { FACTORY_SYSTEM_PROMPT } from "./system-prompt.ts";
 
 const reportSchema = Type.Object({
   outcome: Type.Union([
@@ -14,8 +17,7 @@ const reportSchema = Type.Object({
     Type.Literal("failed"),
   ]),
   summary: Type.String({
-    description: "A brief, single-line summary of the outcome",
-    maxLength: 160,
+    description: "A concise, single-line summary of the outcome",
   }),
 });
 
@@ -37,15 +39,7 @@ function describeTool(name: string, args: Record<string, unknown>) {
 }
 
 function summarize(text: string) {
-  const paragraphs = text
-    .trim()
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-  const singleLine = (paragraphs.at(-1) ?? "").replace(/\s+/g, " ");
-  return singleLine.length <= 160
-    ? singleLine
-    : `${singleLine.slice(0, 159)}…`;
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function containsMalformedToolCall(text: string) {
@@ -62,12 +56,8 @@ export async function runAgent(prompt: string): Promise<AgentReport | undefined>
     description: "Report the final outcome of the task and terminate the run.",
     promptSnippet: "Report the task outcome as structured data",
     promptGuidelines: [
-    "Always call report_outcome as your final action.",
-    "Do not finish with a plain-text assistant response.",
-    "Keep the summary factual, on one line, and under 160 characters.",
-    "Make the summary the direct result, not a description of your reasoning or the user's request.",
-    "For questions, report completed and put the concise answer in the summary.",
-    "Only report completed after finishing the requested work.",
+      "Always call report_outcome as your final action.",
+      "Do not finish with a plain-text assistant response.",
     ],
     parameters: reportSchema,
     async execute(_toolCallId, params) {
@@ -90,10 +80,21 @@ export async function runAgent(prompt: string): Promise<AgentReport | undefined>
     throw new Error("Model openrouter/anthropic/claude-haiku-4.5 is unavailable");
   }
 
+  const resourceLoader = new DefaultResourceLoader({
+    cwd: process.cwd(),
+    agentDir: getAgentDir(),
+    appendSystemPromptOverride: (base) => [
+      ...base,
+      FACTORY_SYSTEM_PROMPT,
+    ],
+  });
+  await resourceLoader.reload();
+
   const { session } = await createAgentSession({
     cwd: process.cwd(),
     model,
     modelRuntime,
+    resourceLoader,
     sessionManager: SessionManager.inMemory(),
     customTools: [reportOutcome],
     tools: ["read", "bash", "edit", "write", "report_outcome"],
