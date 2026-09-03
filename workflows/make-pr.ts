@@ -8,6 +8,7 @@ const worktreesDirectory = "../factory-worktrees";
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
 
+// Ground generated PR copy in both the agent's intent and the committed diff.
 export const describePullRequest = workflow(
   "Describe pull request",
   async (f, implementationSummary: string, committedChange: string) => {
@@ -48,6 +49,22 @@ export const postReview = workflow(
   },
 );
 
+export const createWorktree = workflow(
+  "Create worktree",
+  async (f, branchName: string, worktreePath: string) => {
+    // Ask GitHub instead of assuming the default branch is named main.
+    const baseBranch = (
+      await f.shell`gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`.text()
+    ).trim();
+    if (baseBranch === "") {
+      throw new Error("GitHub did not report a default branch");
+    }
+
+    await f.shell`git fetch origin +refs/heads/${baseBranch}:refs/remotes/origin/${baseBranch}`;
+    await f.shell`git worktree add -b ${branchName} ${worktreePath} origin/${baseBranch}`;
+  },
+);
+
 const makePullRequest = workflow(
   "Make pull request",
   async (f): Promise<WorkflowResult> => {
@@ -59,18 +76,21 @@ const makePullRequest = workflow(
     const worktreesPath = resolve(cwd, worktreesDirectory);
     const worktreePath = resolve(worktreesPath, worktreeId);
 
+    // Keep implementation work isolated from the caller's checkout.
     await mkdir(worktreesPath, { recursive: true });
-    await f.shell`git worktree add -b ${branchName} ${worktreePath}`;
+    await createWorktree(f, branchName, worktreePath);
     f.log.info(`Working in ${worktreePath}`);
 
     const worktree = { ...f, cwd: worktreePath };
     await worktree.shell`bun install --frozen-lockfile`;
     const implementationSummary = await implement(worktree);
 
+    // Review the complete staged change before capturing it in a commit.
     await worktree.shell`git add --all`;
     const reviewResult = await review(worktree);
     await worktree.shell`git commit -m ${implementationSummary}`;
 
+    // Describe exactly what will appear in the pull request.
     const committedChange =
       await worktree.shell`git show --format=fuller --stat --patch --no-ext-diff HEAD`.text();
     const pullRequest = await describePullRequest(
@@ -84,6 +104,7 @@ const makePullRequest = workflow(
     const pullRequestUrl = createdPullRequest.stdout.toString().trim();
     await postReview(worktree, pullRequestUrl, reviewResult);
 
+    // Failed runs intentionally retain their worktree for inspection.
     await f.shell`git worktree remove ${worktreePath}`;
 
     return {

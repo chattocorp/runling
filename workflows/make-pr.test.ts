@@ -1,8 +1,54 @@
 import { describe, expect, test } from "bun:test";
 import type { Factory, Shell, WorkflowResult } from "../src/index.ts";
-import { describePullRequest, postReview } from "./make-pr.ts";
+import {
+  createWorktree,
+  describePullRequest,
+  postReview,
+} from "./make-pr.ts";
 
 describe("make-pr workflow", () => {
+  test("updates the remote default branch and branches the worktree from it", async () => {
+    const commands: Array<{ template: string; values: unknown[] }> = [];
+    const shell = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      commands.push({ template: strings.join("_argument_"), values });
+      return Object.assign(Promise.resolve(), {
+        text: async () => "master\n",
+      });
+    }) as unknown as Shell;
+    const f = {
+      shell,
+      step: <T>(_label: string, work: () => T) => work(),
+    } as unknown as Factory;
+
+    await createWorktree(
+      f,
+      "factory/bright-otters-2468",
+      "/worktrees/bright-otters-2468",
+    );
+
+    expect(commands).toEqual([
+      {
+        template:
+          "gh repo view --json defaultBranchRef --jq .defaultBranchRef.name",
+        values: [],
+      },
+      {
+        template:
+          "git fetch origin +refs/heads/_argument_:refs/remotes/origin/_argument_",
+        values: ["master", "master"],
+      },
+      {
+        template:
+          "git worktree add -b _argument_ _argument_ origin/_argument_",
+        values: [
+          "factory/bright-otters-2468",
+          "/worktrees/bright-otters-2468",
+          "master",
+        ],
+      },
+    ]);
+  });
+
   test("builds PR metadata from the implementation summary and current commit", async () => {
     let disposed = false;
     let prompt = "";
