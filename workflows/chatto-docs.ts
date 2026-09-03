@@ -29,7 +29,7 @@ export const chattoDocs = workflow(
             "Use only pages on docs.chatto.run as factual sources.",
             "Base the answer on pages retrieved with web_fetch during this run, not prior knowledge.",
             "Put a concise direct answer in the report summary.",
-            "Put supporting explanation in the report details, linking the documentation pages next to the claims they support.",
+            "Put supporting explanation in the report details, linking the documentation pages next to the claims they support, but keep it to two links max.",
             "State clearly when the documentation does not answer some part of the question.",
           ],
         },
@@ -37,6 +37,7 @@ export const chattoDocs = workflow(
     );
 
     const answer = report.details ?? report.summary;
+
     return {
       summary: report.summary,
       details: report.details,
