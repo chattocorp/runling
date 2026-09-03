@@ -39,7 +39,11 @@ describe("make-pr workflow", () => {
     } as unknown as Factory;
 
     await expect(
-      describePullRequest(f, "Changed the behavior to fix the bug"),
+      describePullRequest(
+        f,
+        "Changed the behavior to fix the bug",
+        "commit abc123\n\ndiff --git a/foo.ts b/foo.ts",
+      ),
     ).resolves.toEqual({
       title: "Explain the change",
       body: "## Summary\n\nExplains the change and why.",
@@ -49,10 +53,10 @@ describe("make-pr workflow", () => {
       cwd: "/worktree",
       model: "openai-codex/gpt-5.6-sol",
       thinkingLevel: "medium",
-      tools: ["read", "bash"],
+      tools: ["read", "grep", "find", "ls"],
     });
     expect(prompt).toContain("Changed the behavior to fix the bug");
-    expect(prompt).toContain("Inspect the commit and its diff with git");
+    expect(prompt).toContain("diff --git a/foo.ts b/foo.ts");
     expect(disposed).toBe(true);
   });
 });

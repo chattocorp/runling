@@ -1,4 +1,4 @@
-import type { Factory, FactoryAgent } from "../src/index.ts";
+import type { Factory } from "../src/index.ts";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -20,43 +20,9 @@ const runTests = (f: Factory) =>
     () => f.shell`bun test`.nothrow(),
   );
 
-async function validate(f: Factory, agent: FactoryAgent) {
-  let attempt = 1;
-
-  while (true) {
-    let result = await runCheck(f);
-
-    if (result.exitCode === 0) {
-      result = await runTests(f);
-    }
-
-    if (result.exitCode === 0) return;
-    if (attempt === maxValidationAttempts) {
-      throw new Error(
-        f.concat(
-          `Project validation failed after ${maxValidationAttempts} attempts.`,
-          result.stdout.toString(),
-          result.stderr.toString(),
-        ),
-      );
-    }
-
-    await f.step(
-      `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
-      () =>
-        agent.run(
-          f.concat(
-            "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
-            "",
-            "Failure output:",
-            result.stdout.toString(),
-            result.stderr.toString(),
-          ),
-        ),
-    );
-
-    attempt++;
-  }
+async function validate(f: Factory) {
+  const check = await runCheck(f);
+  return check.exitCode === 0 ? runTests(f) : check;
 }
 
 export async function implement(f: Factory): Promise<string> {
@@ -76,7 +42,35 @@ export async function implement(f: Factory): Promise<string> {
     throw new Error("Agent completed without changing the worktree");
   }
 
-  await validate(f, implementationAgent);
+  let validation = await validate(f);
+  for (let attempt = 1; validation.exitCode !== 0; attempt++) {
+    if (attempt === maxValidationAttempts) {
+      throw new Error(
+        f.concat(
+          `Project validation failed after ${maxValidationAttempts} attempts.`,
+          validation.stdout.toString(),
+          validation.stderr.toString(),
+        ),
+      );
+    }
+
+    await f.step(
+      `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
+      () =>
+        implementationAgent.run(
+          f.concat(
+            "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
+            "",
+            "Failure output:",
+            validation.stdout.toString(),
+            validation.stderr.toString(),
+          ),
+        ),
+    );
+
+    validation = await validate(f);
+  }
+
   if (!(await pwd.hasChanges)) {
     throw new Error("The validated worktree no longer contains any changes");
   }

@@ -231,11 +231,13 @@ describe("runAgent", () => {
       eventHandler?.({ type: "agent_start" });
       eventHandler?.({
         type: "tool_execution_start",
+        toolCallId: "read-1",
         toolName: "read",
         args: { path: "src/foo.ts" },
       });
       eventHandler?.({
         type: "tool_execution_end",
+        toolCallId: "bash-1",
         toolName: "bash",
         isError: true,
       });
@@ -325,6 +327,130 @@ describe("runAgent", () => {
         line.includes(
           "Agent retry failed after 5 retry attempts: connection lost",
         ),
+      ),
+    ).toBe(true);
+  });
+
+  test("logs detailed turn, tool, and session lifecycle events", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    const originalLevel = log.level;
+    console.log = (message: string) => logs.push(stripAnsi(message));
+    log.level = "debug";
+    promptImplementation = async () => {
+      eventHandler?.({ type: "turn_start" });
+      eventHandler?.({
+        type: "tool_execution_start",
+        toolCallId: "read-1",
+        toolName: "read",
+        args: { path: "src/foo.ts" },
+      });
+      eventHandler?.({
+        type: "tool_execution_end",
+        toolCallId: "read-1",
+        toolName: "read",
+        result: {},
+        isError: false,
+      });
+      eventHandler?.({
+        type: "turn_end",
+        message: { role: "assistant", content: [] },
+        toolResults: [{}],
+      });
+      eventHandler?.({
+        type: "agent_end",
+        messages: [{ role: "assistant", content: [] }],
+        willRetry: false,
+      });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    try {
+      await runAgent("Do the thing", {
+        model: "anthropic/claude-opus-4-5",
+      });
+    } finally {
+      log.level = originalLevel;
+      console.log = originalLog;
+    }
+
+    expect(logs.some((line) => line.includes("Turn 1 started"))).toBe(true);
+    expect(logs.some((line) => line.includes("read finished in"))).toBe(true);
+    expect(
+      logs.some((line) =>
+        line.includes("Turn 1 finished (1 tool result)"),
+      ),
+    ).toBe(true);
+    expect(
+      logs.some((line) => line.includes("Agent finished (1 message)")),
+    ).toBe(true);
+  });
+
+  test("exposes pi session events to callers", async () => {
+    const events: string[] = [];
+    promptImplementation = async () => {
+      eventHandler?.({ type: "agent_start" });
+      eventHandler?.({ type: "turn_start" });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Do the thing", {
+      model: "anthropic/claude-opus-4-5",
+      onEvent: (event) => events.push(event.type),
+    });
+
+    expect(events).toEqual(["agent_start", "turn_start"]);
+  });
+
+  test("logs compaction and summarization retry progress", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(stripAnsi(message));
+    promptImplementation = async () => {
+      eventHandler?.({ type: "compaction_start", reason: "threshold" });
+      eventHandler?.({
+        type: "summarization_retry_scheduled",
+        attempt: 1,
+        maxAttempts: 5,
+        delayMs: 1500,
+        errorMessage: "stream terminated\nwhile summarizing",
+      });
+      eventHandler?.({
+        type: "compaction_end",
+        reason: "threshold",
+        result: {
+          summary: "Earlier work",
+          firstKeptEntryId: "entry-1",
+          tokensBefore: 120000,
+          estimatedTokensAfter: 30000,
+        },
+        aborted: false,
+        willRetry: false,
+      });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    try {
+      await runAgent("Do the thing", {
+        model: "anthropic/claude-opus-4-5",
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(
+      logs.some((line) => line.includes("Compacting context (threshold)")),
+    ).toBe(true);
+    expect(
+      logs.some((line) =>
+        line.includes(
+          "Retrying context summary in 1500ms (attempt 1/5): stream terminated while summarizing",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      logs.some((line) =>
+        line.includes("Context compacted from 120,000 to about 30,000 tokens"),
       ),
     ).toBe(true);
   });

@@ -19,7 +19,8 @@ two repair attempts. The same agent then summarizes the validated diff.
 same implementation workflow there, then commits and pushes the change. A fresh
 inspection agent combines the implementation summary with the committed diff
 to write the pull request title and description before the workflow opens it
-and prints its URL.
+and prints its URL. The workflow captures that diff directly and gives the
+inspection agent only pi's read-only `read`, `grep`, `find`, and `ls` tools.
 
 ## Requirements
 
@@ -235,7 +236,7 @@ const report = await runAgent("Inspect the repository", {
   model: "openai-codex/gpt-5.6-sol",
   thinkingLevel: "medium",
   cwd: "/path/to/repository",
-  tools: ["read"],
+  tools: ["read", "grep", "find", "ls"],
   signal: AbortSignal.timeout(60_000),
   resources: {
     extensions: false,
@@ -248,7 +249,13 @@ const report = await runAgent("Inspect the repository", {
 ```
 
 `report_outcome` is always available because it is part of the runner's result
-contract.
+contract. The tool set shown above is pi's standard read-only tool set.
+
+Factory logs agent and tool starts in normal output. Verbose mode additionally
+logs turn boundaries and successful tool completion times. Context compaction,
+automatic retries, summarization retries, tool failures, and token usage are
+reported as they occur. Pass `onEvent` to `agent` or `runAgent` when workflow
+code needs to observe pi's raw session-event stream directly.
 
 ## Framework primitives
 

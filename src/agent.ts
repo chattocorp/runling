@@ -3,6 +3,7 @@ import {
   DefaultResourceLoader,
   defineTool,
   getAgentDir,
+  type AgentSessionEvent,
   ModelRuntime,
   SessionManager,
   SettingsManager,
@@ -108,6 +109,8 @@ export interface RunAgentOptions {
   /** Built-in and extension tools to expose. `report_outcome` is always added. */
   tools?: readonly string[];
   resources?: AgentResourceOptions;
+  /** Observe the raw pi event stream for this agent session. */
+  onEvent?: (event: AgentSessionEvent) => void;
   /** Abort an active model turn. */
   signal?: AbortSignal;
 }
@@ -296,11 +299,26 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
     activeReport = undefined;
     let finalText: string | undefined;
     const usage = emptyTokenUsage();
+    let turn = 0;
+    const toolStartedAt = new Map<string, number>();
 
     const unsubscribe = session.subscribe((event) => {
+      options.onEvent?.(event);
+
       if (event.type === "agent_start") {
         agentLog.info(
           `Agent started (model: ${model.provider}/${model.id})`,
+        );
+      }
+
+      if (event.type === "turn_start") {
+        turn++;
+        agentLog.debug(`Turn ${turn} started`);
+      }
+
+      if (event.type === "turn_end") {
+        agentLog.debug(
+          `Turn ${turn} finished (${formatCount(event.toolResults.length, "tool result")})`,
         );
       }
 
@@ -308,6 +326,7 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
         event.type === "tool_execution_start" &&
         event.toolName !== "report_outcome"
       ) {
+        toolStartedAt.set(event.toolCallId, performance.now());
         agentLog.info(
           highlightToolAction(
             event.toolName,
@@ -316,8 +335,64 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
         );
       }
 
-      if (event.type === "tool_execution_end" && event.isError) {
-        agentLog.error(`${event.toolName} failed`);
+      if (
+        event.type === "tool_execution_end" &&
+        event.toolName !== "report_outcome"
+      ) {
+        const startedAt = toolStartedAt.get(event.toolCallId);
+        toolStartedAt.delete(event.toolCallId);
+        const duration =
+          startedAt === undefined
+            ? ""
+            : ` in ${formatDuration(performance.now() - startedAt)}`;
+
+        if (event.isError) {
+          agentLog.error(`${event.toolName} failed${duration}`);
+        } else {
+          agentLog.debug(`${event.toolName} finished${duration}`);
+        }
+      }
+
+      if (event.type === "compaction_start") {
+        agentLog.info(`Compacting context (${event.reason})`);
+      }
+
+      if (event.type === "compaction_end") {
+        if (event.aborted) {
+          agentLog.info("Context compaction aborted");
+        } else if (event.result === undefined) {
+          agentLog.error(
+            `Context compaction failed: ${toSingleLine(event.errorMessage ?? "Unknown error")}`,
+          );
+        } else {
+          const estimatedAfter = event.result.estimatedTokensAfter;
+          agentLog.success(
+            estimatedAfter === undefined
+              ? `Context compacted (${event.result.tokensBefore.toLocaleString()} tokens before compaction)`
+              : `Context compacted from ${event.result.tokensBefore.toLocaleString()} to about ${estimatedAfter.toLocaleString()} tokens`,
+          );
+        }
+      }
+
+      if (event.type === "summarization_retry_scheduled") {
+        agentLog.info(
+          `Retrying context summary in ${formatDelay(event.delayMs)} ` +
+            `(attempt ${event.attempt}/${event.maxAttempts}): ${toSingleLine(event.errorMessage)}`,
+        );
+      }
+
+      if (event.type === "summarization_retry_attempt_start") {
+        agentLog.debug(`Retrying ${formatSummarySource(event.source)} summary`);
+      }
+
+      if (event.type === "summarization_retry_finished") {
+        agentLog.debug("Context summary retry finished");
+      }
+
+      if (event.type === "agent_end") {
+        agentLog.debug(
+          `Agent finished (${formatCount(event.messages.length, "message")})`,
+        );
       }
 
       if (event.type === "auto_retry_start") {
@@ -439,4 +514,18 @@ function formatDelay(delayMs: number): string {
 
 function formatAttempts(attempts: number): string {
   return `${attempts} retry ${attempts === 1 ? "attempt" : "attempts"}`;
+}
+
+function formatCount(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function formatDuration(durationMs: number): string {
+  return durationMs < 1000
+    ? `${Math.round(durationMs)}ms`
+    : `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+function formatSummarySource(source: "branchSummary" | "compaction"): string {
+  return source === "branchSummary" ? "branch" : "context";
 }

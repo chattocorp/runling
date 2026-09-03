@@ -10,24 +10,28 @@ const thinkingLevel = "medium";
 export async function describePullRequest(
   f: Factory,
   implementationSummary: string,
+  committedChange: string,
 ) {
   return f.step("Writing pull request description", async () => {
     await using writer = await f.agent({
       model,
       thinkingLevel,
-      tools: ["read", "bash"],
+      tools: ["read", "grep", "find", "ls"],
       instructions: ["Inspect the repository without modifying it."],
     });
 
     const report = await writer.run(
       f.concat(
         "Write the title and Markdown description for a pull request containing the current commit.",
-        "Inspect the commit and its diff with git before writing the description.",
+        "Use the supplied commit and diff, inspecting repository files when useful.",
         "Use your report summary as the concise pull request title and report details as the complete Markdown body.",
         "Mention that `bun run check` and `bun test` passed.",
         "",
         "Implementation summary:",
         implementationSummary,
+        "",
+        "Commit and diff:",
+        committedChange,
       ),
     );
 
@@ -58,9 +62,12 @@ async function makePullRequest(f: Factory): Promise<WorkflowResult> {
   await worktree.shell`git add --all`;
   await worktree.shell`git commit -m ${implementationSummary}`;
 
+  const committedChange =
+    await worktree.shell`git show --format=fuller --stat --patch --no-ext-diff HEAD`.text();
   const pullRequest = await describePullRequest(
     worktree,
     implementationSummary,
+    committedChange,
   );
   await worktree.shell`git push --set-upstream origin ${branchName}`;
   const createdPullRequest =
