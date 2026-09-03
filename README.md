@@ -42,6 +42,10 @@ context into correctness, testing, and simplicity reviews that run in parallel,
 then asks the original orchestrator to synthesize their findings.
 `workflows/research.ts` gives one agent only the bundled `web_fetch` tool and
 asks it to research a topic from multiple linked sources.
+`workflows/ask.ts` answers questions about the current repository using only
+pi's read-only repository tools.
+`workflows/chatto-docs.ts` answers questions from the official Chatto
+documentation, beginning with its introduction and following relevant links.
 
 ## Requirements
 
@@ -103,6 +107,18 @@ To research a topic using public web sources:
 
 ```bash
 factory workflows/research.ts "How WebAssembly component tooling is evolving"
+```
+
+To answer a question about the current repository:
+
+```bash
+factory workflows/ask.ts "Where are agent tools configured?"
+```
+
+To answer a question from the Chatto documentation:
+
+```bash
+factory workflows/chatto-docs.ts "How do I get started with Chatto?"
 ```
 
 To have a read-only planning agent inspect the repository and interview you

@@ -1,0 +1,48 @@
+import { workflow, type WorkflowResult } from "../src/index.ts";
+
+const model = "openai-codex/gpt-5.6-sol";
+const documentationRoot =
+  "https://docs.chatto.run/getting-started/introduction/";
+
+export const chattoDocs = workflow(
+  "Answer Chatto documentation question",
+  async (f): Promise<WorkflowResult> => {
+    const question =
+      f.prompt.trim() === ""
+        ? await f.input("What would you like to know about Chatto?")
+        : f.prompt;
+
+    const report = await f.step("Consulting Chatto documentation", () =>
+      f.runAgent(
+        f.concat(
+          "Answer this question using the official Chatto documentation:",
+          question,
+          "",
+          `Start by fetching ${documentationRoot}`,
+          "Follow relevant documentation links from that page as needed before answering.",
+        ),
+        {
+          model,
+          thinkingLevel: "medium",
+          tools: ["web_fetch"],
+          instructions: [
+            "Use only pages on docs.chatto.run as factual sources.",
+            "Base the answer on pages retrieved with web_fetch during this run, not prior knowledge.",
+            "Put a concise direct answer in the report summary.",
+            "Put supporting explanation in the report details, linking the documentation pages next to the claims they support.",
+            "State clearly when the documentation does not answer some part of the question.",
+          ],
+        },
+      ),
+    );
+
+    const answer = report.details ?? report.summary;
+    return {
+      summary: report.summary,
+      details: report.details,
+      outputs: { answer },
+    };
+  },
+);
+
+export default chattoDocs;
