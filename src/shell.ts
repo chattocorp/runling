@@ -3,7 +3,7 @@ import { emitFactoryEvent } from "./events.ts";
 import { log, logCommand } from "./log.ts";
 
 const COMMAND_COLOR = "#ae3ec9";
-const COMMAND_PREVIEW_LENGTH = 199;
+const COMMAND_PREVIEW_LENGTH = 200;
 
 export const ShellError = $.ShellError;
 
