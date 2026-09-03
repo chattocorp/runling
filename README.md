@@ -167,8 +167,9 @@ await implement({ ...f, cwd: worktreePath });
 ```
 
 A workflow may return a summary string, nothing, or a structured result.
-`details` contains human-readable Markdown that Factory prints in interactive
-mode; `outputs` contains JSON-compatible values for callers:
+`details` contains human-readable Markdown that Factory renders for an
+interactive terminal. When output is redirected, Factory preserves the raw
+Markdown. `outputs` contains JSON-compatible values for callers:
 
 ```ts
 return {

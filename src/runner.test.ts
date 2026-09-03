@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   executeWorkflow,
   formatDuration,
+  formatWorkflowDetails,
   normalizeWorkflowResult,
 } from "./runner.ts";
 import { createFactory } from "./runtime.ts";
@@ -65,7 +66,7 @@ describe("executeWorkflow", () => {
     });
   });
 
-  test("prints result details in interactive mode", async () => {
+  test("preserves raw result details when stdout is not interactive", async () => {
     const logs: string[] = [];
     const originalLog = console.log;
     console.log = (message: string) => logs.push(message);
@@ -77,6 +78,7 @@ describe("executeWorkflow", () => {
           details: "## Findings\n\nSomething worth reading.",
         }),
         f,
+        { terminal: { isTTY: false, columns: 80 } },
       );
     } finally {
       console.log = originalLog;
@@ -85,7 +87,32 @@ describe("executeWorkflow", () => {
     expect(logs).toContain("\n## Findings\n\nSomething worth reading.\n");
   });
 
+  test("renders result details when stdout is interactive", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+
+    try {
+      await executeWorkflow(
+        async () => ({
+          summary: "Review complete",
+          details: "## Findings\n\nSomething worth reading.",
+        }),
+        f,
+        { terminal: { isTTY: true, columns: 80 } },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const details = logs.find((line) => line.includes("Findings"));
+    expect(details).toBeDefined();
+    expect(details).toContain("\x1b[");
+    expect(Bun.stripANSI(details ?? "")).not.toContain("##");
+  });
+
   test("emits only the execution document to stdout in JSON mode", async () => {
+    const markdown = "## Details\n\n**Still raw.**";
     const output: string[] = [];
     const errors: string[] = [];
     const originalLog = console.log;
@@ -95,9 +122,13 @@ describe("executeWorkflow", () => {
 
     try {
       await executeWorkflow(
-        async () => ({ summary: "Done", outputs: { count: 2 } }),
+        async () => ({
+          summary: "Done",
+          details: markdown,
+          outputs: { count: 2 },
+        }),
         f,
-        { json: true },
+        { json: true, terminal: { isTTY: true, columns: 80 } },
       );
     } finally {
       console.log = originalLog;
@@ -108,8 +139,9 @@ describe("executeWorkflow", () => {
     expect(JSON.parse(output[0] ?? "")).toMatchObject({
       ok: true,
       error: null,
-      result: { summary: "Done", outputs: { count: 2 } },
+      result: { summary: "Done", details: markdown, outputs: { count: 2 } },
     });
+    expect(output[0]).not.toContain("\x1b[");
     expect(errors.some((line) => line.includes("Factory starting"))).toBe(true);
     expect(errors.some((line) => line.includes("Finished in "))).toBe(true);
   });
@@ -247,6 +279,28 @@ describe("executeWorkflow", () => {
       ),
     ).toBe(true);
     expect(logs.some((line) => line.includes("999"))).toBe(false);
+  });
+});
+
+describe("formatWorkflowDetails", () => {
+  test("renders Markdown for an interactive terminal", () => {
+    const formatted = formatWorkflowDetails("## Findings\n\n**Important**", {
+      isTTY: true,
+      columns: 80,
+    });
+
+    expect(formatted).toContain("\x1b[");
+    expect(Bun.stripANSI(formatted)).not.toContain("##");
+    expect(Bun.stripANSI(formatted)).not.toContain("**");
+  });
+
+  test("preserves Markdown for redirected output", () => {
+    expect(
+      formatWorkflowDetails("## Findings\n\n**Important**", {
+        isTTY: false,
+        columns: 80,
+      }),
+    ).toBe("## Findings\n\n**Important**");
   });
 });
 

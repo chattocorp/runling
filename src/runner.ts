@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { cli } from "./cli.ts";
 import { log } from "./log.ts";
+import { renderMarkdown } from "./markdown.ts";
 import {
   createFactory,
   type Factory,
@@ -47,6 +48,25 @@ export interface WorkflowExecution {
   result: WorkflowResult | null;
   error: string | null;
   ok: boolean;
+}
+
+export interface TerminalCapabilities {
+  isTTY?: boolean;
+  columns?: number;
+}
+
+export interface ExecutionOptions {
+  json?: boolean;
+  terminal?: TerminalCapabilities;
+}
+
+export function formatWorkflowDetails(
+  details: string,
+  terminal: TerminalCapabilities = process.stdout,
+): string {
+  return terminal.isTTY
+    ? renderMarkdown(details, terminal.columns ?? 80)
+    : details;
 }
 
 function isJsonValue(
@@ -111,7 +131,7 @@ export function normalizeWorkflowResult(
 export async function executeWorkflow(
   run: FactoryWorkflow,
   f: Factory,
-  options: { json?: boolean } = {},
+  options: ExecutionOptions = {},
 ): Promise<WorkflowExecution> {
   return reportExecution(
     () => log.indented(() => run(f)),
@@ -121,7 +141,10 @@ export async function executeWorkflow(
 
 async function reportExecution(
   run: () => Promise<WorkflowReturn> | WorkflowReturn,
-  { json = false }: { json?: boolean } = {},
+  {
+    json = false,
+    terminal = process.stdout,
+  }: ExecutionOptions = {},
 ): Promise<WorkflowExecution> {
   const execution = await log.withDestination(
     json ? "stderr" : "stdout",
@@ -137,7 +160,7 @@ async function reportExecution(
         if (!json && result !== null) {
           log.success(result.summary);
           if (result.details !== undefined) {
-            console.log(`\n${result.details}\n`);
+            console.log(`\n${formatWorkflowDetails(result.details, terminal)}\n`);
           }
         }
       } catch (cause) {
