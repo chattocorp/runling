@@ -30,7 +30,7 @@ export const review = workflow("Review", async (f): Promise<WorkflowResult> => {
   await using orchestrator = await f.agent({
     model,
     thinkingLevel,
-    tools: ["read", "grep", "find", "ls"],
+    tools: ["read", "grep", "find", "ls", "web_fetch"],
     instructions: [
       "Inspect the repository without modifying it.",
       "Put substantial review findings and rationale in report details.",

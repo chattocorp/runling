@@ -40,6 +40,8 @@ and gives the inspection agent only pi's read-only `read`, `grep`, `find`, and
 `workflows/review.ts` gives a read-only orchestrator the current diff, forks its
 context into correctness, testing, and simplicity reviews that run in parallel,
 then asks the original orchestrator to synthesize their findings.
+`workflows/research.ts` gives one agent only the bundled `web_fetch` tool and
+asks it to research a topic from multiple linked sources.
 
 ## Requirements
 
@@ -95,6 +97,12 @@ To review current working-tree changes from three parallel perspectives:
 
 ```bash
 factory workflows/review.ts
+```
+
+To research a topic using public web sources:
+
+```bash
+factory workflows/research.ts "How WebAssembly component tooling is evolving"
 ```
 
 To have a read-only planning agent inspect the repository and interview you
@@ -326,10 +334,20 @@ completion.
 ## Execution boundaries
 
 Coding agents have meaningful authority. By default, `runAgent` exposes the
-`read`, `bash`, `edit`, and `write` tools and loads pi's configured extensions,
-skills, prompt templates, themes, and project context files. Only run a workflow
-in a repository and environment you are willing to let the selected model
+`read`, `bash`, `edit`, `write`, and bundled `web_fetch` tools and loads pi's
+configured extensions, skills, prompt templates, themes, and project context
+files. `web_fetch` performs GET requests for textual HTTP or HTTPS resources,
+with a 30-second timeout and a 100 KB response limit. It resolves and permits
+only public IP addresses, including at every redirect. Only run a workflow in a
+repository and environment you are willing to let the selected model access and
 modify.
+
+Factory is also a pi package: its `package.json` publishes the resources in
+`extensions/`. Install the package with `pi install /path/to/factory` when you
+want to use `web_fetch` in pi independently of Factory. Factory agents load the
+bundled extension directly, so running Factory does not require this installation.
+Set `resources.extensions` to `false` to prevent all extensions, including the
+bundled one, from loading.
 
 Callers can narrow those boundaries without putting policy in the framework:
 

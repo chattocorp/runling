@@ -115,7 +115,7 @@ describe("review workflow", () => {
     expect(agentOptions).toMatchObject({
       model: "openai-codex/gpt-5.6-sol",
       thinkingLevel: "medium",
-      tools: ["read", "grep", "find", "ls"],
+      tools: ["read", "grep", "find", "ls", "web_fetch"],
     });
     expect(forks).toBe(3);
     expect(maxActiveReviews).toBe(3);

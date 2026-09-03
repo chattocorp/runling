@@ -9,6 +9,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
+import webFetchExtension from "../extensions/web-fetch.ts";
 import { emitFactoryEvent } from "./events.ts";
 import { randomId } from "./id.ts";
 import { log, withLogSource } from "./log.ts";
@@ -255,6 +256,7 @@ async function createFactoryAgent(
   );
 
   const resources = options.resources;
+  const extensionsEnabled = resources?.extensions !== false;
   const settingsManager = SettingsManager.create(cwd, agentDir);
   const retrySettings = settingsManager.getRetrySettings();
   settingsManager.applyOverrides({
@@ -267,7 +269,10 @@ async function createFactoryAgent(
     cwd,
     agentDir,
     settingsManager,
-    noExtensions: resources?.extensions === false,
+    extensionFactories: extensionsEnabled
+      ? [{ name: "factory-web-fetch", factory: webFetchExtension }]
+      : [],
+    noExtensions: !extensionsEnabled,
     noSkills: resources?.skills === false,
     noPromptTemplates: resources?.promptTemplates === false,
     noThemes: resources?.themes === false,
@@ -291,7 +296,13 @@ async function createFactoryAgent(
     customTools: [reportOutcome],
     tools: [
       ...new Set([
-        ...(options.tools ?? ["read", "bash", "edit", "write"]),
+        ...(options.tools ?? [
+          "read",
+          "bash",
+          "edit",
+          "write",
+          ...(extensionsEnabled ? ["web_fetch"] : []),
+        ]),
         "report_outcome",
       ]),
     ],

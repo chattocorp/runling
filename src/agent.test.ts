@@ -693,6 +693,31 @@ describe("runAgent", () => {
     expect(sessionOptions.thinkingLevel).toBeUndefined();
   });
 
+  test("loads and enables Factory's bundled web fetch extension", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Research the topic", {
+      model: "anthropic/claude-opus-4-5",
+    });
+
+    expect(sessionOptions.tools).toEqual([
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "web_fetch",
+      "report_outcome",
+    ]);
+    expect(resourceOptions.extensionFactories).toEqual([
+      {
+        name: "factory-web-fetch",
+        factory: expect.any(Function),
+      },
+    ]);
+  });
+
   test("applies execution and resource boundaries", async () => {
     promptImplementation = async () => {
       await reportOutcome({ outcome: "completed", summary: "Reviewed" });
@@ -722,6 +747,7 @@ describe("runAgent", () => {
       noPromptTemplates: true,
       noThemes: true,
       noContextFiles: true,
+      extensionFactories: [],
     });
     expect(resourceOptions.appendSystemPromptOverride(["Base prompt"])).toEqual([
       "Base prompt",
