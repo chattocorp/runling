@@ -32,6 +32,10 @@ export type FactoryEventPayload =
       id: string;
       status: "completed" | "failed";
       durationMs: number;
+      output: {
+        stdout: string;
+        stderr: string;
+      };
     }
   | {
       type: "agent.started";

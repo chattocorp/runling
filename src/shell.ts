@@ -41,13 +41,15 @@ export function createShell(options: CreateShellOptions = {}) {
             id,
             status: output.exitCode === 0 ? "completed" : "failed",
             durationMs: performance.now() - startedAt,
+            output: shellOutput(output),
           }),
-        () =>
+        (error) =>
           emitFactoryEvent({
             type: "command.finished",
             id,
             status: "failed",
             durationMs: performance.now() - startedAt,
+            output: shellOutput(error),
           }),
       );
     });
@@ -57,6 +59,21 @@ export function createShell(options: CreateShellOptions = {}) {
 }
 
 export type Shell = ReturnType<typeof createShell>;
+
+const shellOutput = (value: unknown): { stdout: string; stderr: string } => {
+  if (typeof value !== "object" || value === null) {
+    return { stdout: "", stderr: "" };
+  }
+
+  const output = value as { stdout?: unknown; stderr?: unknown };
+  return {
+    stdout: bufferText(output.stdout),
+    stderr: bufferText(output.stderr),
+  };
+};
+
+const bufferText = (value: unknown): string =>
+  value instanceof Uint8Array ? new TextDecoder().decode(value) : "";
 
 function formatCommand(...[strings, ...expressions]: Parameters<typeof $>) {
   const command = strings

@@ -65,6 +65,28 @@ describe("createShell", () => {
       type: "command.finished",
       id: started?.id,
       status: "completed",
+      output: { stdout: "", stderr: "" },
+    });
+  });
+
+  test("captures output from failed commands in their lifecycle event", async () => {
+    const events: FactoryEvent[] = [];
+
+    await observeFactoryEvents(
+      (event) => events.push(event),
+      () =>
+        createShell()`bun -e ${"console.log('stdout'); console.error('stderr'); process.exit(3)"}`.nothrow(),
+    );
+    await Promise.resolve();
+
+    const finished = events.find((event) => event.type === "command.finished");
+    expect(finished).toMatchObject({
+      type: "command.finished",
+      status: "failed",
+      output: {
+        stdout: "stdout\n",
+        stderr: "stderr\n",
+      },
     });
   });
 

@@ -37,6 +37,7 @@ test("renders activity as one semantic execution tree", () => {
         id: "command",
         status: "completed",
         durationMs: 24,
+        output: { stdout: "", stderr: "" },
       },
       "investigate",
     ),
@@ -212,6 +213,43 @@ test("renders the final Markdown report and completion state", () => {
   expect(output).toContain("Everything looks good.");
   expect(output).not.toContain("##");
   expect(output).not.toContain("**");
+});
+
+test("shows a bounded, ANSI-free tail for failed commands", () => {
+  const dashboard = new FactoryDashboard("workflow.ts", performance.now());
+  dashboard.handle(
+    event({ type: "step.started", id: "test", label: "Run tests" }),
+  );
+  dashboard.handle(
+    event(
+      { type: "command.started", id: "bun-test", command: "bun test" },
+      "test",
+    ),
+  );
+  dashboard.handle(
+    event(
+      {
+        type: "command.finished",
+        id: "bun-test",
+        status: "failed",
+        durationMs: 1_800,
+        output: {
+          stdout: "Preparing tests\n",
+          stderr: `${Array.from({ length: 9 }, (_, index) => `failure ${index + 1}`).join("\n")}\n\x1b[31mfinal failure\x1b[0m\n`,
+        },
+      },
+      "test",
+    ),
+  );
+
+  const output = Bun.stripANSI(dashboard.render(80).join("\n"));
+  expect(output).toContain("✗ Ran bun test · 1.8s");
+  expect(output).toContain("… 3 earlier lines omitted");
+  expect(output).not.toContain("Preparing tests");
+  expect(output).not.toContain("failure 2");
+  expect(output).toContain("failure 3");
+  expect(output).toContain("final failure");
+  expect(dashboard.render(80).join("\n")).not.toContain("\x1b[31m");
 });
 
 test("never renders beyond the available width", () => {

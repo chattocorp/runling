@@ -106,8 +106,10 @@ force append-only output in an interactive terminal:
 factory workflows/make-pr.ts --log "Add a focused feature and test it"
 ```
 
-Raw command output is suppressed in TUI mode. Use `--verbose` or `-v` to switch
-to append-only output with debug logging and command output:
+Successful command output is suppressed in TUI mode. Failed commands display a
+short tail of their captured output beneath the command. Use `--verbose` or
+`-v` to switch to append-only output with debug logging and complete command
+output:
 
 ```bash
 factory workflows/make-pr.ts --verbose "Investigate and fix the failing test"

@@ -41,6 +41,10 @@ interface CommandNode extends TreeNodeBase {
   command: string;
   status: "running" | "completed" | "failed";
   durationMs?: number;
+  output?: {
+    stdout: string;
+    stderr: string;
+  };
 }
 
 interface AgentNode extends TreeNodeBase {
@@ -124,6 +128,7 @@ export class FactoryDashboard implements Component {
         if (command?.type === "command") {
           command.status = event.status;
           command.durationMs = event.durationMs;
+          command.output = event.output;
         }
         break;
       }
@@ -298,6 +303,17 @@ export class FactoryDashboard implements Component {
           `${bold(paint("#ae3ec9", verb))} ${node.command}${duration}`,
           width,
         );
+        if (node.status === "failed" && node.output !== undefined) {
+          for (const outputLine of failureOutput(node.output)) {
+            lines.push(
+              ...this.wrapNode(
+                `${indent}  ${paint("crimson", "│")} `,
+                dim(outputLine),
+                width,
+              ),
+            );
+          }
+        }
         break;
       }
       case "agent": {
@@ -446,3 +462,29 @@ const formatCost = (cost: number): string =>
     : cost < 0.0001
       ? "<$0.0001"
       : `$${cost.toFixed(cost < 0.01 ? 4 : 2)}`;
+
+const COMMAND_FAILURE_LINES = 8;
+
+const failureOutput = ({
+  stdout,
+  stderr,
+}: {
+  stdout: string;
+  stderr: string;
+}): string[] => {
+  const lines = Bun.stripANSI(
+    [stdout.trimEnd(), stderr.trimEnd()].filter(Boolean).join("\n"),
+  )
+    .split("\n")
+    .map((line) => line.trimEnd());
+
+  while (lines[0]?.trim() === "") lines.shift();
+  while (lines.at(-1)?.trim() === "") lines.pop();
+  if (lines.length <= COMMAND_FAILURE_LINES) return lines;
+
+  const omitted = lines.length - COMMAND_FAILURE_LINES;
+  return [
+    `… ${omitted.toLocaleString("en-US")} earlier lines omitted`,
+    ...lines.slice(-COMMAND_FAILURE_LINES),
+  ];
+};
