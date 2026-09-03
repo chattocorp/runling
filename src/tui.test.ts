@@ -327,7 +327,7 @@ test("drives pi-tui through the fullscreen reporter lifecycle", () => {
   expect(Bun.stripANSI(restoredDocument)).toContain("Done");
 });
 
-test("collects workflow input through a focused TUI interview", async () => {
+test("collects workflow input inline in the execution tree", async () => {
   const terminal = new FakeTerminal();
   const reporter = new TuiReporter("workflow.ts", terminal);
   const input = createInput(reporter.input);
@@ -338,10 +338,11 @@ test("collects workflow input through a focused TUI interview", async () => {
   );
   await Bun.sleep(10);
 
-  expect(Bun.stripANSI(terminal.output)).toContain("Interview");
   expect(Bun.stripANSI(terminal.output)).toContain(
     "What should we call this release?",
   );
+  expect(Bun.stripANSI(terminal.output)).toContain("> Factory ");
+  expect(Bun.stripANSI(terminal.output)).not.toContain("Interview");
 
   for (const character of "Manbot") terminal.send(character);
   terminal.send("\r");

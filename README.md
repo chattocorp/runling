@@ -179,8 +179,8 @@ export default async function implement(f: Factory) {
 ```
 
 Workflows can suspend while their host collects external input with
-`f.input()`. The interactive Factory CLI displays the request in a focused TUI
-interview and resumes the workflow after submission:
+`f.input()`. The interactive Factory CLI embeds a focused editor beneath the
+request in the execution tree and resumes the workflow after submission:
 
 ```ts
 const releaseName = await f.input("What should we call this release?", {

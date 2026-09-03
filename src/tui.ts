@@ -5,7 +5,6 @@ import {
   ProcessTerminal,
   ScrollView,
   matchesKey,
-  type OverlayHandle,
   truncateToWidth,
   TuiAltScreen,
   type Component,
@@ -81,6 +80,7 @@ export class FactoryDashboard implements Component {
   private readonly nodes: TreeNode[] = [];
   private readonly nodesById = new Map<string, TreeNode>();
   private readonly agents = new Map<string, AgentNode>();
+  private readonly inputEditors = new Map<string, Component>();
   private logSequence = 0;
   private usage: TokenUsage = {
     input: 0,
@@ -211,6 +211,11 @@ export class FactoryDashboard implements Component {
   }
 
   invalidate(): void {}
+
+  setInputEditor(id: string, editor: Component | undefined): void {
+    if (editor === undefined) this.inputEditors.delete(id);
+    else this.inputEditors.set(id, editor);
+  }
 
   render(width: number): string[] {
     return [
@@ -421,6 +426,19 @@ export class FactoryDashboard implements Component {
           `${node.message}${node.value === undefined ? "" : ` ${dim("→")} ${node.value}`}${duration}`,
           width,
         );
+        const editor = this.inputEditors.get(node.id);
+        if (node.status === "waiting" && editor !== undefined) {
+          const prefix = `${indent}  `;
+          const continuation = " ".repeat(visibleWidth(prefix));
+          const editorLines = editor.render(
+            Math.max(1, width - visibleWidth(prefix)),
+          );
+          lines.push(
+            ...editorLines.map((line, index) =>
+              fit(`${index === 0 ? prefix : continuation}${line}`, width),
+            ),
+          );
+        }
         break;
       }
       case "log": {
@@ -477,6 +495,7 @@ export class TuiReporter {
   private started = false;
   private stopped = false;
   private readonly pendingInputs = new Set<(error: Error) => void>();
+  private readonly pendingEditors = new Set<InlineInput>();
 
   constructor(
     title: string,
@@ -541,11 +560,13 @@ export class TuiReporter {
     }
 
     return new Promise<string>((resolve, reject) => {
-      let overlay: OverlayHandle | undefined;
+      let editor: InlineInput;
       const settle = (result: { value: string } | { error: Error }) => {
         request.signal?.removeEventListener("abort", abort);
         this.pendingInputs.delete(cancel);
-        overlay?.hide();
+        this.pendingEditors.delete(editor);
+        this.dashboard.setInputEditor(request.id, undefined);
+        this.tui.setFocus([...this.pendingEditors].at(-1) ?? null);
         this.tui.requestRender(true);
         if ("value" in result) resolve(result.value);
         else reject(result.error);
@@ -557,21 +578,17 @@ export class TuiReporter {
             ? request.signal.reason
             : new Error("Input cancelled"),
         );
-      const interview = new Interview(
+      editor = new InlineInput(
         request,
         (value) => settle({ value }),
         () => cancel(new Error(`Input cancelled: ${request.message}`)),
       );
 
       this.pendingInputs.add(cancel);
+      this.pendingEditors.add(editor);
       request.signal?.addEventListener("abort", abort, { once: true });
-      overlay = this.tui.showOverlay(interview, {
-        width: "70%",
-        minWidth: 40,
-        maxHeight: 12,
-        anchor: "center",
-        margin: 1,
-      });
+      this.dashboard.setInputEditor(request.id, editor);
+      this.tui.setFocus(editor);
       this.tui.requestRender(true);
     });
   };
@@ -609,7 +626,7 @@ class DashboardRegion implements Component {
   }
 }
 
-class Interview implements Component, Focusable {
+class InlineInput implements Component, Focusable {
   private readonly input = new TextInput();
 
   constructor(
@@ -643,24 +660,7 @@ class Interview implements Component, Focusable {
   }
 
   render(width: number): string[] {
-    const columns = Math.max(1, Math.floor(width));
-    if (columns < 6) return this.input.render(columns);
-
-    const innerWidth = columns - 4;
-    const title = " Interview ";
-    const top = `╭${title}${"─".repeat(Math.max(0, columns - title.length - 2))}╮`;
-    const body = (line = "") =>
-      `│ ${truncateToWidth(line, innerWidth, "", true)} │`;
-    const question = wrapTextWithAnsi(this.request.message, innerWidth);
-    const answer = this.input.render(Math.max(1, innerWidth - 2));
-
-    return [
-      top,
-      ...question.map(body),
-      body(),
-      ...answer.map((line) => body(`${paint("#f59f00", "›")} ${line}`)),
-      `╰${"─".repeat(columns - 2)}╯`,
-    ];
+    return this.input.render(Math.max(1, Math.floor(width)));
   }
 }
 
