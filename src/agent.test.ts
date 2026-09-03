@@ -12,6 +12,8 @@ let eventHandler: ((event: any) => void) | undefined;
 let promptImplementation: ((prompt: string) => Promise<void>) | undefined;
 let sessionOptions: any;
 let resourceOptions: any;
+let settingsCreateArgs: unknown[] | undefined;
+let settingsOverrides: any;
 let promptCalls = 0;
 let abortCalls = 0;
 let disposed = false;
@@ -31,6 +33,21 @@ mock.module("@earendil-works/pi-coding-agent", () => {
       async reload() {}
     },
     getAgentDir: () => "/tmp/agent-dir",
+    SettingsManager: {
+      create: (...args: unknown[]) => {
+        settingsCreateArgs = args;
+        return {
+          getRetrySettings: () => ({
+            enabled: true,
+            maxRetries: 3,
+            baseDelayMs: 2000,
+          }),
+          applyOverrides: (overrides: unknown) => {
+            settingsOverrides = overrides;
+          },
+        };
+      },
+    },
     SessionManager: {
       inMemory: () => ({}),
     },
@@ -72,6 +89,8 @@ beforeEach(() => {
   promptImplementation = undefined;
   sessionOptions = undefined;
   resourceOptions = undefined;
+  settingsCreateArgs = undefined;
+  settingsOverrides = undefined;
   promptCalls = 0;
   abortCalls = 0;
   disposed = false;
@@ -242,6 +261,77 @@ describe("runAgent", () => {
     expect(
       plainErrors.some((line) => line.includes(`[${id}] bash failed`)),
     ).toBe(true);
+  });
+
+  test("logs automatic retry progress", async () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (message: string) => logs.push(stripAnsi(message));
+    console.error = (message: string) => errors.push(stripAnsi(message));
+    promptImplementation = async () => {
+      eventHandler?.({
+        type: "auto_retry_start",
+        attempt: 1,
+        maxAttempts: 5,
+        delayMs: 2000,
+        errorMessage: "fetch failed\nwhile streaming",
+      });
+      eventHandler?.({ type: "auto_retry_end", success: true, attempt: 1 });
+      eventHandler?.({
+        type: "auto_retry_end",
+        success: false,
+        attempt: 5,
+        finalError: "connection lost",
+      });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    try {
+      await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    expect(
+      logs.some((line) =>
+        line.includes(
+          "Retrying agent in 2s (attempt 1/5): fetch failed while streaming",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      logs.some((line) =>
+        line.includes("Agent recovered after 1 retry attempt"),
+      ),
+    ).toBe(true);
+    expect(
+      errors.some((line) =>
+        line.includes(
+          "Agent retry failed after 5 retry attempts: connection lost",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  test("raises Pi's agent retry budget to at least five", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Do the thing", {
+      model: "anthropic/claude-opus-4-5",
+      cwd: "/tmp/project",
+      resources: { agentDir: "/tmp/custom-agent" },
+    });
+
+    expect(settingsCreateArgs).toEqual(["/tmp/project", "/tmp/custom-agent"]);
+    expect(settingsOverrides).toEqual({
+      retry: { enabled: true, maxRetries: 5, baseDelayMs: 2000 },
+    });
+    expect(resourceOptions.settingsManager).toBe(sessionOptions.settingsManager);
   });
 
   test("returns the structured outcome reported by the agent", async () => {

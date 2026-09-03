@@ -5,6 +5,7 @@ import {
   getAgentDir,
   ModelRuntime,
   SessionManager,
+  SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { randomId } from "./id.ts";
@@ -48,6 +49,7 @@ const AGENT_COLORS = [
   "#f76707",
   "#12b886",
 ] as const;
+const MIN_AGENT_RETRIES = 5;
 let nextAgentColor = 0;
 
 function takeAgentColor(): string {
@@ -165,6 +167,8 @@ async function runAgentSession(
       log.withColor(color, () => log.error(prefixLog(message))),
     info: (message: string) =>
       log.withColor(color, () => log.info(prefixLog(message))),
+    success: (message: string) =>
+      log.withColor(color, () => log.success(prefixLog(message))),
   };
   let report: AgentReport | undefined;
   let finalText: string | undefined;
@@ -191,6 +195,7 @@ async function runAgentSession(
   });
 
   const cwd = options.cwd ?? process.cwd();
+  const agentDir = options.resources?.agentDir ?? getAgentDir();
   const modelRuntime = await ModelRuntime.create();
   const modelReference = parseModelReference(options.model);
   const model = modelRuntime.getModel(modelReference.provider, modelReference.id);
@@ -204,9 +209,18 @@ async function runAgentSession(
   );
 
   const resources = options.resources;
+  const settingsManager = SettingsManager.create(cwd, agentDir);
+  const retrySettings = settingsManager.getRetrySettings();
+  settingsManager.applyOverrides({
+    retry: {
+      ...retrySettings,
+      maxRetries: Math.max(retrySettings.maxRetries, MIN_AGENT_RETRIES),
+    },
+  });
   const resourceLoader = new DefaultResourceLoader({
     cwd,
-    agentDir: resources?.agentDir ?? getAgentDir(),
+    agentDir,
+    settingsManager,
     noExtensions: resources?.extensions === false,
     noSkills: resources?.skills === false,
     noPromptTemplates: resources?.promptTemplates === false,
@@ -227,6 +241,7 @@ async function runAgentSession(
     modelRuntime,
     resourceLoader,
     sessionManager: SessionManager.inMemory(),
+    settingsManager,
     customTools: [reportOutcome],
     tools: [
       ...new Set([
@@ -250,6 +265,25 @@ async function runAgentSession(
 
     if (event.type === "tool_execution_end" && event.isError) {
       agentLog.error(`${event.toolName} failed`);
+    }
+
+    if (event.type === "auto_retry_start") {
+      agentLog.info(
+        `Retrying agent in ${formatDelay(event.delayMs)} ` +
+          `(attempt ${event.attempt}/${event.maxAttempts}): ${toSingleLine(event.errorMessage)}`,
+      );
+    }
+
+    if (event.type === "auto_retry_end") {
+      if (event.success) {
+        agentLog.success(
+          `Agent recovered after ${formatAttempts(event.attempt)}`,
+        );
+      } else {
+        agentLog.error(
+          `Agent retry failed after ${formatAttempts(event.attempt)}: ${toSingleLine(event.finalError ?? "Unknown error")}`,
+        );
+      }
     }
 
     if (event.type === "message_end" && event.message.role === "assistant") {
@@ -313,4 +347,12 @@ async function runAgentSession(
     summary: "Agent finished without a valid outcome report",
     usage,
   };
+}
+
+function formatDelay(delayMs: number): string {
+  return delayMs % 1000 === 0 ? `${delayMs / 1000}s` : `${delayMs}ms`;
+}
+
+function formatAttempts(attempts: number): string {
+  return `${attempts} retry ${attempts === 1 ? "attempt" : "attempts"}`;
 }
