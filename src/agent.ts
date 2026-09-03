@@ -9,8 +9,9 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
+import { emitFactoryEvent } from "./events.ts";
 import { randomId } from "./id.ts";
-import { log } from "./log.ts";
+import { log, withLogSource } from "./log.ts";
 import { parseModelReference } from "./model.ts";
 import { displayPath, displayText } from "./paths.ts";
 import {
@@ -196,15 +197,26 @@ async function createFactoryAgent(
 
   const prefixLog = (message: string) =>
     `${log.colorize(`[${agentId}]`)} ${message}`;
+  const writeAgentLog = (
+    level: "debug" | "error" | "info" | "success",
+    message: string,
+  ) => {
+    if (level !== "debug" || log.level === "debug") {
+      emitFactoryEvent({
+        type: "agent.action",
+        agentId,
+        action: Bun.stripANSI(message),
+      });
+    }
+    withLogSource({ type: "agent", id: agentId }, () =>
+      log.withColor(color, () => log[level](prefixLog(message))),
+    );
+  };
   const agentLog = {
-    debug: (message: string) =>
-      log.withColor(color, () => log.debug(prefixLog(message))),
-    error: (message: string) =>
-      log.withColor(color, () => log.error(prefixLog(message))),
-    info: (message: string) =>
-      log.withColor(color, () => log.info(prefixLog(message))),
-    success: (message: string) =>
-      log.withColor(color, () => log.success(prefixLog(message))),
+    debug: (message: string) => writeAgentLog("debug", message),
+    error: (message: string) => writeAgentLog("error", message),
+    info: (message: string) => writeAgentLog("info", message),
+    success: (message: string) => writeAgentLog("success", message),
   };
   let activeReport: AgentReport | undefined;
 
@@ -318,6 +330,12 @@ async function createFactoryAgent(
       options.onEvent?.(event);
 
       if (event.type === "agent_start") {
+        emitFactoryEvent({
+          type: "agent.started",
+          agentId,
+          model: `${model.provider}/${model.id}`,
+          color,
+        });
         agentLog.info(
           `Agent started (model: ${model.provider}/${model.id})`,
         );
@@ -339,10 +357,11 @@ async function createFactoryAgent(
         event.toolName !== "report_outcome"
       ) {
         toolStartedAt.set(event.toolCallId, performance.now());
+        const action = describeTool(event.toolName, event.args);
         agentLog.info(
           highlightToolAction(
             event.toolName,
-            describeTool(event.toolName, event.args),
+            action,
           ),
         );
       }
@@ -436,6 +455,7 @@ async function createFactoryAgent(
           .join("\n");
 
         accumulateTokenUsage(usage, event.message.usage);
+        recordTokenUsage(event.message.usage);
         agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
       }
     });
@@ -443,9 +463,10 @@ async function createFactoryAgent(
     const abort = () => abortSession(session, agentLog);
 
     signal?.addEventListener("abort", abort, { once: true });
+    let result: AgentResult | undefined;
 
     try {
-      return await log.withColor(color, async () => {
+      result = await log.withColor(color, async (): Promise<AgentResult> => {
         signal?.throwIfAborted();
         await session.prompt(prompt);
         signal?.throwIfAborted();
@@ -479,12 +500,18 @@ async function createFactoryAgent(
           usage,
         };
       });
+      return result;
     } finally {
       signal?.removeEventListener("abort", abort);
       unsubscribe();
       running = false;
       agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
-      recordTokenUsage(usage);
+      emitFactoryEvent({
+        type: "agent.finished",
+        agentId,
+        outcome: result?.outcome ?? "failed",
+        usage: { ...usage },
+      });
     }
   };
 

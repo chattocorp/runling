@@ -1,3 +1,5 @@
+import { emitFactoryEvent } from "./events.ts";
+
 export interface TokenUsage {
   /** Non-cached input tokens. */
   input: number;
@@ -7,7 +9,13 @@ export interface TokenUsage {
   cacheRead: number;
   /** Input tokens written to the prompt cache. */
   cacheWrite: number;
+  /** Provider/model-aware cost in US dollars, when reported by Pi. */
+  cost?: number;
 }
+
+type TokenUsageInput = Omit<TokenUsage, "cost"> & {
+  cost?: number | { total?: number };
+};
 
 export function emptyTokenUsage(): TokenUsage {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -16,9 +24,9 @@ export function emptyTokenUsage(): TokenUsage {
 /** Accumulate `usage` into `total` in place. Missing or malformed usage is ignored. */
 export function accumulateTokenUsage(
   total: TokenUsage,
-  usage: TokenUsage | undefined,
+  usage: TokenUsageInput | undefined,
 ): TokenUsage {
-  if (!isTokenUsage(usage)) {
+  if (!hasValidTokenCounts(usage)) {
     return total;
   }
 
@@ -26,6 +34,8 @@ export function accumulateTokenUsage(
   total.output += usage.output;
   total.cacheRead += usage.cacheRead;
   total.cacheWrite += usage.cacheWrite;
+  const cost = readCost(usage.cost);
+  if (cost !== undefined) total.cost = (total.cost ?? 0) + cost;
   return total;
 }
 
@@ -51,19 +61,40 @@ export function formatTokenUsage(usage: TokenUsage): string {
 }
 
 export function isTokenUsage(value: unknown): value is TokenUsage {
-  if (typeof value !== "object" || value === null) return false;
+  if (!hasValidTokenCounts(value)) return false;
 
   const usage = value as TokenUsage;
+  return (
+    usage.cost === undefined ||
+    (Number.isFinite(usage.cost) && usage.cost >= 0)
+  );
+}
+
+const hasValidTokenCounts = (value: unknown): value is TokenUsageInput => {
+  if (typeof value !== "object" || value === null) return false;
+
+  const usage = value as TokenUsageInput;
   return [usage.input, usage.output, usage.cacheRead, usage.cacheWrite].every(
     (count) => Number.isSafeInteger(count) && count >= 0,
   );
-}
+};
+
+const readCost = (cost: TokenUsageInput["cost"]): number | undefined => {
+  const value = typeof cost === "number" ? cost : cost?.total;
+  return value !== undefined && Number.isFinite(value) && value >= 0
+    ? value
+    : undefined;
+};
 
 let recordedUsage = emptyTokenUsage();
 
 /** Add one agent interaction's usage to the workflow-wide totals. */
-export function recordTokenUsage(usage: TokenUsage): void {
+export function recordTokenUsage(usage: TokenUsageInput): void {
   accumulateTokenUsage(recordedUsage, usage);
+  emitFactoryEvent({
+    type: "usage.updated",
+    usage: getRecordedTokenUsage(),
+  });
 }
 
 /** Workflow-wide token usage accumulated via `recordTokenUsage`. */

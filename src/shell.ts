@@ -1,5 +1,6 @@
 import { $ } from "bun";
-import { log } from "./log.ts";
+import { emitFactoryEvent } from "./events.ts";
+import { log, logCommand } from "./log.ts";
 
 const COMMAND_COLOR = "#ae3ec9";
 const COMMAND_PREVIEW_LENGTH = 200;
@@ -16,12 +17,42 @@ export function createShell(options: CreateShellOptions = {}) {
     this: { cwd?: string } | void,
     ...args: Parameters<typeof $>
   ) {
-    log.info(
-      `${log.highlight("Running", COMMAND_COLOR)} ${formatCommand(...args)}`,
+    const id = crypto.randomUUID();
+    const startedAt = performance.now();
+    const formattedCommand = formatCommand(...args);
+    emitFactoryEvent({
+      type: "command.started",
+      id,
+      command: formattedCommand,
+    });
+    logCommand(
+      id,
+      `${log.highlight("Running", COMMAND_COLOR)} ${formattedCommand}`,
     );
     const command = $(...args).quiet(!(options.verbose ?? false));
     const cwd = options.cwd ?? this?.cwd;
-    return cwd === undefined ? command : command.cwd(cwd);
+    const configured = cwd === undefined ? command : command.cwd(cwd);
+
+    queueMicrotask(() => {
+      void configured.then(
+        (output) =>
+          emitFactoryEvent({
+            type: "command.finished",
+            id,
+            status: output.exitCode === 0 ? "completed" : "failed",
+            durationMs: performance.now() - startedAt,
+          }),
+        () =>
+          emitFactoryEvent({
+            type: "command.finished",
+            id,
+            status: "failed",
+            durationMs: performance.now() - startedAt,
+          }),
+      );
+    });
+
+    return configured;
   };
 }
 

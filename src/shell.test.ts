@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { $ } from "bun";
+import { observeFactoryEvents, type FactoryEvent } from "./events.ts";
 import { log } from "./log.ts";
 import { createShell } from "./shell.ts";
 
@@ -43,6 +44,28 @@ describe("createShell", () => {
     await createShell({ verbose: true })`true`;
 
     expect(quiet).toHaveBeenCalledWith(false);
+  });
+
+  test("reports the command lifecycle under the current activity", async () => {
+    const events: FactoryEvent[] = [];
+
+    await observeFactoryEvents(
+      (event) => events.push(event),
+      () => createShell()`true`,
+    );
+    await Promise.resolve();
+
+    const started = events.find((event) => event.type === "command.started");
+    const finished = events.find((event) => event.type === "command.finished");
+    expect(started).toMatchObject({
+      type: "command.started",
+      command: "true",
+    });
+    expect(finished).toMatchObject({
+      type: "command.finished",
+      id: started?.id,
+      status: "completed",
+    });
   });
 
   test("uses the calling context's cwd by default", async () => {

@@ -141,6 +141,7 @@ function emitAssistantUsage(usage: {
   output: number;
   cacheRead: number;
   cacheWrite: number;
+  cost?: { total: number };
 }) {
   eventHandler?.({
     type: "message_end",
@@ -588,6 +589,30 @@ describe("runAgent", () => {
       output: 5,
       cacheRead: 0,
       cacheWrite: 0,
+    });
+  });
+
+  test("records tokens and cost as each model turn completes", async () => {
+    promptImplementation = async () => {
+      emitAssistantUsage({
+        input: 10,
+        output: 5,
+        cacheRead: 20,
+        cacheWrite: 1,
+        cost: { total: 0.0125 },
+      });
+      expect(getRecordedTokenUsage()).toEqual({
+        input: 10,
+        output: 5,
+        cacheRead: 20,
+        cacheWrite: 1,
+        cost: 0.0125,
+      });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Do the thing", {
+      model: "anthropic/claude-opus-4-5",
     });
   });
 

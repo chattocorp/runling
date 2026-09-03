@@ -44,6 +44,27 @@ describe("token usage", () => {
     });
   });
 
+  test("accumulates numeric and Pi-reported costs", () => {
+    const total = emptyTokenUsage();
+
+    accumulateTokenUsage(total, {
+      input: 1,
+      output: 2,
+      cacheRead: 3,
+      cacheWrite: 4,
+      cost: 0.01,
+    });
+    accumulateTokenUsage(total, {
+      input: 1,
+      output: 2,
+      cacheRead: 3,
+      cacheWrite: 4,
+      cost: { total: 0.025 },
+    });
+
+    expect(total.cost).toBeCloseTo(0.035);
+  });
+
   test("accumulateTokenUsage ignores missing or malformed usage", () => {
     const total = emptyTokenUsage();
 
@@ -77,6 +98,12 @@ describe("token usage", () => {
     expect(isTokenUsage(emptyTokenUsage())).toBe(true);
     expect(isTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(
       true,
+    );
+    expect(isTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4, cost: 0.01 })).toBe(
+      true,
+    );
+    expect(isTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4, cost: -1 })).toBe(
+      false,
     );
     expect(isTokenUsage(undefined)).toBe(false);
     expect(isTokenUsage({})).toBe(false);
