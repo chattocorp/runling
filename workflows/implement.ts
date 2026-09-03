@@ -38,11 +38,7 @@ export const implement = workflow("Implement", async (f): Promise<string> => {
   for (let attempt = 1; validation.exitCode !== 0; attempt++) {
     if (attempt === maxValidationAttempts) {
       throw new Error(
-        f.concat(
-          `Project validation failed after ${maxValidationAttempts} attempts.`,
-          validation.stdout.toString(),
-          validation.stderr.toString(),
-        ),
+        `Project validation failed after ${maxValidationAttempts} attempts.\n${validation.stdout}\n${validation.stderr}`,
       );
     }
 
