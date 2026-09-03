@@ -345,9 +345,11 @@ export class FactoryDashboard implements Component {
       }
     }
 
-    for (const child of this.nodes) {
-      if (child.parentId === node.id) {
-        lines.push(...this.renderNode(child, depth + 1, width));
+    if (node.type !== "step" || node.status !== "completed") {
+      for (const child of this.nodes) {
+        if (child.parentId === node.id) {
+          lines.push(...this.renderNode(child, depth + 1, width));
+        }
       }
     }
     return lines;

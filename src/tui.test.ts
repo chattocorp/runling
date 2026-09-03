@@ -150,6 +150,45 @@ test("renders activity as one semantic execution tree", () => {
   const completed = Bun.stripANSI(dashboard.render(100).join("\n"));
   expect(completed).toContain("      ✓ [bright-otters-1234]");
   expect(completed).not.toContain("↳ Using grep");
+
+  dashboard.handle(
+    event({
+      type: "step.finished",
+      id: "investigate",
+      status: "completed",
+      durationMs: 1_500,
+    }),
+  );
+  const collapsedStep = Bun.stripANSI(dashboard.render(100).join("\n"));
+  expect(collapsedStep).toContain("    ✓ Investigate change · 1.5s");
+  expect(collapsedStep).not.toContain("git status --short");
+  expect(collapsedStep).not.toContain("bright-otters-1234");
+  expect(collapsedStep).not.toContain("Review correctness");
+
+  dashboard.handle(
+    event({
+      type: "step.finished",
+      id: "review",
+      status: "completed",
+      durationMs: 2_000,
+    }),
+  );
+  const collapsedWorkflow = Bun.stripANSI(dashboard.render(100).join("\n"));
+  expect(collapsedWorkflow).toContain("  ✓ Review · 2.0s");
+  expect(collapsedWorkflow).not.toContain("Investigate change");
+
+  dashboard.handle(
+    event({
+      type: "step.finished",
+      id: "review",
+      status: "failed",
+      durationMs: 2_100,
+    }),
+  );
+  const failedWorkflow = Bun.stripANSI(dashboard.render(100).join("\n"));
+  expect(failedWorkflow).toContain("  ✗ Review · 2.1s");
+  expect(failedWorkflow).toContain("    ✓ Investigate change · 1.5s");
+  expect(failedWorkflow).not.toContain("git status --short");
 });
 
 test("renders the final Markdown report and completion state", () => {
