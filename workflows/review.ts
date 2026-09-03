@@ -1,4 +1,5 @@
 import { workflow, type WorkflowResult } from "../src/index.ts";
+import { withOpeningJoke } from "./joke.ts";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -100,4 +101,4 @@ export const review = workflow("Review", async (f): Promise<WorkflowResult> => {
   };
 });
 
-export default review;
+export default withOpeningJoke(review);

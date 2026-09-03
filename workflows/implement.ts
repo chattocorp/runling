@@ -1,4 +1,5 @@
 import { workflow } from "../src/index.ts";
+import { withOpeningJoke } from "./joke.ts";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -72,4 +73,4 @@ export const implement = workflow("Implement", async (f): Promise<string> => {
   return finalReport.summary;
 });
 
-export default implement;
+export default withOpeningJoke(implement);

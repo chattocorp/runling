@@ -25,9 +25,11 @@ The helper only adds the named log scope. It does not create an agent or add
 any workflow behavior.
 
 The example workflows in `workflows/` use the framework to develop this
-repository. Each file is a workflow entrypoint. `workflows/implement.ts` keeps
-one agent session alive while it implements a requested change, runs static
-checks and tests directly, and sends any failures back to that agent for up to
+repository. Each entrypoint first asks a lightweight agent to generate a short
+programming joke and displays it before starting the requested work.
+`workflows/implement.ts` keeps one agent session alive while it implements a
+requested change, runs static checks and tests directly, and sends any failures
+back to that agent for up to
 two repair attempts. The same agent then summarizes the validated diff.
 `workflows/make-pr.ts` creates an isolated Git worktree and branch, calls the
 same implementation workflow there, and reviews the staged change before
@@ -96,6 +98,10 @@ To review current working-tree changes from three parallel perspectives:
 ```bash
 factory workflows/review.ts
 ```
+
+Each of these commands opens with a newly agent-generated programming joke.
+Nested workflows reuse that entrypoint opening rather than generating additional
+jokes.
 
 In an interactive terminal, Factory presents workflow progress, active agents,
 token usage, and the final result in a live TUI. When either input or output is

@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { workflow, type WorkflowResult } from "../src/index.ts";
 import { implement } from "./implement.ts";
+import { withOpeningJoke } from "./joke.ts";
 import { review } from "./review.ts";
 
 const worktreesDirectory = "../factory-worktrees";
@@ -96,4 +97,4 @@ const makePullRequest = workflow(
   },
 );
 
-export default makePullRequest;
+export default withOpeningJoke(makePullRequest);
