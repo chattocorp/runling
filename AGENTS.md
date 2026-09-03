@@ -5,7 +5,8 @@ This repository is an experiment in building the core primitive of an agentic so
 - The framework lives in `src/`
 - Workflow scripts live in `workflows/`
 - `workflows/implement.ts` is a workflow entrypoint that implements and validates a requested change in the current working directory
-- `workflows/make-pr.ts` is a workflow entrypoint that runs the implementation workflow in a worktree and opens a pull request
+- `workflows/make-pr.ts` is a workflow entrypoint that runs the implementation and review workflows in a worktree, opens a pull request, and posts the review as a comment
+- `workflows/review.ts` is a workflow entrypoint that forks a shared investigation into parallel read-only reviews and synthesizes their findings
 
 ## Rules
 

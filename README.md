@@ -25,16 +25,21 @@ The helper only adds the named log scope. It does not create an agent or add
 any workflow behavior.
 
 The example workflows in `workflows/` use the framework to develop this
-repository. Both files are workflow entrypoints. `workflows/implement.ts` keeps
+repository. Each file is a workflow entrypoint. `workflows/implement.ts` keeps
 one agent session alive while it implements a requested change, runs static
 checks and tests directly, and sends any failures back to that agent for up to
 two repair attempts. The same agent then summarizes the validated diff.
 `workflows/make-pr.ts` creates an isolated Git worktree and branch, calls the
-same implementation workflow there, then commits and pushes the change. A fresh
-inspection agent combines the implementation summary with the committed diff
-to write the pull request title and description before the workflow opens it
-and prints its URL. The workflow captures that diff directly and gives the
-inspection agent only pi's read-only `read`, `grep`, `find`, and `ls` tools.
+same implementation workflow there, and reviews the staged change before
+committing and pushing it. A fresh inspection agent combines the implementation
+summary with the committed diff to write the pull request title and description.
+After opening the pull request, the workflow posts the synthesized review as a
+comment and prints the pull request URL. The workflow captures that diff directly
+and gives the inspection agent only pi's read-only `read`, `grep`, `find`, and
+`ls` tools.
+`workflows/review.ts` gives a read-only orchestrator the current diff, forks its
+context into correctness, testing, and simplicity reviews that run in parallel,
+then asks the original orchestrator to synthesize their findings.
 
 ## Requirements
 
@@ -72,8 +77,9 @@ partial change and failure can be inspected.
 
 ## Running the workflows
 
-Pass the prompt as one quoted command-line argument. To implement and validate
-the change directly in the current working directory:
+The prompt is optional. Workflows that need one receive it as a single quoted
+command-line argument. To implement and validate the change directly in the
+current working directory:
 
 ```bash
 factory workflows/implement.ts "Add a focused feature and test it"
@@ -83,6 +89,12 @@ To implement the change in an isolated worktree and open a pull request:
 
 ```bash
 factory workflows/make-pr.ts "Add a focused feature and test it"
+```
+
+To review current working-tree changes from three parallel perspectives:
+
+```bash
+factory workflows/review.ts
 ```
 
 By default, raw command output is suppressed while workflow progress and the
@@ -154,12 +166,14 @@ workflow in its new worktree with:
 await implement({ ...f, cwd: worktreePath });
 ```
 
-A workflow may return a summary string, nothing, or a structured result with
-JSON-compatible outputs:
+A workflow may return a summary string, nothing, or a structured result.
+`details` contains human-readable Markdown that Factory prints in interactive
+mode; `outputs` contains JSON-compatible values for callers:
 
 ```ts
 return {
   summary: `Opened ${pullRequestUrl}`,
+  details: "## Summary\n\nImplemented and validated the requested change.",
   outputs: {
     pullRequestUrl,
     branchName,
@@ -175,6 +189,7 @@ mode, a successful execution has this shape:
   "ok": true,
   "result": {
     "summary": "Opened https://github.com/example/project/pull/42",
+    "details": "## Summary\n\nImplemented and validated the requested change.",
     "outputs": {
       "pullRequestUrl": "https://github.com/example/project/pull/42",
       "branchName": "factory/bright-otters-2468"
@@ -218,6 +233,27 @@ await using a = await f.agent({
 await a.run("Investigate the failure");
 await a.run("Now implement the fix");
 ```
+
+Fork an idle agent to give several agents the same conversation context without
+sharing subsequent messages:
+
+```ts
+await using investigator = await f.agent({ model });
+await investigator.run("Investigate the change");
+
+await using correctness = await investigator.fork();
+await using testing = await investigator.fork();
+
+const reviews = await Promise.all([
+  correctness.run("Review correctness"),
+  testing.run("Review test coverage"),
+]);
+```
+
+Forks are fresh in-memory sessions with their own IDs and lifecycles. They copy
+the parent's current conversation and agent configuration, but later messages
+and disposal are independent. An agent cannot be forked while it is running or
+after it has been disposed.
 
 Calls to `run` must be sequential. Each call returns and records its own outcome
 and token usage while retaining the conversation established by earlier calls.
@@ -278,6 +314,8 @@ code needs to observe pi's raw session-event stream directly.
 - `step(name, work)` runs an inline operation with nested log indentation.
 - `agent(options)` creates an automatically disposable, in-memory agent for
   sequential multi-turn conversations in `f.cwd`.
+- `agent.fork()` creates an independent in-memory agent from the current
+  conversation.
 - `runAgent(prompt, options)` runs and disposes a one-shot agent in `f.cwd`.
 - `workingTreeHash(cwd?)` fingerprints tracked and untracked Git state,
   defaulting to `f.cwd`.

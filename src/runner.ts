@@ -97,6 +97,7 @@ export function normalizeWorkflowResult(
     typeof value !== "object" ||
     value === null ||
     typeof value.summary !== "string" ||
+    (value.details !== undefined && typeof value.details !== "string") ||
     (value.outputs !== undefined &&
       (!isJsonValue(value.outputs) || Array.isArray(value.outputs)))
   ) {
@@ -135,6 +136,9 @@ async function reportExecution(
         result = normalizeWorkflowResult(await run());
         if (!json && result !== null) {
           log.success(result.summary);
+          if (result.details !== undefined) {
+            console.log(`\n${result.details}\n`);
+          }
         }
       } catch (cause) {
         result = null;

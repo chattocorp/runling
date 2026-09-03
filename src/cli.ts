@@ -40,10 +40,10 @@ export function cli(
     throw error instanceof Error ? error : new Error(String(error));
   }
 
-  const [workflowPath, prompt, ...extraPositionals] = parsed.positionals;
-  if (workflowPath === undefined || prompt === undefined) {
+  const [workflowPath, prompt = "", ...extraPositionals] = parsed.positionals;
+  if (workflowPath === undefined) {
     throw new Error(
-      `Usage: ${command} [-v|--verbose] [--json] <workflow.ts> <prompt>`,
+      `Usage: ${command} [-v|--verbose] [--json] <workflow.ts> [prompt]`,
     );
   }
   if (extraPositionals.length > 0) {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Factory } from "../src/index.ts";
-import { describePullRequest } from "./make-pr.ts";
+import type { Factory, Shell, WorkflowResult } from "../src/index.ts";
+import { describePullRequest, postReview } from "./make-pr.ts";
 
 describe("make-pr workflow", () => {
   test("builds PR metadata from the implementation summary and current commit", async () => {
@@ -58,5 +58,51 @@ describe("make-pr workflow", () => {
     expect(prompt).toContain("Changed the behavior to fix the bug");
     expect(prompt).toContain("diff --git a/foo.ts b/foo.ts");
     expect(disposed).toBe(true);
+  });
+
+  test("posts a workflow review as a pull request comment", async () => {
+    let command: TemplateStringsArray | undefined;
+    let expressions: unknown[] = [];
+    const shell = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      command = strings;
+      expressions = values;
+      return Promise.resolve();
+    }) as unknown as Shell;
+    const f = {
+      shell,
+      step: <T>(_label: string, work: () => T) => work(),
+    } as unknown as Factory;
+    const result: WorkflowResult = {
+      summary: "Found one issue",
+      details: "## Findings\n\nFix the race.",
+    };
+
+    await postReview(f, "https://github.com/example/project/pull/42", result);
+
+    expect(command?.join("_argument_")).toBe(
+      "gh pr comment _argument_ --body _argument_",
+    );
+    expect(expressions).toEqual([
+      "https://github.com/example/project/pull/42",
+      "## Findings\n\nFix the race.",
+    ]);
+  });
+
+  test("uses the review summary when it has no details", async () => {
+    let body: unknown;
+    const shell = ((_strings: TemplateStringsArray, ...values: unknown[]) => {
+      body = values[1];
+      return Promise.resolve();
+    }) as unknown as Shell;
+    const f = {
+      shell,
+      step: <T>(_label: string, work: () => T) => work(),
+    } as unknown as Factory;
+
+    await postReview(f, "https://github.com/example/project/pull/42", {
+      summary: "No issues found",
+    });
+
+    expect(body).toBe("No issues found");
   });
 });

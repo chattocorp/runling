@@ -51,6 +51,7 @@ describe("executeWorkflow", () => {
     const execution = await executeWorkflow(
       async () => ({
         summary: "Opened the pull request",
+        details: "## Summary\n\nImplemented the requested change.",
         outputs: { pullRequestUrl: "https://example.com/pull/1" },
       }),
       f,
@@ -59,8 +60,29 @@ describe("executeWorkflow", () => {
     expect(execution.ok).toBe(true);
     expect(execution.result).toEqual({
       summary: "Opened the pull request",
+      details: "## Summary\n\nImplemented the requested change.",
       outputs: { pullRequestUrl: "https://example.com/pull/1" },
     });
+  });
+
+  test("prints result details in interactive mode", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+
+    try {
+      await executeWorkflow(
+        async () => ({
+          summary: "Review complete",
+          details: "## Findings\n\nSomething worth reading.",
+        }),
+        f,
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(logs).toContain("\n## Findings\n\nSomething worth reading.\n");
   });
 
   test("emits only the execution document to stdout in JSON mode", async () => {

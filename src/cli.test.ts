@@ -25,14 +25,23 @@ describe("cli", () => {
     expect(log.level).toBe("debug");
   });
 
-  test("reports missing prompts", () => {
+  test("allows the prompt to be omitted", () => {
+    expect(cli(["workflows/review.ts"])).toEqual({
+      workflowPath: "workflows/review.ts",
+      prompt: "",
+      json: false,
+      verbose: false,
+    });
+  });
+
+  test("reports a missing workflow", () => {
     try {
       cli([], "factory");
       throw new Error("Expected parsing to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe(
-        "Usage: factory [-v|--verbose] [--json] <workflow.ts> <prompt>",
+        "Usage: factory [-v|--verbose] [--json] <workflow.ts> [prompt]",
       );
     }
   });

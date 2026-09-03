@@ -27,6 +27,24 @@ describe("factory executable", () => {
     expect(stdout).toContain("Finished in ");
   });
 
+  test("runs a workflow without a prompt", async () => {
+    const child = Bun.spawn(
+      [process.execPath, executable, fixture, "--json"],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+
+    const [exitCode, stdout] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).result.summary).toBe("");
+  });
+
   test("reports invalid invocations without a stack trace", async () => {
     const child = Bun.spawn([process.execPath, executable], {
       stdout: "pipe",
@@ -40,7 +58,7 @@ describe("factory executable", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      "Usage: factory [-v|--verbose] [--json] <workflow.ts> <prompt>",
+      "Usage: factory [-v|--verbose] [--json] <workflow.ts> [prompt]",
     );
     expect(stderr).not.toContain("at ");
   });
@@ -93,7 +111,7 @@ describe("factory executable", () => {
     expect(JSON.parse(stdout)).toMatchObject({
       ok: false,
       result: null,
-      error: "Usage: factory [-v|--verbose] [--json] <workflow.ts> <prompt>",
+      error: "Usage: factory [-v|--verbose] [--json] <workflow.ts> [prompt]",
     });
     expect(stderr).toContain("Usage: factory");
   });

@@ -129,6 +129,8 @@ export interface FactoryAgent extends AsyncDisposable {
   run(prompt: string, options?: AgentRunOptions): Promise<CompletedAgentReport>;
   /** Run one turn and return any reported outcome. */
   runOutcome(prompt: string, options?: AgentRunOptions): Promise<AgentResult>;
+  /** Create an independent in-memory agent with a copy of this conversation. */
+  fork(): Promise<FactoryAgent>;
   /** Release the underlying in-memory session. */
   dispose(): void;
 }
@@ -180,6 +182,15 @@ export async function runAgent(
 }
 
 export async function agent(options: AgentOptions): Promise<FactoryAgent> {
+  return createFactoryAgent(options);
+}
+
+type AgentSession = Awaited<ReturnType<typeof createAgentSession>>["session"];
+
+async function createFactoryAgent(
+  options: AgentOptions,
+  initialize?: (session: AgentSession) => void,
+): Promise<FactoryAgent> {
   const agentId = randomId();
   const color = takeAgentColor();
 
@@ -273,6 +284,7 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
       ]),
     ],
   });
+  initialize?.(session);
 
   let disposed = false;
   let running = false;
@@ -488,6 +500,20 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
     },
 
     runOutcome,
+
+    async fork() {
+      if (disposed) {
+        throw new Error(`Agent ${agentId} has been disposed`);
+      }
+      if (running) {
+        throw new Error(`Agent ${agentId} is already running`);
+      }
+
+      const messages = session.agent.state.messages;
+      return createFactoryAgent(options, (forkedSession) => {
+        forkedSession.agent.state.messages = messages;
+      });
+    },
 
     dispose,
 

@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { workflow, type WorkflowResult } from "../src/index.ts";
 import { implement } from "./implement.ts";
+import { review } from "./review.ts";
 
 const worktreesDirectory = "../factory-worktrees";
 const model = "openai-codex/gpt-5.6-sol";
@@ -39,6 +40,14 @@ export const describePullRequest = workflow(
   },
 );
 
+export const postReview = workflow(
+  "Post review",
+  async (f, pullRequestUrl: string, result: WorkflowResult) => {
+    const body = result.details ?? result.summary;
+    await f.shell`gh pr comment ${pullRequestUrl} --body ${body}`;
+  },
+);
+
 const makePullRequest = workflow(
   "Make pull request",
   async (f): Promise<WorkflowResult> => {
@@ -59,6 +68,7 @@ const makePullRequest = workflow(
     const implementationSummary = await implement(worktree);
 
     await worktree.shell`git add --all`;
+    const reviewResult = await review(worktree);
     await worktree.shell`git commit -m ${implementationSummary}`;
 
     const committedChange =
@@ -72,6 +82,7 @@ const makePullRequest = workflow(
     const createdPullRequest =
       await worktree.shell`gh pr create --head ${branchName} --title ${pullRequest.title} --body ${pullRequest.body}`.quiet();
     const pullRequestUrl = createdPullRequest.stdout.toString().trim();
+    await postReview(worktree, pullRequestUrl, reviewResult);
 
     await f.shell`git worktree remove ${worktreePath}`;
 

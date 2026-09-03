@@ -16,6 +16,19 @@ describe("createShell", () => {
     expect(info.mock.calls[0]?.[0]).toContain('echo "hello world"');
   });
 
+  test("truncates long command previews without changing the command", async () => {
+    const info = spyOn(log, "info");
+    const value = `${"x".repeat(500)}the-end`;
+
+    const output = await createShell()`printf %s ${value}`.text();
+
+    const message = info.mock.calls[0]?.[0] ?? "";
+    expect(output).toBe(value);
+    expect(message).toContain("characters omitted");
+    expect(message).not.toContain("the-end");
+    expect(message.length).toBeLessThan(260);
+  });
+
   test("creates quiet commands by default", async () => {
     const quiet = spyOn($.ShellPromise.prototype, "quiet");
 

@@ -16,6 +16,7 @@ let settingsCreateArgs: unknown[] | undefined;
 let settingsOverrides: any;
 let promptCalls = 0;
 let sessionCreations = 0;
+let createdSessions: any[] = [];
 let abortCalls = 0;
 let disposed = false;
 let modelAvailable = true;
@@ -55,7 +56,18 @@ mock.module("@earendil-works/pi-coding-agent", () => {
     createAgentSession: async (options: unknown) => {
       sessionCreations++;
       sessionOptions = options;
+      let messages: any[] = [];
       const session = {
+        agent: {
+          state: {
+            get messages() {
+              return messages;
+            },
+            set messages(next: any[]) {
+              messages = [...next];
+            },
+          },
+        },
         subscribe(handler: (event: any) => void) {
           eventHandler = handler;
           return () => {
@@ -73,6 +85,7 @@ mock.module("@earendil-works/pi-coding-agent", () => {
           disposed = true;
         },
       };
+      createdSessions.push(session);
       return { session };
     },
     defineTool: (tool: unknown) => tool,
@@ -97,6 +110,7 @@ beforeEach(() => {
   settingsOverrides = undefined;
   promptCalls = 0;
   sessionCreations = 0;
+  createdSessions = [];
   abortCalls = 0;
   disposed = false;
   modelAvailable = true;
@@ -706,6 +720,48 @@ describe("runAgent", () => {
 });
 
 describe("agent", () => {
+  test("forks the current conversation into an independent session", async () => {
+    const instance = await agent({
+      model: "anthropic/claude-opus-4-5",
+      tools: ["read"],
+    });
+    createdSessions[0].agent.state.messages = [
+      { role: "user", content: [{ type: "text", text: "Investigate" }] },
+    ];
+
+    const fork = await instance.fork();
+
+    try {
+      expect(fork.id).not.toBe(instance.id);
+      expect(sessionCreations).toBe(2);
+      expect(createdSessions[1].agent.state.messages).toEqual(
+        createdSessions[0].agent.state.messages,
+      );
+
+      createdSessions[1].agent.state.messages.push({ role: "assistant" });
+      expect(createdSessions[0].agent.state.messages).toHaveLength(1);
+      expect(createdSessions[1].agent.state.messages).toHaveLength(2);
+      expect(sessionOptions.tools).toEqual(["read", "report_outcome"]);
+    } finally {
+      fork.dispose();
+      instance.dispose();
+    }
+  });
+
+  test("does not fork a running or disposed agent", async () => {
+    let instance: Awaited<ReturnType<typeof agent>>;
+    promptImplementation = async () => {
+      await expect(instance.fork()).rejects.toThrow("already running");
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+    instance = await agent({ model: "anthropic/claude-opus-4-5" });
+
+    await instance.run("Work");
+    instance.dispose();
+
+    await expect(instance.fork()).rejects.toThrow("has been disposed");
+  });
+
   test("retains one session across sequential runs", async () => {
     promptImplementation = async (prompt) => {
       await reportOutcome({ outcome: "completed", summary: prompt });

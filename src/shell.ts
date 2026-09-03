@@ -2,6 +2,7 @@ import { $ } from "bun";
 import { log } from "./log.ts";
 
 const COMMAND_COLOR = "#ae3ec9";
+const COMMAND_PREVIEW_LENGTH = 200;
 
 export const ShellError = $.ShellError;
 
@@ -27,7 +28,7 @@ export function createShell(options: CreateShellOptions = {}) {
 export type Shell = ReturnType<typeof createShell>;
 
 function formatCommand(...[strings, ...expressions]: Parameters<typeof $>) {
-  return strings
+  const command = strings
     .map((part, index) => {
       const expression = expressions[index];
       return expression === undefined
@@ -37,6 +38,10 @@ function formatCommand(...[strings, ...expressions]: Parameters<typeof $>) {
     .join("")
     .trim()
     .replaceAll("\n", " ");
+
+  if (command.length <= COMMAND_PREVIEW_LENGTH) return command;
+
+  return `${command.slice(0, COMMAND_PREVIEW_LENGTH)}… (${(command.length - COMMAND_PREVIEW_LENGTH).toLocaleString()} characters omitted)`;
 }
 
 function formatExpression(expression: Parameters<typeof $>[number]): string {

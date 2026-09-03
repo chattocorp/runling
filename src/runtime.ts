@@ -31,6 +31,8 @@ export type JsonValue =
 
 export interface WorkflowResult {
   summary: string;
+  /** Human-readable Markdown shown after the summary in interactive mode. */
+  details?: string;
   outputs?: Record<string, JsonValue>;
 }
 
