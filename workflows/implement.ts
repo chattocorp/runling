@@ -20,6 +20,8 @@ const validate = workflow("Validate", async (f) => {
 });
 
 export const implement = workflow("Implement", async (f): Promise<string> => {
+  await f.shell`cowsay ${f.prompt}`.quiet(false);
+
   const pwd = await f.getPwd();
 
   await using implementationAgent = await f.agent({

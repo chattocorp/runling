@@ -15,6 +15,7 @@ const completedReport = {
 };
 
 interface RuntimeOptions {
+  runCowsay?: (prompt: string, quiet: boolean) => Promise<void>;
   runCheck?: () => Promise<void>;
   runTests?: () => Promise<void>;
   runAgent?: (
@@ -24,6 +25,7 @@ interface RuntimeOptions {
 }
 
 function runtimeWith({
+  runCowsay = async () => {},
   runCheck = async () => {},
   runTests = async () => {},
   runAgent = async () => completedReport,
@@ -35,11 +37,18 @@ function runtimeWith({
     stdout = Buffer.from("stdout");
     stderr = Buffer.from("stderr");
   }
-  const shell = ((strings: TemplateStringsArray) => {
+  const shell = ((
+    strings: TemplateStringsArray,
+    ...expressions: unknown[]
+  ) => {
     const command = strings.join("");
     const run = command === "bun run check" ? runCheck : runTests;
     const shellPromise = {
       cwd: () => shellPromise,
+      quiet: (quiet: boolean) =>
+        command === "cowsay "
+          ? runCowsay(String(expressions[0]), quiet)
+          : shellPromise,
       async nothrow() {
         try {
           await run();
@@ -108,6 +117,19 @@ function runtimeWith({
 }
 
 describe("implement workflow", () => {
+  test("prints the given prompt with cowsay", async () => {
+    const calls: Array<{ prompt: string; quiet: boolean }> = [];
+    const { factory } = runtimeWith({
+      runCowsay: async (prompt, quiet) => {
+        calls.push({ prompt, quiet });
+      },
+    });
+
+    await implement(factory);
+
+    expect(calls).toEqual([{ prompt: contextValues.prompt, quiet: false }]);
+  });
+
   test("returns the implementing agent's post-validation summary", async () => {
     const prompts: string[] = [];
     const { factory } = runtimeWith({
