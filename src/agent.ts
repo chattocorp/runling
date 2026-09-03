@@ -37,6 +37,13 @@ const reportSchema = Type.Object({
     maxLength: 500,
     pattern: "^[^\\r\\n]+$",
   }),
+  details: Type.Optional(
+    Type.String({
+      description: "Optional detailed Markdown supporting the summary",
+      minLength: 1,
+      maxLength: 20_000,
+    }),
+  ),
 });
 
 const AGENT_COLORS = [

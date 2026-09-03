@@ -11,13 +11,15 @@ validation commands, model choices, and decisions based on agent outcomes all
 belong in the script.
 
 The example workflows in `workflows/` use the framework to develop this
-repository. Both files are workflow entrypoints. `workflows/implement.ts` asks
-an agent to make a requested change in the current working directory, runs the
-static checks and tests, and gives an agent up to two opportunities to repair
-failures.
+repository. Both files are workflow entrypoints. `workflows/implement.ts` keeps
+one agent session alive while it implements a requested change, runs static
+checks and tests directly, and sends any failures back to that agent for up to
+two repair attempts. The same agent then summarizes the validated diff.
 `workflows/make-pr.ts` creates an isolated Git worktree and branch, calls the
-same implementation workflow there, then commits and pushes the change, opens
-a pull request, and prints its URL.
+same implementation workflow there, then commits and pushes the change. A fresh
+inspection agent combines the implementation summary with the committed diff
+to write the pull request title and description before the workflow opens it
+and prints its URL.
 
 ## Requirements
 
@@ -194,7 +196,6 @@ automatically when its scope exits, including after errors and early returns:
 
 ```ts
 await using a = await f.agent({
-  cwd: f.cwd,
   model: "openai-codex/gpt-5.6-sol",
   thinkingLevel: "medium",
 });
@@ -208,6 +209,8 @@ and token usage while retaining the conversation established by earlier calls.
 It throws an `AgentOutcomeError` for blocked or failed outcomes. Use `runOutcome`
 when the workflow needs to inspect and branch on those outcomes instead. Call
 `dispose()` directly when lexical resource management is not convenient.
+Reports contain a concise, single-line `summary` and may include multiline
+Markdown in `details` when the workflow needs a more substantial artifact.
 
 `runAgent` is the one-shot alternative. It creates an agent, runs one turn, and
 disposes it before returning. Unlike `run`, it returns any reported outcome.
@@ -251,11 +254,12 @@ contract.
 
 - `step(name, work)` runs an inline operation with nested log indentation.
 - `agent(options)` creates an automatically disposable, in-memory agent for
-  sequential multi-turn conversations.
-- `runAgent(prompt, options)` runs and disposes a one-shot agent.
-- `workingTreeHash(cwd)` fingerprints tracked and untracked Git state.
-- `getPwd(cwd)` captures a working-directory snapshot whose `hasChanges` getter
-  compares current state with the snapshot.
+  sequential multi-turn conversations in `f.cwd`.
+- `runAgent(prompt, options)` runs and disposes a one-shot agent in `f.cwd`.
+- `workingTreeHash(cwd?)` fingerprints tracked and untracked Git state,
+  defaulting to `f.cwd`.
+- `getPwd(cwd?)` captures a working-directory snapshot, defaulting to `f.cwd`,
+  whose `hasChanges` getter compares current state with the snapshot.
 - `shell` is a Bun shell tag that runs from `f.cwd`, buffers command output by
   default, and streams it in verbose mode.
 - `createShell(options)` creates another configured Bun shell tag.

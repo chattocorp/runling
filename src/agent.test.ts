@@ -106,6 +106,7 @@ beforeEach(() => {
 async function reportOutcome(report: {
   outcome: "completed" | "blocked" | "failed";
   summary: string;
+  details?: string;
 }) {
   await sessionOptions.customTools[0].execute("tool-call", report);
 }
@@ -348,7 +349,11 @@ describe("runAgent", () => {
 
   test("returns the structured outcome reported by the agent", async () => {
     promptImplementation = async () => {
-      await reportOutcome({ outcome: "blocked", summary: "Need access" });
+      await reportOutcome({
+        outcome: "blocked",
+        summary: "Need access",
+        details: "The required repository is unavailable.",
+      });
     };
 
     await expect(
@@ -356,6 +361,7 @@ describe("runAgent", () => {
     ).resolves.toEqual({
       outcome: "blocked",
       summary: "Need access",
+      details: "The required repository is unavailable.",
       usage: emptyUsage,
     });
     expect(disposed).toBe(true);

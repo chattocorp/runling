@@ -64,8 +64,12 @@ function runtimeWith({
   const factory = {
     ...contextValues,
     shell,
-    agent: async (options: Record<string, unknown>) => {
-      agentOptions.push(options);
+    agent: async function (
+      this: Factory,
+      options: Record<string, unknown>,
+    ) {
+      const resolvedOptions = { ...options, cwd: options.cwd ?? this.cwd };
+      agentOptions.push(resolvedOptions);
       let disposed = false;
       const dispose = () => {
         if (disposed) return;
@@ -74,7 +78,7 @@ function runtimeWith({
       };
       return {
         id: "test-agent-0000",
-        run: (prompt: string) => runAgent(prompt, options),
+        run: (prompt: string) => runAgent(prompt, resolvedOptions),
         dispose,
         async [Symbol.asyncDispose]() {
           dispose();
@@ -104,6 +108,24 @@ function runtimeWith({
 }
 
 describe("implement workflow", () => {
+  test("returns the implementing agent's post-validation summary", async () => {
+    const prompts: string[] = [];
+    const { factory } = runtimeWith({
+      runAgent: async (prompt) => {
+        prompts.push(prompt);
+        return {
+          ...completedReport,
+          summary: prompts.length === 1 ? "Initial summary" : "Final summary",
+        };
+      },
+    });
+
+    await expect(implement(factory)).resolves.toBe("Final summary");
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("final working-tree diff");
+    expect(prompts[1]).toContain("what changed and why");
+  });
+
   test("runs agents on Sol with medium thinking", async () => {
     const setup = runtimeWith();
 
@@ -115,12 +137,16 @@ describe("implement workflow", () => {
       cwd: "/project",
       model: "openai-codex/gpt-5.6-sol",
       thinkingLevel: "medium",
-      instructions: ["Write tests for new or changed features."],
+      instructions: [
+        "Write tests for new or changed features.",
+        "Summarize what you changed and why in your final report.",
+      ],
     });
   });
 
-  test("runs repair agents on the same model and thinking level", async () => {
+  test("feeds validation failures back to the implementing agent", async () => {
     let checks = 0;
+    const prompts: string[] = [];
     let TestShellError: new () => Error;
     const setup = runtimeWith({
       runCheck: async () => {
@@ -129,17 +155,21 @@ describe("implement workflow", () => {
           throw new TestShellError();
         }
       },
+      runAgent: async (prompt) => {
+        prompts.push(prompt);
+        return completedReport;
+      },
     });
     TestShellError = setup.TestShellError;
 
     await expect(implement(setup.factory)).resolves.toBe("Made the change");
 
-    expect(setup.agentOptions).toHaveLength(2);
-    expect(setup.disposedAgents).toBe(2);
-    expect(setup.agentOptions[1]).toMatchObject({
-      model: "openai-codex/gpt-5.6-sol",
-      thinkingLevel: "medium",
-    });
+    expect(setup.agentOptions).toHaveLength(1);
+    expect(setup.disposedAgents).toBe(1);
+    expect(prompts).toHaveLength(3);
+    expect(prompts[1]).toContain("Project validation failed");
+    expect(prompts[1]).toContain("stdout");
+    expect(prompts[1]).toContain("stderr");
   });
 
   test("runs checks and tests once when both pass", async () => {
@@ -158,7 +188,12 @@ describe("implement workflow", () => {
 
     expect(checks).toBe(1);
     expect(tests).toBe(1);
-    expect(messages).toEqual(["Running checks", "Running tests"]);
+    expect(messages).toEqual([
+      "Implementing change",
+      "Running checks",
+      "Running tests",
+      "Summarizing changes",
+    ]);
   });
 
   test("awaits a repair before rerunning checks and tests", async () => {
@@ -187,11 +222,13 @@ describe("implement workflow", () => {
 
     expect(tests).toBe(2);
     expect(setup.messages).toEqual([
+      "Implementing change",
       "Running checks",
       "Running tests",
-      "Fixing failed validation (attempt 1/3)",
+      "Repairing validation (attempt 1/3)",
       "Running checks",
       "Running tests",
+      "Summarizing changes",
     ]);
   });
 });

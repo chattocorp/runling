@@ -1,8 +1,11 @@
-import type { Factory } from "../src/index.ts";
+import type { Factory, FactoryAgent } from "../src/index.ts";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
-const agentInstructions = ["Write tests for new or changed features."];
+const agentInstructions = [
+  "Write tests for new or changed features.",
+  "Summarize what you changed and why in your final report.",
+];
 const maxValidationAttempts = 3;
 
 const runCheck = (f: Factory) =>
@@ -17,8 +20,7 @@ const runTests = (f: Factory) =>
     () => f.shell`bun test`.nothrow(),
   );
 
-async function validate(f: Factory) {
-  const { cwd } = f;
+async function validate(f: Factory, agent: FactoryAgent) {
   let attempt = 1;
 
   while (true) {
@@ -39,25 +41,18 @@ async function validate(f: Factory) {
       );
     }
 
-    f.log.info(
-      `Fixing failed validation (attempt ${attempt}/${maxValidationAttempts})`,
-    );
-
-    await using repairAgent = await f.agent({
-      cwd,
-      model,
-      thinkingLevel,
-      instructions: agentInstructions,
-    });
-
-    await repairAgent.run(
-      f.concat(
-        "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
-        "",
-        "Failure output:",
-        result.stdout.toString(),
-        result.stderr.toString(),
-      ),
+    await f.step(
+      `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
+      () =>
+        agent.run(
+          f.concat(
+            "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
+            "",
+            "Failure output:",
+            result.stdout.toString(),
+            result.stderr.toString(),
+          ),
+        ),
     );
 
     attempt++;
@@ -65,29 +60,34 @@ async function validate(f: Factory) {
 }
 
 export async function implement(f: Factory): Promise<string> {
-  const { cwd } = f;
-
-  const pwd = await f.getPwd(cwd);
+  const pwd = await f.getPwd();
 
   await using implementationAgent = await f.agent({
-    cwd,
     model,
     thinkingLevel,
     instructions: agentInstructions,
   });
 
-  const report = await implementationAgent.run(f.prompt);
+  await f.step("Implementing change", () =>
+    implementationAgent.run(f.prompt),
+  );
 
   if (!(await pwd.hasChanges)) {
     throw new Error("Agent completed without changing the worktree");
   }
 
-  await validate(f);
+  await validate(f, implementationAgent);
   if (!(await pwd.hasChanges)) {
     throw new Error("The validated worktree no longer contains any changes");
   }
 
-  return report.summary;
+  const finalReport = await f.step("Summarizing changes", () =>
+    implementationAgent.run(
+      "Inspect the final working-tree diff, including any validation repairs, and summarize what changed and why. Do not modify the worktree.",
+    ),
+  );
+
+  return finalReport.summary;
 }
 
 export default implement;

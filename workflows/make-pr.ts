@@ -4,10 +4,41 @@ import type { Factory, WorkflowResult } from "../src/index.ts";
 import { implement } from "./implement.ts";
 
 const worktreesDirectory = "../factory-worktrees";
+const model = "openai-codex/gpt-5.6-sol";
+const thinkingLevel = "medium";
 
-async function makePullRequest(
+export async function describePullRequest(
   f: Factory,
-): Promise<WorkflowResult> {
+  implementationSummary: string,
+) {
+  return f.step("Writing pull request description", async () => {
+    await using writer = await f.agent({
+      model,
+      thinkingLevel,
+      tools: ["read", "bash"],
+      instructions: ["Inspect the repository without modifying it."],
+    });
+
+    const report = await writer.run(
+      f.concat(
+        "Write the title and Markdown description for a pull request containing the current commit.",
+        "Inspect the commit and its diff with git before writing the description.",
+        "Use your report summary as the concise pull request title and report details as the complete Markdown body.",
+        "Mention that `bun run check` and `bun test` passed.",
+        "",
+        "Implementation summary:",
+        implementationSummary,
+      ),
+    );
+
+    return {
+      title: report.summary.slice(0, 120),
+      body: report.details ?? implementationSummary,
+    };
+  });
+}
+
+async function makePullRequest(f: Factory): Promise<WorkflowResult> {
   const { cwd } = f;
   await f.shell`gh auth status`;
 
@@ -22,25 +53,19 @@ async function makePullRequest(
 
   const worktree = { ...f, cwd: worktreePath };
   await worktree.shell`bun install --frozen-lockfile`;
-  const summary = await implement(worktree);
+  const implementationSummary = await implement(worktree);
 
   await worktree.shell`git add --all`;
-  await worktree.shell`git commit -m ${summary}`;
-  await worktree.shell`git push --set-upstream origin ${branchName}`;
+  await worktree.shell`git commit -m ${implementationSummary}`;
 
-  const pullRequestBody = f.concat(
-    "## Summary",
-    "",
-    summary,
-    "",
-    "## Validation",
-    "",
-    "- `bun run check`",
-    "- `bun test`",
+  const pullRequest = await describePullRequest(
+    worktree,
+    implementationSummary,
   );
-  const pullRequest =
-    await worktree.shell`gh pr create --head ${branchName} --title ${summary.slice(0, 120)} --body ${pullRequestBody}`.quiet();
-  const pullRequestUrl = pullRequest.stdout.toString().trim();
+  await worktree.shell`git push --set-upstream origin ${branchName}`;
+  const createdPullRequest =
+    await worktree.shell`gh pr create --head ${branchName} --title ${pullRequest.title} --body ${pullRequest.body}`.quiet();
+  const pullRequestUrl = createdPullRequest.stdout.toString().trim();
 
   await f.shell`git worktree remove ${worktreePath}`;
 

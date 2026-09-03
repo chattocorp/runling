@@ -1,9 +1,14 @@
 import {
-  agent,
+  agent as createAgent,
   AgentOutcomeError,
-  runAgent,
+  type AgentOptions,
+  runAgent as runAgentOnce,
+  type RunAgentOptions,
 } from "./agent.ts";
-import { getPwd, workingTreeHash } from "./git.ts";
+import {
+  getPwd as captureWorkingDirectory,
+  workingTreeHash as hashWorkingTree,
+} from "./git.ts";
 import { randomId } from "./id.ts";
 import { log } from "./log.ts";
 import { createShell, ShellError, type Shell } from "./shell.ts";
@@ -30,6 +35,26 @@ export interface WorkflowResult {
 }
 
 export type WorkflowReturn = WorkflowResult | string | undefined | void;
+
+function agent(this: FactoryValues, options: AgentOptions) {
+  return createAgent({ ...options, cwd: options.cwd ?? this.cwd });
+}
+
+function runAgent(
+  this: FactoryValues,
+  prompt: string,
+  options: RunAgentOptions,
+) {
+  return runAgentOnce(prompt, { ...options, cwd: options.cwd ?? this.cwd });
+}
+
+function getPwd(this: FactoryValues, cwd = this.cwd) {
+  return captureWorkingDirectory(cwd);
+}
+
+function workingTreeHash(this: FactoryValues, cwd = this.cwd) {
+  return hashWorkingTree(cwd);
+}
 
 const factoryPrimitives = Object.freeze({
   agent,
