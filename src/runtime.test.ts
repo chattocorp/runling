@@ -10,6 +10,7 @@ describe("factory", () => {
     });
 
     expect(f.agent).toBeFunction();
+    expect(f.shell).toBeFunction();
     expect(f.createShell).toBeFunction();
     expect(f.cwd).toBe("/project");
     expect(f.prompt).toBe("Make the change");

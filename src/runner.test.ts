@@ -25,9 +25,9 @@ describe("executeWorkflow", () => {
     await executeWorkflow(async (receivedFactory) => {
       expect(receivedFactory).toBe(f);
       expect(receivedFactory.agent).toBeFunction();
+      expect(receivedFactory.shell).toBeFunction();
       expect(receivedFactory.createShell).toBeFunction();
       expect(receivedFactory.step).toBeFunction();
-      expect(receivedFactory.withRetries).toBeFunction();
       expect(receivedFactory.cwd).toBe("/project");
       expect(receivedFactory.prompt).toBe("Make the change");
     }, f);

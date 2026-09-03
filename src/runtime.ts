@@ -1,14 +1,12 @@
 import {
   agent,
   AgentOutcomeError,
-  requireCompletedReport,
   runAgent,
 } from "./agent.ts";
 import { getPwd, workingTreeHash } from "./git.ts";
 import { randomId } from "./id.ts";
 import { log } from "./log.ts";
-import { withRetries } from "./retries.ts";
-import { createShell, ShellError } from "./shell.ts";
+import { createShell, ShellError, type Shell } from "./shell.ts";
 import { step } from "./step.ts";
 import { concat } from "./utils.ts";
 
@@ -36,14 +34,12 @@ export type WorkflowReturn = WorkflowResult | string | undefined | void;
 const factoryPrimitives = Object.freeze({
   agent,
   AgentOutcomeError,
-  requireCompletedReport,
   runAgent,
   getPwd,
   workingTreeHash,
   randomId,
   log,
   step,
-  withRetries,
   createShell,
   ShellError,
   concat,
@@ -51,12 +47,16 @@ const factoryPrimitives = Object.freeze({
 
 type FactoryPrimitives = typeof factoryPrimitives;
 
-export type Factory = FactoryPrimitives & FactoryValues;
+export type Factory = FactoryPrimitives &
+  FactoryValues & {
+    readonly shell: Shell;
+  };
 
 export function createFactory(values: FactoryValues): Factory {
   return Object.freeze({
     ...factoryPrimitives,
     ...values,
+    shell: createShell({ verbose: values.verbose }),
   });
 }
 

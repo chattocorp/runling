@@ -13,7 +13,8 @@ belong in the script.
 The example workflows in `workflows/` use the framework to develop this
 repository. Both files are workflow entrypoints. `workflows/implement.ts` asks
 an agent to make a requested change in the current working directory, runs the
-project checks, and gives an agent up to two opportunities to repair failures.
+static checks and tests, and gives an agent up to two opportunities to repair
+failures.
 `workflows/make-pr.ts` creates an isolated Git worktree and branch, calls the
 same implementation workflow there, then commits and pushes the change, opens
 a pull request, and prints its URL.
@@ -116,13 +117,8 @@ repeatedly. Larger workflows compose smaller ones with ordinary function calls:
 import type { Factory } from "factory";
 
 async function qualityAssurance(f: Factory) {
-  const { cwd } = f;
-  const $ = f.createShell({ verbose: f.verbose });
-
-  await f.withRetries(3, async ({ attempt, attempts }) => {
-    f.log.info(`Running tests (attempt ${attempt}/${attempts})`);
-    await $`bun test`.cwd(cwd);
-  });
+  f.log.info("Running tests");
+  await f.shell`bun test`.cwd(f.cwd);
 }
 
 export default async function implement(f: Factory) {
@@ -179,10 +175,6 @@ mode, a successful execution has this shape:
 Failed executions set `ok` to `false`, put the message in `error`, leave
 `result` as `null`, and exit with a nonzero status.
 
-`withRetries` accepts an optional third callback that runs after a failed
-attempt and before the next one. Use it for workflow-specific remediation;
-the framework only controls the attempt sequence.
-
 Every report also carries a `usage` object with the agent's accumulated token
 counts: `input`, `output`, `cacheRead`, and `cacheWrite`. Each interaction logs
 its token usage, and the workflow runner prints workflow-wide totals when it
@@ -194,9 +186,29 @@ finishes:
 ● Finished in 2m31s
 ```
 
-Use `agent` as a convenience when anything other than completion should stop the
-workflow. It returns a completed report or throws an `AgentOutcomeError` that
-retains the original report and its `usage`.
+Use `agent` when several turns should share one conversation. The returned
+handle owns an in-memory session. Declare it with `await using` to dispose it
+automatically when its scope exits, including after errors and early returns:
+
+```ts
+await using a = await f.agent({
+  cwd: f.cwd,
+  model: "openai-codex/gpt-5.6-sol",
+  thinkingLevel: "medium",
+});
+
+await a.run("Investigate the failure");
+await a.run("Now implement the fix");
+```
+
+Calls to `run` must be sequential. Each call returns and records its own outcome
+and token usage while retaining the conversation established by earlier calls.
+It throws an `AgentOutcomeError` for blocked or failed outcomes. Use `runOutcome`
+when the workflow needs to inspect and branch on those outcomes instead. Call
+`dispose()` directly when lexical resource management is not convenient.
+
+`runAgent` is the one-shot alternative. It creates an agent, runs one turn, and
+disposes it before returning. Unlike `run`, it returns any reported outcome.
 
 Agents must finish with the `report_outcome` tool. If an agent fails to do so,
 the runner requests a valid report once more. A second missing report produces a
@@ -236,15 +248,15 @@ contract.
 ## Framework primitives
 
 - `step(name, work)` runs an inline operation with nested log indentation.
-- `withRetries(attempts, work, onFailure?)` retries work and awaits optional
-  failure handling between attempts.
-- `runAgent(prompt, options)` runs an agent and returns its structured outcome.
-- `agent(prompt, options)` requires a completed outcome.
+- `agent(options)` creates an automatically disposable, in-memory agent for
+  sequential multi-turn conversations.
+- `runAgent(prompt, options)` runs and disposes a one-shot agent.
 - `workingTreeHash(cwd)` fingerprints tracked and untracked Git state.
 - `getPwd(cwd)` captures a working-directory snapshot whose `hasChanges` getter
   compares current state with the snapshot.
-- `createShell(options)` creates a Bun shell tag that buffers command output by
-  default and streams it in verbose mode.
+- `shell` is a Bun shell tag configured to buffer command output by default and
+  stream it in verbose mode.
+- `createShell(options)` creates another configured Bun shell tag.
 - `ShellError` identifies failed Bun shell commands and exposes their captured
   output.
 - `randomId()` generates a human-friendly adjective–noun–number identifier.
@@ -252,15 +264,14 @@ contract.
 
 ## Validation
 
-Run the complete local check with:
+Run static checks with:
 
 ```bash
 bun run check
 ```
 
-Or run its parts independently:
+Run tests separately with:
 
 ```bash
-bun run typecheck
 bun test
 ```

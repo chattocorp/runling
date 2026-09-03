@@ -9,8 +9,7 @@
   "private": true,
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "check": "bun run typecheck && bun test"
+    "check": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",

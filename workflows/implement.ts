@@ -3,41 +3,63 @@ import type { Factory } from "../src/index.ts";
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
 const agentInstructions = ["Write tests for new or changed features."];
-const maxTestAttempts = 3;
+const maxValidationAttempts = 3;
 
-async function runChecks(f: Factory) {
+function runCheck(f: Factory) {
+  return f.shell`bun run check`.cwd(f.cwd).nothrow();
+}
+
+function runTests(f: Factory) {
+  return f.shell`bun test`.cwd(f.cwd).nothrow();
+}
+
+async function validate(f: Factory) {
   const { cwd } = f;
-  const $ = f.createShell({ verbose: f.verbose });
+  let attempt = 1;
 
-  await f.withRetries(
-    maxTestAttempts,
-    async ({ attempt, attempts }) => {
-      f.log.info(`Running tests (attempt ${attempt}/${attempts})`);
-      await $`bun run check`.cwd(cwd);
-    },
-    async ({ attempt, attempts, error }) => {
-      if (!(error instanceof f.ShellError)) {
-        throw error;
-      }
+  while (true) {
+    f.log.info(`Running checks (attempt ${attempt}/${maxValidationAttempts})`);
+    let result = await runCheck(f);
 
-      f.log.info(`Fixing failing tests (attempt ${attempt}/${attempts})`);
-      await f.agent(
+    if (result.exitCode === 0) {
+      f.log.info(`Running tests (attempt ${attempt}/${maxValidationAttempts})`);
+      result = await runTests(f);
+    }
+
+    if (result.exitCode === 0) return;
+    if (attempt === maxValidationAttempts) {
+      throw new Error(
         f.concat(
-          "The project checks are failing. Fix the implementation and tests so that `bun run check` passes.",
-          "",
-          "Failing check output:",
-          error.stdout.toString(),
-          error.stderr.toString(),
+          `Project validation failed after ${maxValidationAttempts} attempts.`,
+          result.stdout.toString(),
+          result.stderr.toString(),
         ),
-        {
-          cwd,
-          model,
-          thinkingLevel,
-          instructions: agentInstructions,
-        },
       );
-    },
-  );
+    }
+
+    f.log.info(
+      `Fixing failed validation (attempt ${attempt}/${maxValidationAttempts})`,
+    );
+
+    await using repairAgent = await f.agent({
+      cwd,
+      model,
+      thinkingLevel,
+      instructions: agentInstructions,
+    });
+
+    await repairAgent.run(
+      f.concat(
+        "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
+        "",
+        "Failure output:",
+        result.stdout.toString(),
+        result.stderr.toString(),
+      ),
+    );
+
+    attempt++;
+  }
 }
 
 export async function implement(f: Factory): Promise<string> {
@@ -45,18 +67,20 @@ export async function implement(f: Factory): Promise<string> {
 
   const pwd = await f.getPwd(cwd);
 
-  const report = await f.agent(f.prompt, {
+  await using implementationAgent = await f.agent({
     cwd,
     model,
     thinkingLevel,
     instructions: agentInstructions,
   });
 
+  const report = await implementationAgent.run(f.prompt);
+
   if (!(await pwd.hasChanges)) {
     throw new Error("Agent completed without changing the worktree");
   }
 
-  await runChecks(f);
+  await validate(f);
   if (!(await pwd.hasChanges)) {
     throw new Error("The validated worktree no longer contains any changes");
   }

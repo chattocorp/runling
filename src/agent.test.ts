@@ -15,6 +15,7 @@ let resourceOptions: any;
 let settingsCreateArgs: unknown[] | undefined;
 let settingsOverrides: any;
 let promptCalls = 0;
+let sessionCreations = 0;
 let abortCalls = 0;
 let disposed = false;
 let modelAvailable = true;
@@ -52,10 +53,14 @@ mock.module("@earendil-works/pi-coding-agent", () => {
       inMemory: () => ({}),
     },
     createAgentSession: async (options: unknown) => {
+      sessionCreations++;
       sessionOptions = options;
       const session = {
         subscribe(handler: (event: any) => void) {
           eventHandler = handler;
+          return () => {
+            if (eventHandler === handler) eventHandler = undefined;
+          };
         },
         prompt: async (prompt: string) => {
           promptCalls++;
@@ -78,7 +83,6 @@ const {
   agent,
   AgentOutcomeError,
   describeTool,
-  requireCompletedReport,
   runAgent,
 } = await import("./agent.ts");
 const { getRecordedTokenUsage, resetTokenUsage } = await import("./usage.ts");
@@ -92,6 +96,7 @@ beforeEach(() => {
   settingsCreateArgs = undefined;
   settingsOverrides = undefined;
   promptCalls = 0;
+  sessionCreations = 0;
   abortCalls = 0;
   disposed = false;
   modelAvailable = true;
@@ -222,13 +227,6 @@ describe("runAgent", () => {
     console.log = (message: string) => logs.push(message);
     console.error = (message: string) => errors.push(message);
     promptImplementation = async () => {
-      await reportOutcome({ outcome: "completed", summary: "Done" });
-    };
-
-    try {
-      await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
-
-      expect(eventHandler).toBeDefined();
       eventHandler?.({ type: "agent_start" });
       eventHandler?.({
         type: "tool_execution_start",
@@ -240,6 +238,11 @@ describe("runAgent", () => {
         toolName: "bash",
         isError: true,
       });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    try {
+      await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
     } finally {
       console.log = originalLog;
       console.error = originalError;
@@ -545,57 +548,142 @@ describe("runAgent", () => {
 });
 
 describe("agent", () => {
-  test("returns completed reports", async () => {
-    promptImplementation = async () => {
-      await reportOutcome({ outcome: "completed", summary: "Done" });
+  test("retains one session across sequential runs", async () => {
+    promptImplementation = async (prompt) => {
+      await reportOutcome({ outcome: "completed", summary: prompt });
     };
-
-    await expect(
-      agent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
-    ).resolves.toEqual({
-      outcome: "completed",
-      summary: "Done",
-      usage: emptyUsage,
+    const instance = await agent({
+      model: "anthropic/claude-opus-4-5",
     });
-  });
-
-  test("throws an outcome error for unsuccessful reports", async () => {
-    promptImplementation = async () => {
-      await reportOutcome({ outcome: "failed", summary: "Could not finish" });
-    };
 
     try {
-      await agent("Do the thing", { model: "anthropic/claude-opus-4-5" });
-      throw new Error("Expected agent to reject");
-    } catch (error) {
-      expect(error).toBeInstanceOf(AgentOutcomeError);
-      expect((error as InstanceType<typeof AgentOutcomeError>).report.outcome).toBe(
-        "failed",
+      expect(instance.id).toMatch(/^[a-z]+-[a-z]+-\d{4}$/);
+      await expect(instance.run("Investigate")).resolves.toMatchObject({
+        outcome: "completed",
+        summary: "Investigate",
+      });
+      await expect(instance.run("Implement")).resolves.toMatchObject({
+        outcome: "completed",
+        summary: "Implement",
+      });
+
+      expect(sessionCreations).toBe(1);
+      expect(promptCalls).toBe(2);
+      expect(disposed).toBe(false);
+    } finally {
+      instance.dispose();
+    }
+
+    expect(disposed).toBe(true);
+  });
+
+  test("uses fresh outcome state for every run", async () => {
+    promptImplementation = async (prompt) => {
+      await reportOutcome(
+        prompt === "First"
+          ? { outcome: "completed", summary: "First result" }
+          : { outcome: "blocked", summary: "Second result" },
       );
+    };
+    const instance = await agent({
+      model: "anthropic/claude-opus-4-5",
+    });
+
+    try {
+      await expect(instance.run("First")).resolves.toMatchObject({
+        outcome: "completed",
+        summary: "First result",
+      });
+      await expect(instance.runOutcome("Second")).resolves.toMatchObject({
+        outcome: "blocked",
+        summary: "Second result",
+      });
+    } finally {
+      instance.dispose();
     }
   });
-});
 
-describe("requireCompletedReport", () => {
-  test("returns completed reports", () => {
-    const report = {
-      outcome: "completed" as const,
-      summary: "Done",
-      usage: emptyUsage,
+  test("rejects concurrent runs", async () => {
+    let release: (() => void) | undefined;
+    promptImplementation = async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await reportOutcome({ outcome: "completed", summary: "Done" });
     };
-    expect(requireCompletedReport(report)).toBe(report);
+    const instance = await agent({
+      model: "anthropic/claude-opus-4-5",
+    });
+
+    try {
+      const first = instance.run("First");
+      await expect(instance.run("Second")).rejects.toThrow("already running");
+      release?.();
+      await first;
+    } finally {
+      instance.dispose();
+    }
   });
 
-  test("rejects unsuccessful reports while preserving their outcome", () => {
+  test("rejects runs after disposal", async () => {
+    const instance = await agent({
+      model: "anthropic/claude-opus-4-5",
+    });
+    instance.dispose();
+
+    await expect(instance.run("Too late")).rejects.toThrow("has been disposed");
+  });
+
+  test("can run again after an aborted turn", async () => {
+    const controller = new AbortController();
+    promptImplementation = async () => controller.abort("Stopped");
+    const instance = await agent({
+      model: "anthropic/claude-opus-4-5",
+    });
+
     try {
-      requireCompletedReport({
-        outcome: "blocked",
-        summary: "Need input",
-        usage: emptyUsage,
+      await expect(
+        instance.run("First", { signal: controller.signal }),
+      ).rejects.toBe("Stopped");
+      expect(disposed).toBe(false);
+
+      promptImplementation = async () => {
+        await reportOutcome({ outcome: "completed", summary: "Recovered" });
+      };
+      await expect(instance.run("Second")).resolves.toMatchObject({
+        outcome: "completed",
+        summary: "Recovered",
       });
-      throw new Error("Expected validation to fail");
+    } finally {
+      instance.dispose();
+    }
+  });
+
+  test("supports automatic disposal", async () => {
+    {
+      await using instance = await agent({
+        model: "anthropic/claude-opus-4-5",
+      });
+      expect(disposed).toBe(false);
+      expect(instance.id).toBeString();
+    }
+
+    expect(disposed).toBe(true);
+  });
+
+  test("throws unsuccessful outcomes while preserving their report", async () => {
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "blocked", summary: "Need input" });
+    };
+    await using instance = await agent({
+      model: "anthropic/claude-opus-4-5",
+    });
+
+    try {
+      await instance.run("Do the thing");
+      throw new Error("Expected run to fail");
     } catch (error) {
-      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(AgentOutcomeError);
       expect((error as Error).message).toBe("Need input");
       expect((error as { report: unknown }).report).toEqual({
         outcome: "blocked",

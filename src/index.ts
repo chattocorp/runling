@@ -1,23 +1,18 @@
 export {
   agent,
   AgentOutcomeError,
+  type AgentOptions,
   type AgentReport,
   type AgentResourceOptions,
+  type AgentRunOptions,
   type CompletedAgentReport,
-  requireCompletedReport,
+  type FactoryAgent,
   runAgent,
   type RunAgentOptions,
 } from "./agent.ts";
 export { getPwd, WorkingDirectory, workingTreeHash } from "./git.ts";
 export { randomId } from "./id.ts";
 export { log, type LogLevel } from "./log.ts";
-export {
-  type RetryContext,
-  type RetryFailureContext,
-  type RetryFailureHandler,
-  type RetryWork,
-  withRetries,
-} from "./retries.ts";
 export { step, type StepWork } from "./step.ts";
 export {
   createShell,

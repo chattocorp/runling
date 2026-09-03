@@ -99,29 +99,30 @@ export interface RunAgentOptions {
   signal?: AbortSignal;
 }
 
+export type AgentOptions = Omit<RunAgentOptions, "signal">;
+
+export interface AgentRunOptions {
+  /** Abort this model turn without disposing the agent. */
+  signal?: AbortSignal;
+}
+
+export interface FactoryAgent extends AsyncDisposable {
+  /** Human-friendly ID used to prefix this agent's log lines. */
+  readonly id: string;
+  /** Run one turn and require it to complete successfully. */
+  run(prompt: string, options?: AgentRunOptions): Promise<CompletedAgentReport>;
+  /** Run one turn and return any reported outcome. */
+  runOutcome(prompt: string, options?: AgentRunOptions): Promise<AgentResult>;
+  /** Release the underlying in-memory session. */
+  dispose(): void;
+}
+
 export class AgentOutcomeError extends Error {
   override readonly name = "AgentOutcomeError";
 
   constructor(readonly report: AgentResult) {
     super(report.summary);
   }
-}
-
-export function requireCompletedReport(
-  report: AgentResult,
-): CompletedAgentReport {
-  if (report.outcome !== "completed") {
-    throw new AgentOutcomeError(report);
-  }
-
-  return report as CompletedAgentReport;
-}
-
-export async function agent(
-  prompt: string,
-  options: RunAgentOptions,
-): Promise<CompletedAgentReport> {
-  return requireCompletedReport(await runAgent(prompt, options));
 }
 
 export function describeTool(name: string, args: Record<string, unknown>) {
@@ -143,20 +144,20 @@ export async function runAgent(
   prompt: string,
   options: RunAgentOptions,
 ): Promise<AgentResult> {
-  const agentId = randomId();
-  const color = takeAgentColor();
-  return log.withColor(color, () =>
-    runAgentSession(agentId, color, prompt, options),
-  );
+  const { signal, ...createOptions } = options;
+  signal?.throwIfAborted();
+  const instance = await agent(createOptions);
+
+  try {
+    return await instance.runOutcome(prompt, { signal });
+  } finally {
+    instance.dispose();
+  }
 }
 
-async function runAgentSession(
-  agentId: string,
-  color: string,
-  prompt: string,
-  options: RunAgentOptions,
-): Promise<AgentResult> {
-  options.signal?.throwIfAborted();
+export async function agent(options: AgentOptions): Promise<FactoryAgent> {
+  const agentId = randomId();
+  const color = takeAgentColor();
 
   const prefixLog = (message: string) =>
     `${log.colorize(`[${agentId}]`)} ${message}`;
@@ -170,9 +171,7 @@ async function runAgentSession(
     success: (message: string) =>
       log.withColor(color, () => log.success(prefixLog(message))),
   };
-  let report: AgentReport | undefined;
-  let finalText: string | undefined;
-  const usage = emptyTokenUsage();
+  let activeReport: AgentReport | undefined;
 
   const reportOutcome = defineTool({
     name: "report_outcome",
@@ -185,7 +184,7 @@ async function runAgentSession(
     ],
     parameters: reportSchema,
     async execute(_toolCallId, params) {
-      report = params;
+      activeReport = params;
       return {
         content: [{ type: "text" as const, text: "Outcome recorded." }],
         details: params,
@@ -251,102 +250,162 @@ async function runAgentSession(
     ],
   });
 
-  session.subscribe((event) => {
-    if (event.type === "agent_start") {
-      agentLog.info(`Agent started (model: ${model.provider}/${model.id})`);
+  let disposed = false;
+  let running = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    if (running) abortSession(session, agentLog);
+    session.dispose();
+  };
+
+  const runOutcome: FactoryAgent["runOutcome"] = async (
+    prompt,
+    { signal } = {},
+  ) => {
+    if (disposed) {
+      throw new Error(`Agent ${agentId} has been disposed`);
+    }
+    if (running) {
+      throw new Error(`Agent ${agentId} is already running`);
     }
 
-    if (
-      event.type === "tool_execution_start" &&
-      event.toolName !== "report_outcome"
-    ) {
-      agentLog.info(describeTool(event.toolName, event.args));
-    }
+    signal?.throwIfAborted();
+    running = true;
+    activeReport = undefined;
+    let finalText: string | undefined;
+    const usage = emptyTokenUsage();
 
-    if (event.type === "tool_execution_end" && event.isError) {
-      agentLog.error(`${event.toolName} failed`);
-    }
-
-    if (event.type === "auto_retry_start") {
-      agentLog.info(
-        `Retrying agent in ${formatDelay(event.delayMs)} ` +
-          `(attempt ${event.attempt}/${event.maxAttempts}): ${toSingleLine(event.errorMessage)}`,
-      );
-    }
-
-    if (event.type === "auto_retry_end") {
-      if (event.success) {
-        agentLog.success(
-          `Agent recovered after ${formatAttempts(event.attempt)}`,
-        );
-      } else {
-        agentLog.error(
-          `Agent retry failed after ${formatAttempts(event.attempt)}: ${toSingleLine(event.finalError ?? "Unknown error")}`,
+    const unsubscribe = session.subscribe((event) => {
+      if (event.type === "agent_start") {
+        agentLog.info(
+          `Agent started (model: ${model.provider}/${model.id})`,
         );
       }
-    }
 
-    if (event.type === "message_end" && event.message.role === "assistant") {
-      finalText = event.message.content
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-        .join("\n");
+      if (
+        event.type === "tool_execution_start" &&
+        event.toolName !== "report_outcome"
+      ) {
+        agentLog.info(describeTool(event.toolName, event.args));
+      }
 
-      accumulateTokenUsage(usage, event.message.usage);
-      agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
-    }
-  });
+      if (event.type === "tool_execution_end" && event.isError) {
+        agentLog.error(`${event.toolName} failed`);
+      }
 
-  const abort = () => {
-    void session.abort().catch((error) => {
-      agentLog.error(
-        `Failed to abort agent: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      if (event.type === "auto_retry_start") {
+        agentLog.info(
+          `Retrying agent in ${formatDelay(event.delayMs)} ` +
+            `(attempt ${event.attempt}/${event.maxAttempts}): ${toSingleLine(event.errorMessage)}`,
+        );
+      }
+
+      if (event.type === "auto_retry_end") {
+        if (event.success) {
+          agentLog.success(
+            `Agent recovered after ${formatAttempts(event.attempt)}`,
+          );
+        } else {
+          agentLog.error(
+            `Agent retry failed after ${formatAttempts(event.attempt)}: ${toSingleLine(event.finalError ?? "Unknown error")}`,
+          );
+        }
+      }
+
+      if (
+        event.type === "message_end" &&
+        event.message.role === "assistant"
+      ) {
+        finalText = event.message.content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n");
+
+        accumulateTokenUsage(usage, event.message.usage);
+        agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
+      }
     });
-  };
 
-  options.signal?.addEventListener("abort", abort, { once: true });
+    const abort = () => abortSession(session, agentLog);
 
-  try {
-    options.signal?.throwIfAborted();
-    await session.prompt(prompt);
-    options.signal?.throwIfAborted();
+    signal?.addEventListener("abort", abort, { once: true });
 
-    if (report === undefined) {
-      agentLog.info(
-        finalText !== undefined && containsMalformedToolCall(finalText)
-          ? "Retrying malformed outcome report"
-          : "Retrying missing outcome report",
-      );
-      finalText = undefined;
-      await session.prompt(
-        "Finish the original task by calling report_outcome with the truthful outcome. Use native tool calling; do not respond with plain text.",
-      );
-      options.signal?.throwIfAborted();
+    try {
+      return await log.withColor(color, async () => {
+        signal?.throwIfAborted();
+        await session.prompt(prompt);
+        signal?.throwIfAborted();
+
+        if (activeReport === undefined) {
+          agentLog.info(
+            finalText !== undefined && containsMalformedToolCall(finalText)
+              ? "Retrying malformed outcome report"
+              : "Retrying missing outcome report",
+          );
+          finalText = undefined;
+          await session.prompt(
+            "Finish the original task by calling report_outcome with the truthful outcome. Use native tool calling; do not respond with plain text.",
+          );
+          signal?.throwIfAborted();
+        }
+
+        agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
+        recordTokenUsage(usage);
+
+        if (activeReport !== undefined) {
+          return { ...activeReport, usage };
+        }
+
+        if (finalText !== undefined && finalText.trim() !== "") {
+          agentLog.debug(
+            `Discarding unreported final text: ${toSingleLine(finalText)}`,
+          );
+        }
+
+        return {
+          outcome: "failed",
+          summary: "Agent finished without a valid outcome report",
+          usage,
+        };
+      });
+    } finally {
+      signal?.removeEventListener("abort", abort);
+      unsubscribe();
+      running = false;
     }
-  } finally {
-    options.signal?.removeEventListener("abort", abort);
-    session.dispose();
-  }
-
-  agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
-  recordTokenUsage(usage);
-
-  if (report !== undefined) {
-    return { ...report, usage };
-  }
-
-  if (finalText !== undefined && finalText.trim() !== "") {
-    agentLog.debug(
-      `Discarding unreported final text: ${toSingleLine(finalText)}`,
-    );
-  }
+  };
 
   return {
-    outcome: "failed",
-    summary: "Agent finished without a valid outcome report",
-    usage,
+    id: agentId,
+
+    async run(prompt, runOptions) {
+      const report = await runOutcome(prompt, runOptions);
+      if (report.outcome !== "completed") {
+        throw new AgentOutcomeError(report);
+      }
+      return report as CompletedAgentReport;
+    },
+
+    runOutcome,
+
+    dispose,
+
+    async [Symbol.asyncDispose]() {
+      dispose();
+    },
   };
+}
+
+function abortSession(
+  session: { abort(): Promise<void> },
+  agentLog: { error(message: string): void },
+) {
+  void session.abort().catch((error) => {
+    agentLog.error(
+      `Failed to abort agent: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
 }
 
 function formatDelay(delayMs: number): string {
