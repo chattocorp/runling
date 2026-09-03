@@ -3,14 +3,12 @@ import {
   Input as TextInput,
   Key,
   ProcessTerminal,
-  ScrollView,
   matchesKey,
   truncateToWidth,
-  TuiAltScreen,
+  TuiMainScreen,
   type Component,
   type Terminal,
   visibleWidth,
-  VStack,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import type { FactoryEvent } from "./events.ts";
@@ -255,16 +253,11 @@ export class FactoryDashboard implements Component {
 
     const result = this.execution?.result;
     if (result !== undefined && result !== null) {
-      if (result.details === undefined) {
-        lines.push("", ...renderMarkdown(result.summary, columns).split("\n"));
-      } else {
-        lines.push(
-          "",
-          fit(`${paint("limegreen", "✓")} ${result.summary}`, columns),
-          "",
-          ...renderMarkdown(result.details, columns).split("\n"),
-        );
-      }
+      const markdown =
+        result.details === undefined
+          ? result.summary
+          : `${result.summary}\n\n${result.details}`;
+      lines.push("", ...renderMarkdown(markdown, columns).split("\n"));
     }
 
     return lines.map((line) => fit(line, columns));
@@ -490,7 +483,7 @@ export class FactoryDashboard implements Component {
 
 export class TuiReporter {
   private readonly dashboard: FactoryDashboard;
-  private readonly tui: TuiAltScreen;
+  private readonly tui: TuiMainScreen;
   private timer?: ReturnType<typeof setInterval>;
   private started = false;
   private stopped = false;
@@ -505,40 +498,8 @@ export class TuiReporter {
     },
   ) {
     this.dashboard = new FactoryDashboard(title);
-    this.tui = new TuiAltScreen(terminal);
-    this.tui.setLayoutRoot(
-      new VStack([
-        {
-          component: new DashboardRegion((width) =>
-            this.dashboard.renderHeader(width),
-          ),
-          basis: "auto",
-          shrink: 0,
-        },
-        {
-          component: new ScrollView(
-            new DashboardRegion((width) =>
-              this.dashboard.renderTranscript(width),
-            ),
-            {
-              follow: "end",
-              primary: true,
-              scrollbar: "auto",
-            },
-          ),
-          basis: "auto",
-          grow: 1,
-          minSize: 1,
-        },
-        {
-          component: new DashboardRegion((width) =>
-            this.dashboard.renderFooter(width),
-          ),
-          basis: "auto",
-          shrink: 0,
-        },
-      ]),
-    );
+    this.tui = new TuiMainScreen(terminal);
+    this.tui.addChild(this.dashboard);
     this.tui.addInputListener((data) => {
       if (!matchesKey(data, Key.ctrl("c"))) return;
 
@@ -550,7 +511,7 @@ export class TuiReporter {
 
   handle = (event: FactoryEvent): void => {
     this.dashboard.handle(event);
-    if (event.type === "input.finished") this.tui.renderNow(true);
+    if (event.type === "input.finished") this.tui.renderNow();
     else this.tui.requestRender();
   };
 
@@ -567,7 +528,7 @@ export class TuiReporter {
         this.pendingEditors.delete(editor);
         this.dashboard.setInputEditor(request.id, undefined);
         this.tui.setFocus([...this.pendingEditors].at(-1) ?? null);
-        this.tui.requestRender(true);
+        this.tui.requestRender();
         if ("value" in result) resolve(result.value);
         else reject(result.error);
       };
@@ -589,7 +550,7 @@ export class TuiReporter {
       request.signal?.addEventListener("abort", abort, { once: true });
       this.dashboard.setInputEditor(request.id, editor);
       this.tui.setFocus(editor);
-      this.tui.requestRender(true);
+      this.tui.requestRender();
     });
   };
 
@@ -602,7 +563,7 @@ export class TuiReporter {
 
   finish(execution: WorkflowExecution): void {
     this.dashboard.finish(execution);
-    this.tui.renderNow(true);
+    this.tui.renderNow();
   }
 
   stop(): void {
@@ -613,16 +574,6 @@ export class TuiReporter {
     }
     if (this.timer !== undefined) clearInterval(this.timer);
     this.tui.stop();
-  }
-}
-
-class DashboardRegion implements Component {
-  constructor(private readonly renderRegion: (width: number) => string[]) {}
-
-  invalidate(): void {}
-
-  render(width: number): string[] {
-    return this.renderRegion(width);
   }
 }
 

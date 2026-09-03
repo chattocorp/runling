@@ -211,10 +211,34 @@ test("renders the final Markdown report and completion state", () => {
   const output = Bun.stripANSI(dashboard.render(80).join("\n"));
 
   expect(output).toContain("Completed  ·  1s  ·  0 tokens  ·  $0.00");
-  expect(output).toContain("✓ Review complete");
+  expect(output).toContain("\nReview complete\n");
+  expect(output).not.toContain("✓ Review complete");
   expect(output).toContain("Findings");
   expect(output).toContain("Everything looks good.");
   expect(output).not.toContain("##");
+  expect(output).not.toContain("**");
+});
+
+test("wraps and Markdown-renders the final summary when details are present", () => {
+  const dashboard = new FactoryDashboard("workflows/review.ts", 0);
+  dashboard.finish({
+    ok: true,
+    error: null,
+    durationMs: 1_000,
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    result: {
+      summary:
+        "Chatto **deliberately** keeps servers independent, according to the documentation.",
+      details: "Supporting details.",
+    },
+  });
+
+  const output = Bun.stripANSI(dashboard.render(40).join("\n"));
+  expect(output).toContain(
+    "\nChatto deliberately keeps servers\nindependent, according to the\ndocumentation.\n",
+  );
+  expect(output).toContain("deliberately");
+  expect(output).toContain("documentation.");
   expect(output).not.toContain("**");
 });
 
@@ -292,7 +316,7 @@ test("never renders beyond the available width", () => {
   ).toBe(true);
 });
 
-test("drives pi-tui through the fullscreen reporter lifecycle", () => {
+test("drives pi-tui through the main-screen reporter lifecycle", () => {
   const terminal = new FakeTerminal();
   const reporter = new TuiReporter("workflow.ts", terminal);
 
@@ -317,14 +341,12 @@ test("drives pi-tui through the fullscreen reporter lifecycle", () => {
 
   expect(terminal.started).toBe(true);
   expect(terminal.stopped).toBe(true);
-  expect(terminal.output).toContain("\x1b[?1049h");
-  expect(terminal.output).toContain("\x1b[?1049l");
+  expect(terminal.output).not.toContain("\x1b[?1049h");
+  expect(terminal.output).not.toContain("\x1b[?1049l");
+  expect(terminal.output).not.toContain("\x1b[2J");
+  expect(terminal.output).not.toContain("\x1b[3J");
   expect(Bun.stripANSI(terminal.output)).toContain("Doing useful work");
-  const restoredDocument = terminal.output.slice(
-    terminal.output.lastIndexOf("\x1b[?1049l"),
-  );
-  expect(Bun.stripANSI(restoredDocument)).toContain("Doing useful work");
-  expect(Bun.stripANSI(restoredDocument)).toContain("Done");
+  expect(Bun.stripANSI(terminal.output)).toContain("Done");
 });
 
 test("collects workflow input inline in the execution tree", async () => {
@@ -343,6 +365,8 @@ test("collects workflow input inline in the execution tree", async () => {
   );
   expect(Bun.stripANSI(terminal.output)).toContain("> Factory ");
   expect(Bun.stripANSI(terminal.output)).not.toContain("Interview");
+  expect(terminal.output).not.toContain("\x1b[2J");
+  expect(terminal.output).not.toContain("\x1b[3J");
 
   for (const character of "Manbot") terminal.send(character);
   terminal.send("\r");
@@ -352,6 +376,8 @@ test("collects workflow input inline in the execution tree", async () => {
   expect(Bun.stripANSI(terminal.output)).toContain(
     "✓ What should we call this release? → Factory Manbot",
   );
+  expect(terminal.output).not.toContain("\x1b[2J");
+  expect(terminal.output).not.toContain("\x1b[3J");
   reporter.stop();
 });
 
