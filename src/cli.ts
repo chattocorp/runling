@@ -5,6 +5,7 @@ import { displayPath } from "./paths.ts";
 export interface CliArguments {
   workflowPath: string;
   prompt: string;
+  json: boolean;
   verbose: boolean;
 }
 
@@ -12,6 +13,10 @@ function parseCliArguments(argv: readonly string[]) {
   return parseArgs({
     args: [...argv],
     options: {
+      json: {
+        type: "boolean",
+        default: false,
+      },
       verbose: {
         type: "boolean",
         short: "v",
@@ -38,15 +43,16 @@ export function cli(
   const [workflowPath, prompt, ...extraPositionals] = parsed.positionals;
   if (workflowPath === undefined || prompt === undefined) {
     throw new Error(
-      `Usage: ${command} [-v|--verbose] <workflow.ts> <prompt>`,
+      `Usage: ${command} [-v|--verbose] [--json] <workflow.ts> <prompt>`,
     );
   }
   if (extraPositionals.length > 0) {
     throw new Error("The prompt must be passed as a single quoted argument");
   }
 
+  const json = parsed.values.json ?? false;
   const verbose = parsed.values.verbose ?? false;
   log.level = verbose ? "debug" : "info";
 
-  return { workflowPath, prompt, verbose };
+  return { workflowPath, prompt, json, verbose };
 }

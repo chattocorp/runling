@@ -7,8 +7,13 @@ describe("cli", () => {
     expect(cli(["workflows/implement.ts", "make the change"])).toEqual({
       workflowPath: "workflows/implement.ts",
       prompt: "make the change",
+      json: false,
       verbose: false,
     });
+  });
+
+  test("accepts JSON output mode", () => {
+    expect(cli(["workflow.ts", "--json", "make the change"]).json).toBe(true);
   });
 
   test("accepts both verbose flags", () => {
@@ -27,7 +32,7 @@ describe("cli", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe(
-        "Usage: factory [-v|--verbose] <workflow.ts> <prompt>",
+        "Usage: factory [-v|--verbose] [--json] <workflow.ts> <prompt>",
       );
     }
   });

@@ -5,6 +5,7 @@ import {
   type FactoryRuntime,
   type FactoryWorkflow,
   type WorkflowInvocation,
+  type WorkflowResult,
 } from "../src/index.ts";
 import { implement } from "./implement.ts";
 
@@ -26,7 +27,7 @@ const makePullRequest = workflow(
   async (
     factory: FactoryRuntime,
     invocation: WorkflowInvocation,
-  ): Promise<string> => {
+  ): Promise<WorkflowResult> => {
     const { concat, createShell, log, randomId } = factory;
     const { cwd, prompt, verbose } = invocation;
     const $ = createShell({ verbose });
@@ -70,7 +71,13 @@ const makePullRequest = workflow(
 
     await $`git worktree remove ${worktreePath}`;
 
-    return pullRequestUrl;
+    return {
+      summary: `Opened ${pullRequestUrl}`,
+      outputs: {
+        branchName,
+        pullRequestUrl,
+      },
+    };
   },
 );
 

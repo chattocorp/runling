@@ -5,7 +5,10 @@ import { log } from "./log.ts";
 import {
   factoryRuntime,
   type FactoryWorkflow,
+  type JsonValue,
   type WorkflowInvocation,
+  type WorkflowResult,
+  type WorkflowReturn,
 } from "./runtime.ts";
 import {
   formatTokenUsage,
@@ -40,36 +43,129 @@ export function formatDuration(ms: number): string {
   return parts.join("");
 }
 
+export interface WorkflowExecution {
+  durationMs: number;
+  usage: ReturnType<typeof getRecordedTokenUsage>;
+  result: WorkflowResult | null;
+  error: string | null;
+  ok: boolean;
+}
+
+function isJsonValue(
+  value: unknown,
+  ancestors = new Set<object>(),
+): value is JsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (typeof value !== "object" || ancestors.has(value)) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  if (
+    !Array.isArray(value) &&
+    prototype !== Object.prototype &&
+    prototype !== null
+  ) {
+    return false;
+  }
+
+  ancestors.add(value);
+  const valid = Object.values(value).every((entry) =>
+    isJsonValue(entry, ancestors),
+  );
+  ancestors.delete(value);
+  return valid;
+}
+
+export function normalizeWorkflowResult(
+  value: WorkflowReturn,
+): WorkflowResult | null {
+  if (value === undefined) {
+    return null;
+  }
+  if (typeof value === "string") {
+    return { summary: value };
+  }
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    typeof value.summary !== "string" ||
+    (value.outputs !== undefined &&
+      (!isJsonValue(value.outputs) || Array.isArray(value.outputs)))
+  ) {
+    throw new Error(
+      "Workflow must return a string, a structured result, or nothing",
+    );
+  }
+  return value;
+}
+
 export async function executeWorkflow(
   workflow: FactoryWorkflow,
   invocation: WorkflowInvocation,
-): Promise<void> {
-  await reportExecution(() =>
-    log.indented(() => workflow(factoryRuntime, invocation)),
+  options: { json?: boolean } = {},
+): Promise<WorkflowExecution> {
+  return reportExecution(
+    () => log.indented(() => workflow(factoryRuntime, invocation)),
+    options,
   );
 }
 
 async function reportExecution(
-  run: () => Promise<string | undefined | void> | string | undefined | void,
-): Promise<void> {
-  resetTokenUsage();
-  const start = performance.now();
-  log.info("Factory starting");
-  try {
-    const summary = await run();
-    if (summary !== undefined) {
-      log.success(summary);
-    }
-  } catch (error) {
-    log.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  } finally {
-    const totals = getRecordedTokenUsage();
-    if (totalTokens(totals) > 0) {
-      log.info(`Total token usage: ${formatTokenUsage(totals)}`);
-    }
-    log.info(`Finished in ${formatDuration(performance.now() - start)}`);
+  run: () => Promise<WorkflowReturn> | WorkflowReturn,
+  { json = false }: { json?: boolean } = {},
+): Promise<WorkflowExecution> {
+  const execution = await log.withDestination(
+    json ? "stderr" : "stdout",
+    async () => {
+      resetTokenUsage();
+      const start = performance.now();
+      let result: WorkflowResult | null = null;
+      let error: string | null = null;
+
+      log.info("Factory starting");
+      try {
+        result = normalizeWorkflowResult(await run());
+        if (!json && result !== null) {
+          log.success(result.summary);
+        }
+      } catch (cause) {
+        error = cause instanceof Error ? cause.message : String(cause);
+        log.error(error);
+        process.exitCode = 1;
+      }
+
+      const usage = getRecordedTokenUsage();
+      if (totalTokens(usage) > 0) {
+        log.info(`Total token usage: ${formatTokenUsage(usage)}`);
+      }
+      const durationMs = performance.now() - start;
+      log.info(`Finished in ${formatDuration(durationMs)}`);
+
+      return {
+        durationMs,
+        usage,
+        result,
+        error,
+        ok: error === null,
+      };
+    },
+  );
+
+  if (json) {
+    console.log(JSON.stringify(execution));
   }
+
+  return execution;
 }
 
 export async function loadWorkflow(path: string): Promise<FactoryWorkflow> {
@@ -84,12 +180,16 @@ export async function loadWorkflow(path: string): Promise<FactoryWorkflow> {
 }
 
 export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
-  await reportExecution(async () => {
-    const { workflowPath, prompt, verbose } = cli(argv, "factory");
-    const cwd = process.cwd();
-    const workflow = await loadWorkflow(workflowPath);
-    return log.indented(() =>
-      workflow(factoryRuntime, { cwd, prompt, verbose }),
-    );
-  });
+  const json = argv.includes("--json");
+  await reportExecution(
+    async () => {
+      const { workflowPath, prompt, verbose } = cli(argv, "factory");
+      const cwd = process.cwd();
+      const workflow = await loadWorkflow(workflowPath);
+      return log.indented(() =>
+        workflow(factoryRuntime, { cwd, prompt, verbose }),
+      );
+    },
+    { json },
+  );
 }

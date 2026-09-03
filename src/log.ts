@@ -16,6 +16,7 @@ const INDENT_UNIT = "  ";
  */
 const depthStorage = new AsyncLocalStorage<number>();
 const colorStorage = new AsyncLocalStorage<string>();
+const destinationStorage = new AsyncLocalStorage<"stdout" | "stderr">();
 
 function indent(): string {
   return INDENT_UNIT.repeat(depthStorage.getStore() ?? 0);
@@ -25,6 +26,14 @@ function marker(defaultColor: string, symbol: string): string {
   return paint(colorStorage.getStore() ?? defaultColor, symbol);
 }
 
+function write(message: string, error = false): void {
+  if (error || destinationStorage.getStore() === "stderr") {
+    console.error(message);
+  } else {
+    console.log(message);
+  }
+}
+
 /** A chunk of work whose log output is indented one level deeper. */
 export type LoggedWork<T> = () => T;
 
@@ -32,15 +41,15 @@ export const log = {
   level: "info" as LogLevel,
   debug: (message: string) => {
     if (log.level === "debug") {
-      console.log(`${indent()}${marker("gray", "·")} ${message}`);
+      write(`${indent()}${marker("gray", "·")} ${message}`);
     }
   },
   info: (message: string) =>
-    console.log(`${indent()}${marker("dodgerblue", "●")} ${message}`),
+    write(`${indent()}${marker("dodgerblue", "●")} ${message}`),
   success: (message: string) =>
-    console.log(`${indent()}${marker("limegreen", "✓")} ${message}`),
+    write(`${indent()}${marker("limegreen", "✓")} ${message}`),
   error: (message: string) =>
-    console.error(`${indent()}${marker("crimson", "✗")} ${message}`),
+    write(`${indent()}${marker("crimson", "✗")} ${message}`, true),
   /** Renders `text` in the active contextual color, if there is one. */
   colorize(text: string): string {
     const color = colorStorage.getStore();
@@ -49,6 +58,13 @@ export const log = {
   /** Runs `work` with log markers rendered in `color`. */
   withColor<T>(color: string, work: LoggedWork<T>): T {
     return colorStorage.run(color, work);
+  },
+  /** Runs `work` with informational output written to `destination`. */
+  withDestination<T>(
+    destination: "stdout" | "stderr",
+    work: LoggedWork<T>,
+  ): T {
+    return destinationStorage.run(destination, work);
   },
   /**
    * Runs `work` with all of its log output indented one level deeper than the

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { executeWorkflow, formatDuration } from "./runner.ts";
+import {
+  executeWorkflow,
+  formatDuration,
+  normalizeWorkflowResult,
+} from "./runner.ts";
 import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
 
 const initialExitCode = process.exitCode;
@@ -38,6 +42,51 @@ describe("executeWorkflow", () => {
     }
 
     expect(logs.some((line) => line.includes("Made the change"))).toBe(true);
+  });
+
+  test("accepts structured workflow results", async () => {
+    const execution = await executeWorkflow(
+      async () => ({
+        summary: "Opened the pull request",
+        outputs: { pullRequestUrl: "https://example.com/pull/1" },
+      }),
+      invocation,
+    );
+
+    expect(execution.ok).toBe(true);
+    expect(execution.result).toEqual({
+      summary: "Opened the pull request",
+      outputs: { pullRequestUrl: "https://example.com/pull/1" },
+    });
+  });
+
+  test("emits only the execution document to stdout in JSON mode", async () => {
+    const output: string[] = [];
+    const errors: string[] = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (message: string) => output.push(message);
+    console.error = (message: string) => errors.push(message);
+
+    try {
+      await executeWorkflow(
+        async () => ({ summary: "Done", outputs: { count: 2 } }),
+        invocation,
+        { json: true },
+      );
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    expect(output).toHaveLength(1);
+    expect(JSON.parse(output[0] ?? "")).toMatchObject({
+      ok: true,
+      error: null,
+      result: { summary: "Done", outputs: { count: 2 } },
+    });
+    expect(errors.some((line) => line.includes("Factory starting"))).toBe(true);
+    expect(errors.some((line) => line.includes("Finished in "))).toBe(true);
   });
 
   test("indents workflow log output below the factory greeting", async () => {
@@ -173,6 +222,23 @@ describe("executeWorkflow", () => {
       ),
     ).toBe(true);
     expect(logs.some((line) => line.includes("999"))).toBe(false);
+  });
+});
+
+describe("normalizeWorkflowResult", () => {
+  test("keeps string-returning workflows compatible", () => {
+    expect(normalizeWorkflowResult("Made the change")).toEqual({
+      summary: "Made the change",
+    });
+  });
+
+  test("rejects outputs that cannot be represented as JSON", () => {
+    expect(() =>
+      normalizeWorkflowResult({
+        summary: "Invalid",
+        outputs: { value: Number.NaN },
+      }),
+    ).toThrow("Workflow must return a string, a structured result, or nothing");
   });
 });
 

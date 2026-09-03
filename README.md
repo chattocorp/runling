@@ -72,6 +72,13 @@ and command output:
 factory workflows/make-pr.ts --verbose "Investigate and fix the failing test"
 ```
 
+Use `--json` when another program needs to consume the result. Factory writes
+one JSON document to stdout and routes its progress logs to stderr:
+
+```bash
+factory workflows/make-pr.ts --json "Add a focused feature and test it"
+```
+
 ## Writing a workflow
 
 Define workflows with `workflow(name, handler)` and export the result. The
@@ -126,6 +133,46 @@ export default workflow("Implement change", async (factory, { cwd }) => {
   await qualityAssurance(factory, cwd);
 });
 ```
+
+A workflow may return a summary string, nothing, or a structured result with
+JSON-compatible outputs:
+
+```ts
+return {
+  summary: `Opened ${pullRequestUrl}`,
+  outputs: {
+    pullRequestUrl,
+    branchName,
+  },
+};
+```
+
+String returns remain supported and are normalized to `{ summary }`. In JSON
+mode, a successful execution has this shape:
+
+```json
+{
+  "ok": true,
+  "result": {
+    "summary": "Opened https://github.com/example/project/pull/42",
+    "outputs": {
+      "pullRequestUrl": "https://github.com/example/project/pull/42",
+      "branchName": "factory/add-caching-bright-otters-2468"
+    }
+  },
+  "error": null,
+  "durationMs": 1234,
+  "usage": {
+    "input": 1200,
+    "output": 340,
+    "cacheRead": 45678,
+    "cacheWrite": 890
+  }
+}
+```
+
+Failed executions set `ok` to `false`, put the message in `error`, leave
+`result` as `null`, and exit with a nonzero status.
 
 `withRetries` accepts an optional third callback that runs after a failed
 attempt and before the next one. Use it for workflow-specific remediation;

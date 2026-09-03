@@ -18,6 +18,21 @@ export interface WorkflowInvocation {
   verbose: boolean;
 }
 
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export interface WorkflowResult {
+  summary: string;
+  outputs?: Record<string, JsonValue>;
+}
+
+export type WorkflowReturn = WorkflowResult | string | undefined | void;
+
 export const factoryRuntime = Object.freeze({
   agent,
   AgentOutcomeError,
@@ -39,4 +54,4 @@ export type FactoryRuntime = typeof factoryRuntime;
 export type FactoryWorkflow = (
   factory: FactoryRuntime,
   invocation: WorkflowInvocation,
-) => Promise<string | undefined | void> | string | undefined | void;
+) => Promise<WorkflowReturn> | WorkflowReturn;

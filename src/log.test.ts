@@ -53,6 +53,19 @@ describe("log", () => {
     expect(print).toHaveBeenCalledTimes(2);
   });
 
+  test("can route informational output to stderr", async () => {
+    const print = spyOn(console, "log");
+    const printError = spyOn(console, "error");
+
+    await log.withDestination("stderr", async () => {
+      log.info("machine-readable companion log");
+      log.success("completed");
+    });
+
+    expect(print).not.toHaveBeenCalled();
+    expect(printError).toHaveBeenCalledTimes(2);
+  });
+
   test("indents output one level deeper inside a step", () => {
     const print = spyOn(console, "log");
     const result = step("Running a step", () => {

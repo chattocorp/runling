@@ -34,7 +34,10 @@ export {
 export {
   type FactoryRuntime,
   type FactoryWorkflow,
+  type JsonValue,
   type WorkflowInvocation,
+  type WorkflowResult,
+  type WorkflowReturn,
 } from "./runtime.ts";
 export {
   accumulateTokenUsage,

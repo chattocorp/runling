@@ -5,5 +5,8 @@ export default workflow("Echo", ({ randomId }, { prompt }) => {
   if (!/^[a-z]+-[a-z]+-\d{4}$/.test(id)) {
     throw new Error("The factory runtime was not injected");
   }
-  return prompt;
+  return {
+    summary: prompt,
+    outputs: { id },
+  };
 });
