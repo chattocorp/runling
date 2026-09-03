@@ -4,8 +4,11 @@ import {
   formatDuration,
   formatWorkflowDetails,
   normalizeWorkflowResult,
+  runWorkflow,
   shouldUseTui,
 } from "./runner.ts";
+import type { FactoryEvent } from "./events.ts";
+import type { InputRequest } from "./input.ts";
 import { createFactory } from "./runtime.ts";
 import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
 
@@ -280,6 +283,58 @@ describe("executeWorkflow", () => {
       ),
     ).toBe(true);
     expect(logs.some((line) => line.includes("999"))).toBe(false);
+  });
+});
+
+describe("runWorkflow", () => {
+  test("runs headlessly with host-provided input and event handling", async () => {
+    const events: FactoryEvent[] = [];
+    const requested = Promise.withResolvers<InputRequest>();
+    const answer = Promise.withResolvers<string>();
+    const running = runWorkflow(
+      async (f) => {
+        expect(f.cwd).toBe("/project");
+        expect(f.prompt).toBe("Make me laugh");
+        const topic = await f.input("What is the topic?");
+        return `A joke about ${topic}`;
+      },
+      {
+        cwd: "/project",
+        prompt: "Make me laugh",
+        onInput: (request) => {
+          requested.resolve(request);
+          return answer.promise;
+        },
+        onEvent: (event) => events.push(event),
+      },
+    );
+
+    expect((await requested.promise).message).toBe("What is the topic?");
+    answer.resolve("robots");
+    const execution = await running;
+
+    expect(execution).toMatchObject({
+      ok: true,
+      error: null,
+      result: { summary: "A joke about robots" },
+    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "input.finished",
+        status: "answered",
+        value: "robots",
+      }),
+    );
+  });
+
+  test("captures failures without changing the process exit code", async () => {
+    const exitCode = process.exitCode;
+    const execution = await runWorkflow(async () => {
+      throw new Error("Nope");
+    });
+
+    expect(execution).toMatchObject({ ok: false, error: "Nope", result: null });
+    expect(process.exitCode).toBe(exitCode);
   });
 });
 

@@ -178,23 +178,26 @@ const releaseName = await f.input("What should we call this release?", {
 });
 ```
 
-Other hosts inject their own asynchronous callback when creating the Factory.
-The callback may remain pending while a bot, webhook, or another external
-system collects the answer:
+Other hosts use `runWorkflow` to inject their own asynchronous callback and
+observe progress. The callback may remain pending while a bot, webhook, or
+another external system collects the answer:
 
 ```ts
-import { createFactory } from "factory";
+import { runWorkflow } from "factory";
+import joke from "./workflows/joke.ts";
 
-const f = createFactory({
+const execution = await runWorkflow(joke, {
   cwd,
-  prompt,
-  verbose,
-  handleInput: async (request) => collectAnswer(request),
+  prompt: "",
+  onInput: async (request) => collectAnswer(request),
+  onEvent: (event) => publishProgress(event),
 });
 ```
 
-Hosts without an input handler fail immediately when a workflow requests
-input instead of waiting indefinitely.
+`runWorkflow` adds no CLI or TUI presentation output and does not modify
+`process.exitCode`; it returns the complete execution result to the host. Hosts
+without an input handler fail immediately when a workflow requests input
+instead of waiting indefinitely.
 
 Use object spread when nested work should inherit everything except specific
 invocation state. For example, the pull-request workflow runs the implementation

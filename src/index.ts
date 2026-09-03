@@ -11,6 +11,11 @@ export {
   type RunAgentOptions,
 } from "./agent.ts";
 export { getPwd, WorkingDirectory, workingTreeHash } from "./git.ts";
+export type {
+  FactoryEvent,
+  FactoryEventListener,
+  FactoryEventPayload,
+} from "./events.ts";
 export { randomId } from "./id.ts";
 export {
   createInput,
@@ -39,6 +44,11 @@ export {
   type WorkflowResult,
   type WorkflowReturn,
 } from "./runtime.ts";
+export {
+  runWorkflow,
+  type RunWorkflowOptions,
+  type WorkflowExecution,
+} from "./runner.ts";
 export {
   accumulateTokenUsage,
   emptyTokenUsage,

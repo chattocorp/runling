@@ -1,7 +1,10 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { cli } from "./cli.ts";
-import { observeFactoryEvents } from "./events.ts";
+import {
+  observeFactoryEvents,
+  type FactoryEventListener,
+} from "./events.ts";
 import type { InputHandler } from "./input.ts";
 import { log } from "./log.ts";
 import { renderMarkdown } from "./markdown.ts";
@@ -63,6 +66,14 @@ export interface ExecutionOptions {
   presentation?: "log" | "tui";
   terminal?: TerminalCapabilities;
   title?: string;
+}
+
+export interface RunWorkflowOptions {
+  cwd?: string;
+  prompt?: string;
+  verbose?: boolean;
+  onInput?: InputHandler;
+  onEvent?: FactoryEventListener;
 }
 
 export function formatWorkflowDetails(
@@ -144,6 +155,31 @@ export async function executeWorkflow(
   );
 }
 
+/** Run a workflow without assuming a terminal, printing, or changing process state. */
+export async function runWorkflow(
+  run: FactoryWorkflow,
+  {
+    cwd = process.cwd(),
+    prompt = "",
+    verbose = false,
+    onInput,
+    onEvent = () => {},
+  }: RunWorkflowOptions = {},
+): Promise<WorkflowExecution> {
+  const f = createFactory({
+    cwd,
+    prompt,
+    verbose,
+    handleInput: onInput,
+  });
+
+  return observeFactoryEvents(onEvent, () =>
+    log.withDestination("silent", () =>
+      captureExecution(() => log.indented(() => run(f))),
+    ),
+  );
+}
+
 async function reportExecution(
   run: (host: ExecutionHost) => Promise<WorkflowReturn> | WorkflowReturn,
   {
@@ -162,11 +198,36 @@ async function reportExecution(
       () =>
         log.withDestination(
           presentation === "tui" ? "silent" : json ? "stderr" : "stdout",
-          () =>
-            captureExecution(
-              () => run({ handleInput: reporter?.input }),
-              { json, presentation, terminal },
-            ),
+          async () => {
+            if (presentation === "log") log.info("Factory starting");
+            const execution = await captureExecution(() =>
+              run({ handleInput: reporter?.input }),
+            );
+
+            if (execution.error !== null) {
+              log.error(execution.error);
+              process.exitCode = 1;
+            } else if (!json && execution.result !== null) {
+              log.success(execution.result.summary);
+              if (
+                presentation === "log" &&
+                execution.result.details !== undefined
+              ) {
+                console.log(
+                  `\n${formatWorkflowDetails(execution.result.details, terminal)}\n`,
+                );
+              }
+            }
+
+            if (presentation === "log" && totalTokens(execution.usage) > 0) {
+              log.info(`Total token usage: ${formatTokenUsage(execution.usage)}`);
+            }
+            if (presentation === "log") {
+              log.info(`Finished in ${formatDuration(execution.durationMs)}`);
+            }
+
+            return execution;
+          },
         ),
     );
 
@@ -185,40 +246,20 @@ interface ExecutionHost {
 
 async function captureExecution(
   run: () => Promise<WorkflowReturn> | WorkflowReturn,
-  {
-    json,
-    presentation,
-    terminal,
-  }: Required<Pick<ExecutionOptions, "json" | "presentation" | "terminal">>,
 ): Promise<WorkflowExecution> {
   resetTokenUsage();
   const start = performance.now();
   let result: WorkflowResult | null = null;
   let error: string | null = null;
 
-  if (presentation === "log") log.info("Factory starting");
   try {
     result = normalizeWorkflowResult(await run());
-    if (!json && result !== null) {
-      log.success(result.summary);
-      if (presentation === "log" && result.details !== undefined) {
-        console.log(`\n${formatWorkflowDetails(result.details, terminal)}\n`);
-      }
-    }
   } catch (cause) {
     error = cause instanceof Error ? cause.message : String(cause);
-    log.error(error);
-    process.exitCode = 1;
   }
 
   const usage = getRecordedTokenUsage();
-  if (presentation === "log" && totalTokens(usage) > 0) {
-    log.info(`Total token usage: ${formatTokenUsage(usage)}`);
-  }
   const durationMs = performance.now() - start;
-  if (presentation === "log") {
-    log.info(`Finished in ${formatDuration(durationMs)}`);
-  }
 
   return {
     durationMs,
