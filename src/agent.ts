@@ -369,9 +369,6 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
           signal?.throwIfAborted();
         }
 
-        agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
-        recordTokenUsage(usage);
-
         if (activeReport !== undefined) {
           return { ...activeReport, usage };
         }
@@ -392,6 +389,8 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
       signal?.removeEventListener("abort", abort);
       unsubscribe();
       running = false;
+      agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
+      recordTokenUsage(usage);
     }
   };
 

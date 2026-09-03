@@ -51,13 +51,11 @@ export function formatTokenUsage(usage: TokenUsage): string {
 }
 
 export function isTokenUsage(value: unknown): value is TokenUsage {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as TokenUsage).input === "number" &&
-    typeof (value as TokenUsage).output === "number" &&
-    typeof (value as TokenUsage).cacheRead === "number" &&
-    typeof (value as TokenUsage).cacheWrite === "number"
+  if (typeof value !== "object" || value === null) return false;
+
+  const usage = value as TokenUsage;
+  return [usage.input, usage.output, usage.cacheRead, usage.cacheWrite].every(
+    (count) => Number.isSafeInteger(count) && count >= 0,
   );
 }
 
@@ -70,7 +68,7 @@ export function recordTokenUsage(usage: TokenUsage): void {
 
 /** Workflow-wide token usage accumulated via `recordTokenUsage`. */
 export function getRecordedTokenUsage(): TokenUsage {
-  return recordedUsage;
+  return { ...recordedUsage };
 }
 
 /** Reset workflow-wide totals, e.g. at the start of a workflow execution. */
