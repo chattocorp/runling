@@ -168,6 +168,34 @@ export default async function implement(f: Factory) {
 }
 ```
 
+Workflows can suspend while their host collects external input with
+`f.input()`. The interactive Factory CLI displays the request in a focused TUI
+interview and resumes the workflow after submission:
+
+```ts
+const releaseName = await f.input("What should we call this release?", {
+  defaultValue: "Factory",
+});
+```
+
+Other hosts inject their own asynchronous callback when creating the Factory.
+The callback may remain pending while a bot, webhook, or another external
+system collects the answer:
+
+```ts
+import { createFactory } from "factory";
+
+const f = createFactory({
+  cwd,
+  prompt,
+  verbose,
+  handleInput: async (request) => collectAnswer(request),
+});
+```
+
+Hosts without an input handler fail immediately when a workflow requests
+input instead of waiting indefinitely.
+
 Use object spread when nested work should inherit everything except specific
 invocation state. For example, the pull-request workflow runs the implementation
 workflow in its new worktree with:

@@ -10,6 +10,7 @@ import {
   workingTreeHash as hashWorkingTree,
 } from "./git.ts";
 import { randomId } from "./id.ts";
+import { createInput, type Input, type InputHandler } from "./input.ts";
 import { log } from "./log.ts";
 import { createShell, ShellError, type Shell } from "./shell.ts";
 import { step } from "./step.ts";
@@ -19,6 +20,10 @@ interface FactoryValues {
   cwd: string;
   prompt: string;
   verbose: boolean;
+}
+
+export interface CreateFactoryOptions extends FactoryValues {
+  handleInput?: InputHandler;
 }
 
 export type JsonValue =
@@ -76,13 +81,18 @@ type FactoryPrimitives = typeof factoryPrimitives;
 
 export type Factory = FactoryPrimitives &
   FactoryValues & {
+    readonly input: Input;
     readonly shell: Shell;
   };
 
-export function createFactory(values: FactoryValues): Factory {
+export function createFactory({
+  handleInput,
+  ...values
+}: CreateFactoryOptions): Factory {
   return Object.freeze({
     ...factoryPrimitives,
     ...values,
+    input: createInput(handleInput),
     shell: createShell({ verbose: values.verbose }),
   });
 }

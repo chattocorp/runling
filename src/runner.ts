@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { cli } from "./cli.ts";
 import { observeFactoryEvents } from "./events.ts";
+import type { InputHandler } from "./input.ts";
 import { log } from "./log.ts";
 import { renderMarkdown } from "./markdown.ts";
 import {
@@ -144,7 +145,7 @@ export async function executeWorkflow(
 }
 
 async function reportExecution(
-  run: () => Promise<WorkflowReturn> | WorkflowReturn,
+  run: (host: ExecutionHost) => Promise<WorkflowReturn> | WorkflowReturn,
   {
     json = false,
     presentation = "log",
@@ -161,7 +162,11 @@ async function reportExecution(
       () =>
         log.withDestination(
           presentation === "tui" ? "silent" : json ? "stderr" : "stdout",
-          () => captureExecution(run, { json, presentation, terminal }),
+          () =>
+            captureExecution(
+              () => run({ handleInput: reporter?.input }),
+              { json, presentation, terminal },
+            ),
         ),
     );
 
@@ -172,6 +177,10 @@ async function reportExecution(
   } finally {
     reporter?.stop();
   }
+}
+
+interface ExecutionHost {
+  handleInput?: InputHandler;
 }
 
 async function captureExecution(
@@ -237,11 +246,11 @@ export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
   const title =
     argv.find((argument) => !argument.startsWith("-")) ?? "Workflow";
   await reportExecution(
-    async () => {
+    async ({ handleInput }) => {
       const { workflowPath, prompt, verbose } = cli(argv, "factory");
       const cwd = process.cwd();
       const run = await loadWorkflow(workflowPath);
-      const f = createFactory({ cwd, prompt, verbose });
+      const f = createFactory({ cwd, prompt, verbose, handleInput });
       return log.indented(() => run(f));
     },
     { json, presentation, title },

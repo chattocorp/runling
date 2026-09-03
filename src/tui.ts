@@ -1,7 +1,10 @@
 import {
+  type Focusable,
+  Input as TextInput,
   Key,
   ProcessTerminal,
   matchesKey,
+  type OverlayHandle,
   truncateToWidth,
   TuiMainScreen,
   type Component,
@@ -10,6 +13,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import type { FactoryEvent } from "./events.ts";
+import type { InputHandler, InputRequest } from "./input.ts";
 import { renderMarkdown } from "./markdown.ts";
 import type { WorkflowExecution } from "./runner.ts";
 import { totalTokens, type TokenUsage } from "./usage.ts";
@@ -56,12 +60,20 @@ interface AgentNode extends TreeNodeBase {
   outcome?: "completed" | "blocked" | "failed";
 }
 
+interface InputNode extends TreeNodeBase {
+  type: "input";
+  message: string;
+  status: "waiting" | "answered" | "failed";
+  value?: string;
+  durationMs?: number;
+}
+
 interface LogNode extends TreeNodeBase {
   type: "log";
   event: Extract<FactoryEvent, { type: "log" }>;
 }
 
-type TreeNode = StepNode | CommandNode | AgentNode | LogNode;
+type TreeNode = StepNode | CommandNode | AgentNode | InputNode | LogNode;
 
 export class FactoryDashboard implements Component {
   private readonly nodes: TreeNode[] = [];
@@ -87,7 +99,8 @@ export class FactoryDashboard implements Component {
         if (
           event.source !== "step" &&
           event.source !== "agent" &&
-          event.source !== "command"
+          event.source !== "command" &&
+          event.source !== "input"
         ) {
           this.addNode({
             type: "log",
@@ -129,6 +142,24 @@ export class FactoryDashboard implements Component {
           command.status = event.status;
           command.durationMs = event.durationMs;
           command.output = event.output;
+        }
+        break;
+      }
+      case "input.requested":
+        this.addNode({
+          type: "input",
+          id: event.id,
+          parentId: event.activityId,
+          message: event.message,
+          status: "waiting",
+        });
+        break;
+      case "input.finished": {
+        const input = this.nodesById.get(event.id);
+        if (input?.type === "input") {
+          input.status = event.status;
+          if (event.status === "answered") input.value = event.value;
+          input.durationMs = event.durationMs;
         }
         break;
       }
@@ -228,11 +259,16 @@ export class FactoryDashboard implements Component {
     const failed = steps.filter(
       ({ status }) => status === "failed",
     ).length;
+    const waitingForInput = this.nodes.some(
+      (node) => node.type === "input" && node.status === "waiting",
+    );
     const status = this.execution
       ? this.execution.ok
         ? "Completed"
         : "Failed"
-      : "Working…";
+      : waitingForInput
+        ? "Waiting for input…"
+        : "Working…";
     const tokens = totalTokens(this.usage);
     const parts = [
       status,
@@ -342,6 +378,24 @@ export class FactoryDashboard implements Component {
         }
         break;
       }
+      case "input": {
+        const marker =
+          node.status === "answered"
+            ? paint("limegreen", "✓")
+            : node.status === "failed"
+              ? paint("crimson", "✗")
+              : paint("#f59f00", "?");
+        const duration =
+          node.durationMs === undefined
+            ? ""
+            : ` ${dim(`· ${formatStepDuration(node.durationMs)}`)}`;
+        lines = this.wrapNode(
+          `${indent}${marker} `,
+          `${node.message}${node.value === undefined ? "" : ` ${dim("→")} ${node.value}`}${duration}`,
+          width,
+        );
+        break;
+      }
       case "log": {
         const { event } = node;
         const marker =
@@ -395,6 +449,7 @@ export class TuiReporter {
   private timer?: ReturnType<typeof setInterval>;
   private started = false;
   private stopped = false;
+  private readonly pendingInputs = new Set<(error: Error) => void>();
 
   constructor(
     title: string,
@@ -417,7 +472,49 @@ export class TuiReporter {
 
   handle = (event: FactoryEvent): void => {
     this.dashboard.handle(event);
-    this.tui.requestRender();
+    if (event.type === "input.finished") this.tui.renderNow(true);
+    else this.tui.requestRender();
+  };
+
+  input: InputHandler = (request) => {
+    if (!this.started || this.stopped) {
+      return Promise.reject(new Error("The TUI cannot request input while stopped"));
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      let overlay: OverlayHandle | undefined;
+      const settle = (result: { value: string } | { error: Error }) => {
+        request.signal?.removeEventListener("abort", abort);
+        this.pendingInputs.delete(cancel);
+        overlay?.hide();
+        this.tui.requestRender(true);
+        if ("value" in result) resolve(result.value);
+        else reject(result.error);
+      };
+      const cancel = (error: Error) => settle({ error });
+      const abort = () =>
+        cancel(
+          request.signal?.reason instanceof Error
+            ? request.signal.reason
+            : new Error("Input cancelled"),
+        );
+      const interview = new Interview(
+        request,
+        (value) => settle({ value }),
+        () => cancel(new Error(`Input cancelled: ${request.message}`)),
+      );
+
+      this.pendingInputs.add(cancel);
+      request.signal?.addEventListener("abort", abort, { once: true });
+      overlay = this.tui.showOverlay(interview, {
+        width: "70%",
+        minWidth: 40,
+        maxHeight: 12,
+        anchor: "center",
+        margin: 1,
+      });
+      this.tui.requestRender(true);
+    });
   };
 
   start(): void {
@@ -435,8 +532,66 @@ export class TuiReporter {
   stop(): void {
     if (!this.started || this.stopped) return;
     this.stopped = true;
+    for (const cancel of [...this.pendingInputs]) {
+      cancel(new Error("The TUI stopped while waiting for input"));
+    }
     if (this.timer !== undefined) clearInterval(this.timer);
     this.tui.stop();
+  }
+}
+
+class Interview implements Component, Focusable {
+  private readonly input = new TextInput();
+
+  constructor(
+    private readonly request: InputRequest,
+    onSubmit: (value: string) => void,
+    onCancel: () => void,
+  ) {
+    if (request.defaultValue !== undefined) {
+      for (const character of request.defaultValue) {
+        this.input.handleInput(character);
+      }
+    }
+    this.input.onSubmit = onSubmit;
+    this.input.onEscape = onCancel;
+  }
+
+  get focused(): boolean {
+    return this.input.focused;
+  }
+
+  set focused(value: boolean) {
+    this.input.focused = value;
+  }
+
+  handleInput(data: string): void {
+    this.input.handleInput(data);
+  }
+
+  invalidate(): void {
+    this.input.invalidate();
+  }
+
+  render(width: number): string[] {
+    const columns = Math.max(1, Math.floor(width));
+    if (columns < 6) return this.input.render(columns);
+
+    const innerWidth = columns - 4;
+    const title = " Interview ";
+    const top = `╭${title}${"─".repeat(Math.max(0, columns - title.length - 2))}╮`;
+    const body = (line = "") =>
+      `│ ${truncateToWidth(line, innerWidth, "", true)} │`;
+    const question = wrapTextWithAnsi(this.request.message, innerWidth);
+    const answer = this.input.render(Math.max(1, innerWidth - 2));
+
+    return [
+      top,
+      ...question.map(body),
+      body(),
+      ...answer.map((line) => body(`${paint("#f59f00", "›")} ${line}`)),
+      `╰${"─".repeat(columns - 2)}╯`,
+    ];
   }
 }
 

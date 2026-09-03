@@ -12,6 +12,14 @@ export {
 } from "./agent.ts";
 export { getPwd, WorkingDirectory, workingTreeHash } from "./git.ts";
 export { randomId } from "./id.ts";
+export {
+  createInput,
+  InputUnavailableError,
+  type Input,
+  type InputHandler,
+  type InputOptions,
+  type InputRequest,
+} from "./input.ts";
 export { log, type LogLevel } from "./log.ts";
 export { step, type StepWork } from "./step.ts";
 export {
@@ -23,7 +31,9 @@ export {
 export { concat, type ConcatPart } from "./utils.ts";
 export { workflow, type Workflow } from "./workflow.ts";
 export {
+  createFactory,
   type Factory,
+  type CreateFactoryOptions,
   type FactoryWorkflow,
   type JsonValue,
   type WorkflowResult,

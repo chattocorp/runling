@@ -8,7 +8,7 @@ export type FactoryEventPayload =
       message: string;
       depth: number;
       color: string;
-      source?: "step" | "agent" | "command";
+      source?: "step" | "agent" | "command" | "input";
       sourceId?: string;
     }
   | {
@@ -36,6 +36,25 @@ export type FactoryEventPayload =
         stdout: string;
         stderr: string;
       };
+    }
+  | {
+      type: "input.requested";
+      id: string;
+      message: string;
+      defaultValue?: string;
+    }
+  | {
+      type: "input.finished";
+      id: string;
+      status: "answered";
+      value: string;
+      durationMs: number;
+    }
+  | {
+      type: "input.finished";
+      id: string;
+      status: "failed";
+      durationMs: number;
     }
   | {
       type: "agent.started";
@@ -86,3 +105,17 @@ export const observeFactoryEvents = <T>(
 
 export const withFactoryActivity = <T>(id: string, work: () => T): T =>
   activity.run(id, work);
+
+export const bindFactoryContext = <Args extends unknown[], Result>(
+  work: (...args: Args) => Result,
+): ((...args: Args) => Result) => {
+  const capturedListeners = listeners.getStore() ?? [];
+  const capturedActivity = activity.getStore();
+
+  return (...args) =>
+    listeners.run(capturedListeners, () =>
+      capturedActivity === undefined
+        ? work(...args)
+        : activity.run(capturedActivity, () => work(...args)),
+    );
+};

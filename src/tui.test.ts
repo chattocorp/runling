@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import type { Terminal } from "@earendil-works/pi-tui";
 import type { FactoryEvent, FactoryEventPayload } from "./events.ts";
+import { observeFactoryEvents } from "./events.ts";
+import { createInput } from "./input.ts";
 import type { WorkflowExecution } from "./runner.ts";
 import { FactoryDashboard, TuiReporter } from "./tui.ts";
 
@@ -295,6 +297,33 @@ test("drives pi-tui through the reporter lifecycle", () => {
   expect(terminal.started).toBe(true);
   expect(terminal.stopped).toBe(true);
   expect(Bun.stripANSI(terminal.output)).toContain("Doing useful work");
+});
+
+test("collects workflow input through a focused TUI interview", async () => {
+  const terminal = new FakeTerminal();
+  const reporter = new TuiReporter("workflow.ts", terminal);
+  const input = createInput(reporter.input);
+
+  reporter.start();
+  const answer = observeFactoryEvents(reporter.handle, () =>
+    input("What should we call this release?", { defaultValue: "Factory " }),
+  );
+  await Bun.sleep(10);
+
+  expect(Bun.stripANSI(terminal.output)).toContain("Interview");
+  expect(Bun.stripANSI(terminal.output)).toContain(
+    "What should we call this release?",
+  );
+
+  for (const character of "Manbot") terminal.send(character);
+  terminal.send("\r");
+
+  await expect(answer).resolves.toBe("Factory Manbot");
+  await Bun.sleep(10);
+  expect(Bun.stripANSI(terminal.output)).toContain(
+    "✓ What should we call this release? → Factory Manbot",
+  );
+  reporter.stop();
 });
 
 test("restores the terminal before handling Ctrl-C", () => {

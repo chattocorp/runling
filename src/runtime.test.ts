@@ -10,6 +10,7 @@ describe("factory", () => {
     });
 
     expect(f.agent).toBeFunction();
+    expect(f.input).toBeFunction();
     expect(f.shell).toBeFunction();
     expect(f.createShell).toBeFunction();
     expect(f.cwd).toBe("/project");
@@ -30,5 +31,16 @@ describe("factory", () => {
     expect(derived.prompt).toBe(f.prompt);
     expect(derived.agent).toBe(f.agent);
     expect(f.cwd).toBe("/project");
+  });
+
+  test("delegates workflow input to its host callback", async () => {
+    const f = createFactory({
+      cwd: "/project",
+      prompt: "Make the change",
+      verbose: false,
+      handleInput: async ({ message }) => `Answered: ${message}`,
+    });
+
+    await expect(f.input("What now?")).resolves.toBe("Answered: What now?");
   });
 });
