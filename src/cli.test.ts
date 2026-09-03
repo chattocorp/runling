@@ -8,12 +8,17 @@ describe("cli", () => {
       workflowPath: "workflows/implement.ts",
       prompt: "make the change",
       json: false,
+      logMode: false,
       verbose: false,
     });
   });
 
   test("accepts JSON output mode", () => {
     expect(cli(["workflow.ts", "--json", "make the change"]).json).toBe(true);
+  });
+
+  test("accepts append-only log mode", () => {
+    expect(cli(["workflow.ts", "--log"]).logMode).toBe(true);
   });
 
   test("accepts both verbose flags", () => {
@@ -30,6 +35,7 @@ describe("cli", () => {
       workflowPath: "workflows/review.ts",
       prompt: "",
       json: false,
+      logMode: false,
       verbose: false,
     });
   });
@@ -41,7 +47,7 @@ describe("cli", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe(
-        "Usage: factory [-v|--verbose] [--json] <workflow.ts> [prompt]",
+        "Usage: factory [-v|--verbose] [--log|--json] <workflow.ts> [prompt]",
       );
     }
   });

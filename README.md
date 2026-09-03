@@ -97,9 +97,17 @@ To review current working-tree changes from three parallel perspectives:
 factory workflows/review.ts
 ```
 
-By default, raw command output is suppressed while workflow progress and the
-final result remain visible. Use `--verbose` or `-v` to include debug logging
-and command output:
+In an interactive terminal, Factory presents workflow progress, active agents,
+token usage, and the final result in a live TUI. When either input or output is
+redirected, it automatically uses append-only logs instead. Use `--log` to
+force append-only output in an interactive terminal:
+
+```bash
+factory workflows/make-pr.ts --log "Add a focused feature and test it"
+```
+
+Raw command output is suppressed in TUI mode. Use `--verbose` or `-v` to switch
+to append-only output with debug logging and command output:
 
 ```bash
 factory workflows/make-pr.ts --verbose "Investigate and fix the failing test"

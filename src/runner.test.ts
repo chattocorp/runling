@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatWorkflowDetails,
   normalizeWorkflowResult,
+  shouldUseTui,
 } from "./runner.ts";
 import { createFactory } from "./runtime.ts";
 import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
@@ -301,6 +302,36 @@ describe("formatWorkflowDetails", () => {
         columns: 80,
       }),
     ).toBe("## Findings\n\n**Important**");
+  });
+});
+
+describe("shouldUseTui", () => {
+  const interactive = { stdinIsTTY: true, stdoutIsTTY: true };
+
+  test("uses the TUI for an interactive terminal", () => {
+    expect(shouldUseTui(["workflow.ts"], interactive)).toBe(true);
+  });
+
+  test("uses logs for redirected input or output", () => {
+    expect(
+      shouldUseTui(["workflow.ts"], {
+        stdinIsTTY: false,
+        stdoutIsTTY: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldUseTui(["workflow.ts"], {
+        stdinIsTTY: true,
+        stdoutIsTTY: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("allows log, verbose, and JSON modes to override an interactive terminal", () => {
+    expect(shouldUseTui(["workflow.ts", "--log"], interactive)).toBe(false);
+    expect(shouldUseTui(["workflow.ts", "--verbose"], interactive)).toBe(false);
+    expect(shouldUseTui(["workflow.ts", "-v"], interactive)).toBe(false);
+    expect(shouldUseTui(["workflow.ts", "--json"], interactive)).toBe(false);
   });
 });
 

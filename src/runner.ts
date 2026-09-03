@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { cli } from "./cli.ts";
+import { observeFactoryEvents } from "./events.ts";
 import { log } from "./log.ts";
 import { renderMarkdown } from "./markdown.ts";
 import {
@@ -11,6 +12,7 @@ import {
   type WorkflowResult,
   type WorkflowReturn,
 } from "./runtime.ts";
+import { TuiReporter } from "./tui.ts";
 import {
   formatTokenUsage,
   getRecordedTokenUsage,
@@ -57,7 +59,9 @@ export interface TerminalCapabilities {
 
 export interface ExecutionOptions {
   json?: boolean;
+  presentation?: "log" | "tui";
   terminal?: TerminalCapabilities;
+  title?: string;
 }
 
 export function formatWorkflowDetails(
@@ -143,55 +147,77 @@ async function reportExecution(
   run: () => Promise<WorkflowReturn> | WorkflowReturn,
   {
     json = false,
+    presentation = "log",
     terminal = process.stdout,
+    title = "Workflow",
   }: ExecutionOptions = {},
 ): Promise<WorkflowExecution> {
-  const execution = await log.withDestination(
-    json ? "stderr" : "stdout",
-    async () => {
-      resetTokenUsage();
-      const start = performance.now();
-      let result: WorkflowResult | null = null;
-      let error: string | null = null;
+  const reporter = presentation === "tui" ? new TuiReporter(title) : undefined;
 
-      log.info("Factory starting");
-      try {
-        result = normalizeWorkflowResult(await run());
-        if (!json && result !== null) {
-          log.success(result.summary);
-          if (result.details !== undefined) {
-            console.log(`\n${formatWorkflowDetails(result.details, terminal)}\n`);
-          }
-        }
-      } catch (cause) {
-        result = null;
-        error = cause instanceof Error ? cause.message : String(cause);
-        log.error(error);
-        process.exitCode = 1;
+  try {
+    reporter?.start();
+    const execution = await observeFactoryEvents(
+      reporter?.handle ?? (() => {}),
+      () =>
+        log.withDestination(
+          presentation === "tui" ? "silent" : json ? "stderr" : "stdout",
+          () => captureExecution(run, { json, presentation, terminal }),
+        ),
+    );
+
+    reporter?.finish(execution);
+    if (json) console.log(JSON.stringify(execution));
+
+    return execution;
+  } finally {
+    reporter?.stop();
+  }
+}
+
+async function captureExecution(
+  run: () => Promise<WorkflowReturn> | WorkflowReturn,
+  {
+    json,
+    presentation,
+    terminal,
+  }: Required<Pick<ExecutionOptions, "json" | "presentation" | "terminal">>,
+): Promise<WorkflowExecution> {
+  resetTokenUsage();
+  const start = performance.now();
+  let result: WorkflowResult | null = null;
+  let error: string | null = null;
+
+  if (presentation === "log") log.info("Factory starting");
+  try {
+    result = normalizeWorkflowResult(await run());
+    if (!json && result !== null) {
+      log.success(result.summary);
+      if (presentation === "log" && result.details !== undefined) {
+        console.log(`\n${formatWorkflowDetails(result.details, terminal)}\n`);
       }
-
-      const usage = getRecordedTokenUsage();
-      if (totalTokens(usage) > 0) {
-        log.info(`Total token usage: ${formatTokenUsage(usage)}`);
-      }
-      const durationMs = performance.now() - start;
-      log.info(`Finished in ${formatDuration(durationMs)}`);
-
-      return {
-        durationMs,
-        usage,
-        result,
-        error,
-        ok: error === null,
-      };
-    },
-  );
-
-  if (json) {
-    console.log(JSON.stringify(execution));
+    }
+  } catch (cause) {
+    error = cause instanceof Error ? cause.message : String(cause);
+    log.error(error);
+    process.exitCode = 1;
   }
 
-  return execution;
+  const usage = getRecordedTokenUsage();
+  if (presentation === "log" && totalTokens(usage) > 0) {
+    log.info(`Total token usage: ${formatTokenUsage(usage)}`);
+  }
+  const durationMs = performance.now() - start;
+  if (presentation === "log") {
+    log.info(`Finished in ${formatDuration(durationMs)}`);
+  }
+
+  return {
+    durationMs,
+    usage,
+    result,
+    error,
+    ok: error === null,
+  };
 }
 
 export async function loadWorkflow(path: string): Promise<FactoryWorkflow> {
@@ -207,6 +233,9 @@ export async function loadWorkflow(path: string): Promise<FactoryWorkflow> {
 
 export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
   const json = argv.includes("--json");
+  const presentation = shouldUseTui(argv) ? "tui" : "log";
+  const title =
+    argv.find((argument) => !argument.startsWith("-")) ?? "Workflow";
   await reportExecution(
     async () => {
       const { workflowPath, prompt, verbose } = cli(argv, "factory");
@@ -215,6 +244,23 @@ export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
       const f = createFactory({ cwd, prompt, verbose });
       return log.indented(() => run(f));
     },
-    { json },
+    { json, presentation, title },
+  );
+}
+
+export function shouldUseTui(
+  argv: readonly string[],
+  terminal: { stdinIsTTY?: boolean; stdoutIsTTY?: boolean } = {
+    stdinIsTTY: process.stdin.isTTY,
+    stdoutIsTTY: process.stdout.isTTY,
+  },
+): boolean {
+  return (
+    terminal.stdinIsTTY === true &&
+    terminal.stdoutIsTTY === true &&
+    !argv.includes("--json") &&
+    !argv.includes("--log") &&
+    !argv.includes("--verbose") &&
+    !argv.includes("-v")
   );
 }

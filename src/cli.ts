@@ -6,6 +6,7 @@ export interface CliArguments {
   workflowPath: string;
   prompt: string;
   json: boolean;
+  logMode: boolean;
   verbose: boolean;
 }
 
@@ -14,6 +15,10 @@ function parseCliArguments(argv: readonly string[]) {
     args: [...argv],
     options: {
       json: {
+        type: "boolean",
+        default: false,
+      },
+      log: {
         type: "boolean",
         default: false,
       },
@@ -43,7 +48,7 @@ export function cli(
   const [workflowPath, prompt = "", ...extraPositionals] = parsed.positionals;
   if (workflowPath === undefined) {
     throw new Error(
-      `Usage: ${command} [-v|--verbose] [--json] <workflow.ts> [prompt]`,
+      `Usage: ${command} [-v|--verbose] [--log|--json] <workflow.ts> [prompt]`,
     );
   }
   if (extraPositionals.length > 0) {
@@ -51,8 +56,9 @@ export function cli(
   }
 
   const json = parsed.values.json ?? false;
+  const logMode = parsed.values.log ?? false;
   const verbose = parsed.values.verbose ?? false;
   log.level = verbose ? "debug" : "info";
 
-  return { workflowPath, prompt, json, verbose };
+  return { workflowPath, prompt, json, logMode, verbose };
 }

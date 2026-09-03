@@ -58,7 +58,7 @@ describe("factory executable", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      "Usage: factory [-v|--verbose] [--json] <workflow.ts> [prompt]",
+      "Usage: factory [-v|--verbose] [--log|--json] <workflow.ts> [prompt]",
     );
     expect(stderr).not.toContain("at ");
   });
@@ -111,7 +111,8 @@ describe("factory executable", () => {
     expect(JSON.parse(stdout)).toMatchObject({
       ok: false,
       result: null,
-      error: "Usage: factory [-v|--verbose] [--json] <workflow.ts> [prompt]",
+      error:
+        "Usage: factory [-v|--verbose] [--log|--json] <workflow.ts> [prompt]",
     });
     expect(stderr).toContain("Usage: factory");
   });
