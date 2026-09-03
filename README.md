@@ -118,7 +118,7 @@ import type { Factory } from "factory";
 
 async function qualityAssurance(f: Factory) {
   f.log.info("Running tests");
-  await f.shell`bun test`.cwd(f.cwd);
+  await f.shell`bun test`;
 }
 
 export default async function implement(f: Factory) {
@@ -254,8 +254,8 @@ contract.
 - `workingTreeHash(cwd)` fingerprints tracked and untracked Git state.
 - `getPwd(cwd)` captures a working-directory snapshot whose `hasChanges` getter
   compares current state with the snapshot.
-- `shell` is a Bun shell tag configured to buffer command output by default and
-  stream it in verbose mode.
+- `shell` is a Bun shell tag that runs from `f.cwd`, buffers command output by
+  default, and streams it in verbose mode.
 - `createShell(options)` creates another configured Bun shell tag.
 - `ShellError` identifies failed Bun shell commands and exposes their captured
   output.

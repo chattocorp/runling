@@ -31,4 +31,22 @@ describe("createShell", () => {
 
     expect(quiet).toHaveBeenCalledWith(false);
   });
+
+  test("uses the calling context's cwd by default", async () => {
+    const cwd = spyOn($.ShellPromise.prototype, "cwd");
+    const shell = createShell();
+    const context = { cwd: process.cwd(), shell };
+
+    await context.shell`true`;
+
+    expect(cwd).toHaveBeenCalledWith(process.cwd());
+  });
+
+  test("allows an explicit default cwd", async () => {
+    const cwd = spyOn($.ShellPromise.prototype, "cwd");
+
+    await createShell({ cwd: process.cwd() })`true`;
+
+    expect(cwd).toHaveBeenCalledWith(process.cwd());
+  });
 });

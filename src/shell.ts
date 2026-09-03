@@ -7,14 +7,20 @@ export const ShellError = $.ShellError;
 
 export interface CreateShellOptions {
   verbose?: boolean;
+  cwd?: string;
 }
 
 export function createShell(options: CreateShellOptions = {}) {
-  return (...args: Parameters<typeof $>) => {
+  return function (
+    this: { cwd?: string } | void,
+    ...args: Parameters<typeof $>
+  ) {
     log.info(
       `${log.highlight("Running", COMMAND_COLOR)} ${formatCommand(...args)}`,
     );
-    return $(...args).quiet(!(options.verbose ?? false));
+    const command = $(...args).quiet(!(options.verbose ?? false));
+    const cwd = options.cwd ?? this?.cwd;
+    return cwd === undefined ? command : command.cwd(cwd);
   };
 }
 
