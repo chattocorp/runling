@@ -97,6 +97,13 @@ To review current working-tree changes from three parallel perspectives:
 factory workflows/review.ts
 ```
 
+To have a read-only planning agent inspect the repository and interview you
+until it can produce a concrete implementation plan:
+
+```bash
+factory workflows/plan.ts "Add deployment support"
+```
+
 In an interactive terminal, Factory presents workflow progress, active agents,
 token usage, and the final result in a live TUI. When either input or output is
 redirected, it automatically uses append-only logs instead. Use `--log` to

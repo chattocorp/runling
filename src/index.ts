@@ -3,6 +3,7 @@ export {
   AgentOutcomeError,
   type AgentOptions,
   type AgentReport,
+  type AgentResult,
   type AgentResourceOptions,
   type AgentRunOptions,
   type CompletedAgentReport,
