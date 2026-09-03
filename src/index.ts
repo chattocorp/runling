@@ -21,6 +21,7 @@ export {
   type Shell,
 } from "./shell.ts";
 export { concat, type ConcatPart } from "./utils.ts";
+export { workflow, type Workflow } from "./workflow.ts";
 export {
   type Factory,
   type FactoryWorkflow,

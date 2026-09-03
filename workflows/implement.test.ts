@@ -189,9 +189,11 @@ describe("implement workflow", () => {
     expect(checks).toBe(1);
     expect(tests).toBe(1);
     expect(messages).toEqual([
+      "Implement",
       "Implementing change",
-      "Running checks",
-      "Running tests",
+      "Validate",
+      "Run checks",
+      "Run tests",
       "Summarizing changes",
     ]);
   });
@@ -222,12 +224,15 @@ describe("implement workflow", () => {
 
     expect(tests).toBe(2);
     expect(setup.messages).toEqual([
+      "Implement",
       "Implementing change",
-      "Running checks",
-      "Running tests",
+      "Validate",
+      "Run checks",
+      "Run tests",
       "Repairing validation (attempt 1/3)",
-      "Running checks",
-      "Running tests",
+      "Validate",
+      "Run checks",
+      "Run tests",
       "Summarizing changes",
     ]);
   });

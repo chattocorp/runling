@@ -1,4 +1,4 @@
-import type { Factory } from "../src/index.ts";
+import { workflow } from "../src/index.ts";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -8,24 +8,18 @@ const agentInstructions = [
 ];
 const maxValidationAttempts = 3;
 
-const runCheck = (f: Factory) =>
-  f.step(
-    "Running checks",
-    () => f.shell`bun run check`.nothrow(),
-  );
+const runCheck = workflow("Run checks", (f) =>
+  f.shell`bun run check`.nothrow(),
+);
 
-const runTests = (f: Factory) =>
-  f.step(
-    "Running tests",
-    () => f.shell`bun test`.nothrow(),
-  );
+const runTests = workflow("Run tests", (f) => f.shell`bun test`.nothrow());
 
-async function validate(f: Factory) {
+const validate = workflow("Validate", async (f) => {
   const check = await runCheck(f);
   return check.exitCode === 0 ? runTests(f) : check;
-}
+});
 
-export async function implement(f: Factory): Promise<string> {
+export const implement = workflow("Implement", async (f): Promise<string> => {
   const pwd = await f.getPwd();
 
   await using implementationAgent = await f.agent({
@@ -34,9 +28,7 @@ export async function implement(f: Factory): Promise<string> {
     instructions: agentInstructions,
   });
 
-  await f.step("Implementing change", () =>
-    implementationAgent.run(f.prompt),
-  );
+  await f.step("Implementing change", () => implementationAgent.run(f.prompt));
 
   if (!(await pwd.hasChanges)) {
     throw new Error("Agent completed without changing the worktree");
@@ -82,6 +74,6 @@ export async function implement(f: Factory): Promise<string> {
   );
 
   return finalReport.summary;
-}
+});
 
 export default implement;

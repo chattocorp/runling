@@ -10,6 +10,20 @@ reports its result. A workflow script owns the policy: loops, retries,
 validation commands, model choices, and decisions based on agent outcomes all
 belong in the script.
 
+Use `workflow` to name an entrypoint or subworkflow and indent its log output:
+
+```ts
+import { workflow } from "factory";
+
+export default workflow("Implement", async (f) => {
+  await f.shell`bun test`;
+  return "Implemented the change";
+});
+```
+
+The helper only adds the named log scope. It does not create an agent or add
+any workflow behavior.
+
 The example workflows in `workflows/` use the framework to develop this
 repository. Both files are workflow entrypoints. `workflows/implement.ts` keeps
 one agent session alive while it implements a requested change, runs static
@@ -259,6 +273,8 @@ code needs to observe pi's raw session-event stream directly.
 
 ## Framework primitives
 
+- `workflow(name, run)` declares a named workflow or subworkflow and nests its
+  log output beneath that name.
 - `step(name, work)` runs an inline operation with nested log indentation.
 - `agent(options)` creates an automatically disposable, in-memory agent for
   sequential multi-turn conversations in `f.cwd`.
