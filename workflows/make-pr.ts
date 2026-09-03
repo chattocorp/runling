@@ -20,7 +20,7 @@ async function makePullRequest(
   f: Factory,
 ): Promise<WorkflowResult> {
   const { cwd } = f;
-  await f.shell`gh auth status`.cwd(cwd);
+  await f.shell`gh auth status`;
 
   const branchName = createBranchName(f.prompt, f.randomId);
   const worktreesPath = resolve(cwd, worktreesDirectory);
@@ -30,15 +30,16 @@ async function makePullRequest(
   );
 
   await mkdir(worktreesPath, { recursive: true });
-  await f.shell`git worktree add -b ${branchName} ${worktreePath}`.cwd(cwd);
+  await f.shell`git worktree add -b ${branchName} ${worktreePath}`;
   f.log.info(`Working in ${worktreePath}`);
 
-  await f.shell`bun install --frozen-lockfile`.cwd(worktreePath);
-  const summary = await implement({ ...f, cwd: worktreePath });
+  const worktree = { ...f, cwd: worktreePath };
+  await worktree.shell`bun install --frozen-lockfile`;
+  const summary = await implement(worktree);
 
-  await f.shell`git add --all`.cwd(worktreePath);
-  await f.shell`git commit -m ${summary}`.cwd(worktreePath);
-  await f.shell`git push --set-upstream origin ${branchName}`.cwd(worktreePath);
+  await worktree.shell`git add --all`;
+  await worktree.shell`git commit -m ${summary}`;
+  await worktree.shell`git push --set-upstream origin ${branchName}`;
 
   const pullRequestBody = f.concat(
     "## Summary",
@@ -51,9 +52,7 @@ async function makePullRequest(
     "- `bun test`",
   );
   const pullRequest =
-    await f.shell`gh pr create --head ${branchName} --title ${summary.slice(0, 120)} --body ${pullRequestBody}`
-      .cwd(worktreePath)
-      .quiet();
+    await worktree.shell`gh pr create --head ${branchName} --title ${summary.slice(0, 120)} --body ${pullRequestBody}`.quiet();
   const pullRequestUrl = pullRequest.stdout.toString().trim();
 
   await f.shell`git worktree remove ${worktreePath}`;

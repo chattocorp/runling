@@ -5,24 +5,26 @@ const thinkingLevel = "medium";
 const agentInstructions = ["Write tests for new or changed features."];
 const maxValidationAttempts = 3;
 
-function runCheck(f: Factory) {
-  return f.shell`bun run check`.cwd(f.cwd).nothrow();
-}
+const runCheck = (f: Factory) =>
+  f.step(
+    "Running checks",
+    () => f.shell`bun run check`.nothrow(),
+  );
 
-function runTests(f: Factory) {
-  return f.shell`bun test`.cwd(f.cwd).nothrow();
-}
+const runTests = (f: Factory) =>
+  f.step(
+    "Running tests",
+    () => f.shell`bun test`.nothrow(),
+  );
 
 async function validate(f: Factory) {
   const { cwd } = f;
   let attempt = 1;
 
   while (true) {
-    f.log.info(`Running checks (attempt ${attempt}/${maxValidationAttempts})`);
     let result = await runCheck(f);
 
     if (result.exitCode === 0) {
-      f.log.info(`Running tests (attempt ${attempt}/${maxValidationAttempts})`);
       result = await runTests(f);
     }
 

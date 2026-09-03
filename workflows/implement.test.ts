@@ -86,6 +86,10 @@ function runtimeWith({
     getPwd: async () => ({ hasChanges: Promise.resolve(true) }),
     log: { info: (message: string) => messages.push(message) },
     ShellError: TestShellError,
+    step: <T>(label: string, work: () => T) => {
+      messages.push(label);
+      return work();
+    },
   } as unknown as Factory;
 
   return {
@@ -154,10 +158,7 @@ describe("implement workflow", () => {
 
     expect(checks).toBe(1);
     expect(tests).toBe(1);
-    expect(messages).toEqual([
-      "Running checks (attempt 1/3)",
-      "Running tests (attempt 1/3)",
-    ]);
+    expect(messages).toEqual(["Running checks", "Running tests"]);
   });
 
   test("awaits a repair before rerunning checks and tests", async () => {
@@ -186,11 +187,11 @@ describe("implement workflow", () => {
 
     expect(tests).toBe(2);
     expect(setup.messages).toEqual([
-      "Running checks (attempt 1/3)",
-      "Running tests (attempt 1/3)",
+      "Running checks",
+      "Running tests",
       "Fixing failed validation (attempt 1/3)",
-      "Running checks (attempt 2/3)",
-      "Running tests (attempt 2/3)",
+      "Running checks",
+      "Running tests",
     ]);
   });
 });
