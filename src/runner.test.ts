@@ -6,7 +6,7 @@ import {
   normalizeWorkflowResult,
   shouldUseTui,
 } from "./runner.ts";
-import { createFactory } from "./runtime.ts";
+import { createFactory, type Factory } from "./runtime.ts";
 import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
 
 const initialExitCode = process.exitCode;
@@ -17,10 +17,86 @@ afterEach(() => {
 });
 
 describe("executeWorkflow", () => {
-  const f = createFactory({
+  const baseFactory = createFactory({
     cwd: "/project",
     prompt: "Make the change",
     verbose: false,
+  });
+  const f: Factory = {
+    ...baseFactory,
+    runAgent: async () => ({
+      outcome: "completed",
+      summary: "Why do programmers prefer dark mode? Because light attracts bugs!",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    }),
+  };
+
+  test("generates and tells a joke before running the workflow", async () => {
+    const events: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => events.push(message);
+    const jokeFactory: Factory = {
+      ...baseFactory,
+      runAgent: async (prompt, options) => {
+        events.push("generated joke");
+        expect(prompt).toContain("one short, family-friendly joke");
+        expect(options).toMatchObject({
+          model: "openai-codex/gpt-5.6-sol",
+          thinkingLevel: "minimal",
+          tools: [],
+          resources: {
+            extensions: false,
+            skills: false,
+            promptTemplates: false,
+            themes: false,
+            contextFiles: false,
+          },
+        });
+        return {
+          outcome: "completed",
+          summary: "A generated test joke",
+          usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+        };
+      },
+    };
+
+    try {
+      await executeWorkflow(async () => {
+        events.push("workflow ran");
+      }, jokeFactory);
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(events.indexOf("generated joke")).toBeLessThan(
+      events.indexOf("workflow ran"),
+    );
+    expect(
+      events.some((event) => event.includes("Joke: A generated test joke")),
+    ).toBe(true);
+  });
+
+  test("does not run the workflow when joke generation fails", async () => {
+    let workflowRan = false;
+    const jokeFactory: Factory = {
+      ...baseFactory,
+      runAgent: async () => ({
+        outcome: "failed",
+        summary: "Could not generate a joke",
+        usage: { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 },
+      }),
+    };
+
+    const execution = await executeWorkflow(async () => {
+      workflowRan = true;
+    }, jokeFactory);
+
+    expect(workflowRan).toBe(false);
+    expect(execution).toMatchObject({
+      ok: false,
+      error: "Could not generate a joke",
+      result: null,
+    });
   });
 
   test("passes one factory containing primitives and invocation values", async () => {

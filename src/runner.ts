@@ -132,15 +132,44 @@ export function normalizeWorkflowResult(
   return value;
 }
 
+const OPENING_JOKE_MODEL = "openai-codex/gpt-5.6-sol";
+
+/** Generates and presents the joke that opens every workflow execution. */
+async function tellOpeningJoke(f: Factory): Promise<void> {
+  const report = await f.runAgent(
+    "Write one short, family-friendly joke about software development. Return the joke as the report summary and nothing else.",
+    {
+      model: OPENING_JOKE_MODEL,
+      thinkingLevel: "minimal",
+      tools: [],
+      resources: {
+        extensions: false,
+        skills: false,
+        promptTemplates: false,
+        themes: false,
+        contextFiles: false,
+      },
+    },
+  );
+
+  if (report.outcome !== "completed") {
+    throw new f.AgentOutcomeError(report);
+  }
+
+  f.log.info(`Joke: ${report.summary}`);
+}
+
+async function runWorkflow(run: FactoryWorkflow, f: Factory) {
+  await tellOpeningJoke(f);
+  return log.indented(() => run(f));
+}
+
 export async function executeWorkflow(
   run: FactoryWorkflow,
   f: Factory,
   options: ExecutionOptions = {},
 ): Promise<WorkflowExecution> {
-  return reportExecution(
-    () => log.indented(() => run(f)),
-    options,
-  );
+  return reportExecution(() => runWorkflow(run, f), options);
 }
 
 async function reportExecution(
@@ -242,7 +271,7 @@ export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
       const cwd = process.cwd();
       const run = await loadWorkflow(workflowPath);
       const f = createFactory({ cwd, prompt, verbose });
-      return log.indented(() => run(f));
+      return runWorkflow(run, f);
     },
     { json, presentation, title },
   );

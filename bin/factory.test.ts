@@ -85,13 +85,14 @@ describe("factory executable", () => {
     expect(execution.result.summary).toBe("A JSON result");
     expect(execution.result.outputs.id).toMatch(/^[a-z]+-[a-z]+-\d{4}$/);
     expect(execution.durationMs).toBeNumber();
-    expect(execution.usage).toEqual({
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
+    expect(execution.usage).toMatchObject({
+      cacheRead: expect.any(Number),
+      cacheWrite: expect.any(Number),
     });
+    expect(execution.usage.input).toBeGreaterThan(0);
+    expect(execution.usage.output).toBeGreaterThan(0);
     expect(stderr).toContain("Factory starting");
+    expect(stderr).toContain("Joke:");
     expect(stderr).toContain("Finished in ");
   });
 

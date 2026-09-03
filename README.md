@@ -5,8 +5,9 @@ workflows.
 
 The library in `src/` provides mechanisms for running coding agents and
 inspecting workspace state. The `factory` executable loads a workflow script,
-creates a `Factory` containing those primitives and the invocation state, and
-reports its result. A workflow script owns the policy: loops, retries,
+creates a `Factory` containing those primitives and the invocation state,
+generates a short opening joke with an agent, and reports the workflow result.
+A workflow script owns the policy: loops, retries,
 validation commands, model choices, and decisions based on agent outcomes all
 belong in the script.
 
@@ -63,9 +64,9 @@ global command link in `~/.bun/bin`; make sure that directory is on your
 fish_add_path ~/.bun/bin
 ```
 
-The example currently uses `openai-codex/gpt-5.6-sol` with medium thinking, so pi must
-be able to authenticate with OpenAI (ChatGPT Plus/Pro Codex auth) before that workflow
-can run.
+Factory uses `openai-codex/gpt-5.6-sol` to generate a joke before every workflow
+and the example workflows use the same model with medium thinking. Pi must be able
+to authenticate with OpenAI (ChatGPT Plus/Pro Codex auth) before a workflow can run.
 
 The worktree parent directory is configured by `worktreesDirectory` near the
 top of `workflows/make-pr.ts`. Its default is `../factory-worktrees`, relative
