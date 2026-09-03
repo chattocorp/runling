@@ -208,14 +208,15 @@ async function reportExecution(
               log.error(execution.error);
               process.exitCode = 1;
             } else if (!json && execution.result !== null) {
-              log.success(execution.result.summary);
               if (
-                presentation === "log" &&
-                execution.result.details !== undefined
+                presentation === "log"
               ) {
-                console.log(
-                  `\n${formatWorkflowDetails(execution.result.details, terminal)}\n`,
-                );
+                log.success(execution.result.summary);
+                if (execution.result.details !== undefined) {
+                  console.log(
+                    `\n${formatWorkflowDetails(execution.result.details, terminal)}\n`,
+                  );
+                }
               }
             }
 

@@ -211,9 +211,30 @@ test("renders the final Markdown report and completion state", () => {
   const output = Bun.stripANSI(dashboard.render(80).join("\n"));
 
   expect(output).toContain("Completed  ·  1s  ·  0 tokens  ·  $0.00");
+  expect(output).toContain("✓ Review complete");
   expect(output).toContain("Findings");
   expect(output).toContain("Everything looks good.");
   expect(output).not.toContain("##");
+  expect(output).not.toContain("**");
+});
+
+test("renders a Markdown result supplied as the workflow summary", () => {
+  const dashboard = new FactoryDashboard("workflows/joke.ts", 0);
+
+  dashboard.finish({
+    ok: true,
+    error: null,
+    durationMs: 1_000,
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    result: {
+      summary: "# Joke\n\nA factory walks into a **bar**.",
+    },
+  });
+
+  const output = Bun.stripANSI(dashboard.render(80).join("\n"));
+  expect(output).toContain("Joke");
+  expect(output).toContain("A factory walks into a bar.");
+  expect(output).not.toContain("# Joke");
   expect(output).not.toContain("**");
 });
 
@@ -271,7 +292,7 @@ test("never renders beyond the available width", () => {
   ).toBe(true);
 });
 
-test("drives pi-tui through the reporter lifecycle", () => {
+test("drives pi-tui through the fullscreen reporter lifecycle", () => {
   const terminal = new FakeTerminal();
   const reporter = new TuiReporter("workflow.ts", terminal);
 
@@ -296,7 +317,14 @@ test("drives pi-tui through the reporter lifecycle", () => {
 
   expect(terminal.started).toBe(true);
   expect(terminal.stopped).toBe(true);
+  expect(terminal.output).toContain("\x1b[?1049h");
+  expect(terminal.output).toContain("\x1b[?1049l");
   expect(Bun.stripANSI(terminal.output)).toContain("Doing useful work");
+  const restoredDocument = terminal.output.slice(
+    terminal.output.lastIndexOf("\x1b[?1049l"),
+  );
+  expect(Bun.stripANSI(restoredDocument)).toContain("Doing useful work");
+  expect(Bun.stripANSI(restoredDocument)).toContain("Done");
 });
 
 test("collects workflow input through a focused TUI interview", async () => {

@@ -105,9 +105,12 @@ factory workflows/plan.ts "Add deployment support"
 ```
 
 In an interactive terminal, Factory presents workflow progress, active agents,
-token usage, and the final result in a live TUI. When either input or output is
-redirected, it automatically uses append-only logs instead. Use `--log` to
-force append-only output in an interactive terminal:
+token usage, and the final result in a fullscreen TUI. The execution transcript
+is scrollable while its header and status remain visible; leaving the TUI
+restores the terminal and prints the final document into normal scrollback.
+When either input or output is redirected, Factory automatically uses
+append-only logs instead. Use `--log` to force append-only output in an
+interactive terminal:
 
 ```bash
 factory workflows/make-pr.ts --log "Add a focused feature and test it"

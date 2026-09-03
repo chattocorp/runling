@@ -3,13 +3,15 @@ import {
   Input as TextInput,
   Key,
   ProcessTerminal,
+  ScrollView,
   matchesKey,
   type OverlayHandle,
   truncateToWidth,
-  TuiMainScreen,
+  TuiAltScreen,
   type Component,
   type Terminal,
   visibleWidth,
+  VStack,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import type { FactoryEvent } from "./events.ts";
@@ -211,10 +213,15 @@ export class FactoryDashboard implements Component {
   invalidate(): void {}
 
   render(width: number): string[] {
+    return [
+      ...this.renderHeader(width),
+      ...this.renderTranscript(width),
+      ...this.renderFooter(width),
+    ];
+  }
+
+  renderHeader(width: number): string[] {
     const columns = Math.max(1, Math.floor(width));
-    const elapsed = formatElapsed(
-      this.execution?.durationMs ?? performance.now() - this.startedAt,
-    );
     const status = this.execution
       ? this.execution.ok
         ? paint("limegreen", "✓")
@@ -223,12 +230,17 @@ export class FactoryDashboard implements Component {
           "dodgerblue",
           this.spinner(),
         );
-    const lines = [
+    return [
       fit(
         `${bold(paint("dodgerblue", "◆ Factory"))}  ${this.title}  ${status}`,
         columns,
       ),
     ];
+  }
+
+  renderTranscript(width: number): string[] {
+    const columns = Math.max(1, Math.floor(width));
+    const lines: string[] = [];
 
     for (const node of this.nodes) {
       if (!this.hasParent(node)) {
@@ -236,17 +248,32 @@ export class FactoryDashboard implements Component {
       }
     }
 
-    lines.push(dim("─".repeat(columns)));
-    lines.push(fit(this.footer(elapsed), columns));
-
-    if (this.execution?.result?.details !== undefined) {
-      lines.push(
-        "",
-        ...renderMarkdown(this.execution.result.details, columns).split("\n"),
-      );
+    const result = this.execution?.result;
+    if (result !== undefined && result !== null) {
+      if (result.details === undefined) {
+        lines.push("", ...renderMarkdown(result.summary, columns).split("\n"));
+      } else {
+        lines.push(
+          "",
+          fit(`${paint("limegreen", "✓")} ${result.summary}`, columns),
+          "",
+          ...renderMarkdown(result.details, columns).split("\n"),
+        );
+      }
     }
 
     return lines.map((line) => fit(line, columns));
+  }
+
+  renderFooter(width: number): string[] {
+    const columns = Math.max(1, Math.floor(width));
+    const elapsed = formatElapsed(
+      this.execution?.durationMs ?? performance.now() - this.startedAt,
+    );
+    return [
+      dim("─".repeat(columns)),
+      fit(this.footer(elapsed), columns),
+    ];
   }
 
   private footer(elapsed: string): string {
@@ -445,7 +472,7 @@ export class FactoryDashboard implements Component {
 
 export class TuiReporter {
   private readonly dashboard: FactoryDashboard;
-  private readonly tui: TuiMainScreen;
+  private readonly tui: TuiAltScreen;
   private timer?: ReturnType<typeof setInterval>;
   private started = false;
   private stopped = false;
@@ -459,8 +486,40 @@ export class TuiReporter {
     },
   ) {
     this.dashboard = new FactoryDashboard(title);
-    this.tui = new TuiMainScreen(terminal);
-    this.tui.addChild(this.dashboard);
+    this.tui = new TuiAltScreen(terminal);
+    this.tui.setLayoutRoot(
+      new VStack([
+        {
+          component: new DashboardRegion((width) =>
+            this.dashboard.renderHeader(width),
+          ),
+          basis: "auto",
+          shrink: 0,
+        },
+        {
+          component: new ScrollView(
+            new DashboardRegion((width) =>
+              this.dashboard.renderTranscript(width),
+            ),
+            {
+              follow: "end",
+              primary: true,
+              scrollbar: "auto",
+            },
+          ),
+          basis: "auto",
+          grow: 1,
+          minSize: 1,
+        },
+        {
+          component: new DashboardRegion((width) =>
+            this.dashboard.renderFooter(width),
+          ),
+          basis: "auto",
+          shrink: 0,
+        },
+      ]),
+    );
     this.tui.addInputListener((data) => {
       if (!matchesKey(data, Key.ctrl("c"))) return;
 
@@ -537,6 +596,16 @@ export class TuiReporter {
     }
     if (this.timer !== undefined) clearInterval(this.timer);
     this.tui.stop();
+  }
+}
+
+class DashboardRegion implements Component {
+  constructor(private readonly renderRegion: (width: number) => string[]) {}
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    return this.renderRegion(width);
   }
 }
 
