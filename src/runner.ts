@@ -3,10 +3,10 @@ import { pathToFileURL } from "node:url";
 import { cli } from "./cli.ts";
 import { log } from "./log.ts";
 import {
-  factoryRuntime,
+  createFactory,
+  type Factory,
   type FactoryWorkflow,
   type JsonValue,
-  type WorkflowInvocation,
   type WorkflowResult,
   type WorkflowReturn,
 } from "./runtime.ts";
@@ -110,12 +110,12 @@ export function normalizeWorkflowResult(
 }
 
 export async function executeWorkflow(
-  workflow: FactoryWorkflow,
-  invocation: WorkflowInvocation,
+  run: FactoryWorkflow,
+  f: Factory,
   options: { json?: boolean } = {},
 ): Promise<WorkflowExecution> {
   return reportExecution(
-    () => log.indented(() => workflow(factoryRuntime, invocation)),
+    () => log.indented(() => run(f)),
     options,
   );
 }
@@ -139,6 +139,7 @@ async function reportExecution(
           log.success(result.summary);
         }
       } catch (cause) {
+        result = null;
         error = cause instanceof Error ? cause.message : String(cause);
         log.error(error);
         process.exitCode = 1;
@@ -185,10 +186,9 @@ export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
     async () => {
       const { workflowPath, prompt, verbose } = cli(argv, "factory");
       const cwd = process.cwd();
-      const workflow = await loadWorkflow(workflowPath);
-      return log.indented(() =>
-        workflow(factoryRuntime, { cwd, prompt, verbose }),
-      );
+      const run = await loadWorkflow(workflowPath);
+      const f = createFactory({ cwd, prompt, verbose });
+      return log.indented(() => run(f));
     },
     { json },
   );

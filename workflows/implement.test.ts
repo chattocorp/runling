@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { withRetries, type FactoryRuntime, type Shell } from "../src/index.ts";
+import { withRetries, type Factory, type Shell } from "../src/index.ts";
 import { implement } from "./implement.ts";
 
-const invocation = {
+const contextValues = {
   cwd: "/project",
   prompt: "Make the change",
   verbose: false,
@@ -30,6 +30,7 @@ function runtimeWith(
   }
 
   const factory = {
+    ...contextValues,
     agent: (prompt: string, options: Record<string, unknown>) => {
       agentOptions.push(options);
       return runAgent(prompt, options);
@@ -40,7 +41,7 @@ function runtimeWith(
     log: { info: (message: string) => messages.push(message) },
     ShellError: TestShellError,
     withRetries,
-  } as unknown as FactoryRuntime;
+  } as unknown as Factory;
 
   return { factory, messages, agentOptions, TestShellError };
 }
@@ -49,9 +50,7 @@ describe("implement workflow", () => {
   test("runs agents on Sol with medium thinking", async () => {
     const { factory, agentOptions } = runtimeWith(async () => {});
 
-    await expect(implement(factory, invocation)).resolves.toBe(
-      "Made the change",
-    );
+    await expect(implement(factory)).resolves.toBe("Made the change");
 
     expect(agentOptions).toHaveLength(1);
     expect(agentOptions[0]).toMatchObject({
@@ -75,9 +74,7 @@ describe("implement workflow", () => {
     );
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.factory, invocation)).resolves.toBe(
-      "Made the change",
-    );
+    await expect(implement(setup.factory)).resolves.toBe("Made the change");
 
     expect(setup.agentOptions).toHaveLength(2);
     expect(setup.agentOptions[1]).toMatchObject({
@@ -92,9 +89,7 @@ describe("implement workflow", () => {
       checks++;
     });
 
-    await expect(implement(factory, invocation)).resolves.toBe(
-      "Made the change",
-    );
+    await expect(implement(factory)).resolves.toBe("Made the change");
 
     expect(checks).toBe(1);
     expect(messages).toEqual(["Running tests (attempt 1/3)"]);
@@ -122,9 +117,7 @@ describe("implement workflow", () => {
     );
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.factory, invocation)).resolves.toBe(
-      "Made the change",
-    );
+    await expect(implement(setup.factory)).resolves.toBe("Made the change");
 
     expect(checks).toBe(2);
     expect(setup.messages).toEqual([

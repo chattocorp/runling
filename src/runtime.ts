@@ -12,7 +12,7 @@ import { createShell, ShellError } from "./shell.ts";
 import { step } from "./step.ts";
 import { concat } from "./utils.ts";
 
-export interface WorkflowInvocation {
+interface FactoryValues {
   cwd: string;
   prompt: string;
   verbose: boolean;
@@ -33,7 +33,7 @@ export interface WorkflowResult {
 
 export type WorkflowReturn = WorkflowResult | string | undefined | void;
 
-export const factoryRuntime = Object.freeze({
+const factoryPrimitives = Object.freeze({
   agent,
   AgentOutcomeError,
   requireCompletedReport,
@@ -49,9 +49,17 @@ export const factoryRuntime = Object.freeze({
   concat,
 });
 
-export type FactoryRuntime = typeof factoryRuntime;
+type FactoryPrimitives = typeof factoryPrimitives;
+
+export type Factory = FactoryPrimitives & FactoryValues;
+
+export function createFactory(values: FactoryValues): Factory {
+  return Object.freeze({
+    ...factoryPrimitives,
+    ...values,
+  });
+}
 
 export type FactoryWorkflow = (
-  factory: FactoryRuntime,
-  invocation: WorkflowInvocation,
+  f: Factory,
 ) => Promise<WorkflowReturn> | WorkflowReturn;

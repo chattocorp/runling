@@ -5,9 +5,10 @@ workflows.
 
 The library in `src/` provides mechanisms for running coding agents and
 inspecting workspace state. The `factory` executable loads a workflow script,
-injects those primitives, and reports its result. A workflow script owns the
-policy: loops, retries, validation commands, model choices, and decisions based
-on agent outcomes all belong in the script.
+creates a `Factory` containing those primitives and the invocation state, and
+reports its result. A workflow script owns the policy: loops, retries,
+validation commands, model choices, and decisions based on agent outcomes all
+belong in the script.
 
 The example workflows in `workflows/` use the framework to develop this
 repository. Both files are workflow entrypoints. `workflows/implement.ts` asks
@@ -81,16 +82,15 @@ factory workflows/make-pr.ts --json "Add a focused feature and test it"
 
 ## Writing a workflow
 
-Define workflows with `workflow(name, handler)` and export the result. The
-executable passes the framework runtime as the handler's first argument and the
-invocation details as its second:
+Export an ordinary function that accepts one `Factory`. It contains framework
+primitives and invocation details:
 
 ```ts
-import { workflow } from "factory";
+import type { Factory } from "factory";
 
-export default workflow("Review change", async ({ runAgent }, { prompt, cwd }) => {
-  const report = await runAgent(prompt, {
-    cwd,
+export default async function review(f: Factory) {
+  const report = await f.runAgent(f.prompt, {
+    cwd: f.cwd,
     model: "openai-codex/gpt-5.6-sol",
     thinkingLevel: "medium",
     tools: ["read"],
@@ -104,34 +104,39 @@ export default workflow("Review change", async ({ runAgent }, { prompt, cwd }) =
     case "failed":
       throw new Error(`Review failed: ${report.summary}`);
   }
-});
+}
 ```
 
-The invocation contains the quoted `prompt`, the current working directory as
-`cwd`, and the `verbose` flag. Destructure only the framework primitives and
-invocation values that the workflow needs. A named workflow is an ordinary
-callable, so larger workflows can compose smaller ones by passing along the
-runtime:
+The `Factory` contains the quoted `prompt`, the current working directory as
+`cwd`, the `verbose` flag, and all framework primitives. Use `f` as its
+conventional parameter name. Short local aliases can still help for values used
+repeatedly. Larger workflows compose smaller ones with ordinary function calls:
 
 ```ts
-import { workflow } from "factory";
+import type { Factory } from "factory";
 
-const qualityAssurance = workflow(
-  "Quality Assurance",
-  async ({ createShell, log, withRetries }, cwd: string) => {
-    const $ = createShell();
+async function qualityAssurance(f: Factory) {
+  const { cwd } = f;
+  const $ = f.createShell({ verbose: f.verbose });
 
-    await withRetries(3, async ({ attempt, attempts }) => {
-      log.info(`Running tests (attempt ${attempt}/${attempts})`);
-      await $`bun test`.cwd(cwd);
-    });
-  },
-);
+  await f.withRetries(3, async ({ attempt, attempts }) => {
+    f.log.info(`Running tests (attempt ${attempt}/${attempts})`);
+    await $`bun test`.cwd(cwd);
+  });
+}
 
-export default workflow("Implement change", async (factory, { cwd }) => {
+export default async function implement(f: Factory) {
   // Implement the change...
-  await qualityAssurance(factory, cwd);
-});
+  await qualityAssurance(f);
+}
+```
+
+Use object spread when nested work should inherit everything except specific
+invocation state. For example, the pull-request workflow runs the implementation
+workflow in its new worktree with:
+
+```ts
+await implement({ ...f, cwd: worktreePath });
 ```
 
 A workflow may return a summary string, nothing, or a structured result with
@@ -230,7 +235,6 @@ contract.
 
 ## Framework primitives
 
-- `workflow(name, handler)` defines a named, reusable workflow unit.
 - `step(name, work)` runs an inline operation with nested log indentation.
 - `withRetries(attempts, work, onFailure?)` retries work and awaits optional
   failure handling between attempts.

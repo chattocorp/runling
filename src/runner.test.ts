@@ -4,6 +4,7 @@ import {
   formatDuration,
   normalizeWorkflowResult,
 } from "./runner.ts";
+import { createFactory } from "./runtime.ts";
 import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
 
 const initialExitCode = process.exitCode;
@@ -14,20 +15,22 @@ afterEach(() => {
 });
 
 describe("executeWorkflow", () => {
-  const invocation = {
+  const f = createFactory({
     cwd: "/project",
     prompt: "Make the change",
     verbose: false,
-  };
+  });
 
-  test("injects the runtime and invocation", async () => {
-    await executeWorkflow(async (factory, receivedInvocation) => {
-      expect(factory.agent).toBeFunction();
-      expect(factory.createShell).toBeFunction();
-      expect(factory.step).toBeFunction();
-      expect(factory.withRetries).toBeFunction();
-      expect(receivedInvocation).toEqual(invocation);
-    }, invocation);
+  test("passes one factory containing primitives and invocation values", async () => {
+    await executeWorkflow(async (receivedFactory) => {
+      expect(receivedFactory).toBe(f);
+      expect(receivedFactory.agent).toBeFunction();
+      expect(receivedFactory.createShell).toBeFunction();
+      expect(receivedFactory.step).toBeFunction();
+      expect(receivedFactory.withRetries).toBeFunction();
+      expect(receivedFactory.cwd).toBe("/project");
+      expect(receivedFactory.prompt).toBe("Make the change");
+    }, f);
   });
 
   test("logs a workflow summary", async () => {
@@ -36,7 +39,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => "Made the change", invocation);
+      await executeWorkflow(async () => "Made the change", f);
     } finally {
       console.log = originalLog;
     }
@@ -50,7 +53,7 @@ describe("executeWorkflow", () => {
         summary: "Opened the pull request",
         outputs: { pullRequestUrl: "https://example.com/pull/1" },
       }),
-      invocation,
+      f,
     );
 
     expect(execution.ok).toBe(true);
@@ -71,7 +74,7 @@ describe("executeWorkflow", () => {
     try {
       await executeWorkflow(
         async () => ({ summary: "Done", outputs: { count: 2 } }),
-        invocation,
+        f,
         { json: true },
       );
     } finally {
@@ -98,7 +101,7 @@ describe("executeWorkflow", () => {
       await executeWorkflow(async ({ log }) => {
         log.info("inside the workflow");
         return "Made the change";
-      }, invocation);
+      }, f);
     } finally {
       console.log = originalLog;
     }
@@ -125,7 +128,7 @@ describe("executeWorkflow", () => {
     try {
       await executeWorkflow(async () => {
         throw "Tests failed";
-      }, invocation);
+      }, f);
     } finally {
       console.error = originalError;
     }
@@ -140,7 +143,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => undefined, invocation);
+      await executeWorkflow(async () => undefined, f);
     } finally {
       console.log = originalLog;
     }
@@ -156,7 +159,7 @@ describe("executeWorkflow", () => {
     try {
       await executeWorkflow(async () => {
         throw "Tests failed";
-      }, invocation);
+      }, f);
     } finally {
       console.log = originalLog;
     }
@@ -173,7 +176,7 @@ describe("executeWorkflow", () => {
       await executeWorkflow(async () => {
         recordTokenUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 });
         recordTokenUsage({ input: 50, output: 25, cacheRead: 550, cacheWrite: 15 });
-      }, invocation);
+      }, f);
     } finally {
       console.log = originalLog;
     }
@@ -194,7 +197,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => undefined, invocation);
+      await executeWorkflow(async () => undefined, f);
     } finally {
       console.log = originalLog;
     }
@@ -211,7 +214,7 @@ describe("executeWorkflow", () => {
     try {
       await executeWorkflow(async () => {
         recordTokenUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
-      }, invocation);
+      }, f);
     } finally {
       console.log = originalLog;
     }

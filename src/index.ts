@@ -27,15 +27,9 @@ export {
 } from "./shell.ts";
 export { concat, type ConcatPart } from "./utils.ts";
 export {
-  type NamedWorkflow,
-  workflow,
-  type WorkflowHandler,
-} from "./workflow.ts";
-export {
-  type FactoryRuntime,
+  type Factory,
   type FactoryWorkflow,
   type JsonValue,
-  type WorkflowInvocation,
   type WorkflowResult,
   type WorkflowReturn,
 } from "./runtime.ts";

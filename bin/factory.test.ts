@@ -23,7 +23,6 @@ describe("factory executable", () => {
 
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
-    expect(stdout).toContain("Echo");
     expect(stdout).toContain("A workflow result");
     expect(stdout).toContain("Finished in ");
   });
