@@ -13,6 +13,7 @@ import { log } from "./log.ts";
 import { parseModelReference } from "./model.ts";
 import { displayPath, displayText } from "./paths.ts";
 import {
+  ESPERANTO_OUTPUT_INSTRUCTION,
   FACTORY_SYSTEM_PROMPT,
   formatAgentInstructions,
 } from "./system-prompt.ts";
@@ -134,15 +135,15 @@ export class AgentOutcomeError extends Error {
 export function describeTool(name: string, args: Record<string, unknown>) {
   switch (name) {
     case "read":
-      return `Reading ${displayPath(String(args.path))}`;
+      return `${log.text("Reading", "Legante")} ${displayPath(String(args.path))}`;
     case "edit":
-      return `Editing ${displayPath(String(args.path))}`;
+      return `${log.text("Editing", "Redaktante")} ${displayPath(String(args.path))}`;
     case "write":
-      return `Writing ${displayPath(String(args.path))}`;
+      return `${log.text("Writing", "Skribante")} ${displayPath(String(args.path))}`;
     case "bash":
-      return `Running ${displayText(String(args.command).replaceAll("\n", " "))}`;
+      return `${log.text("Running", "Rulante")} ${displayText(String(args.command).replaceAll("\n", " "))}`;
     default:
-      return `Using ${name}`;
+      return `${log.text("Using", "Uzante")} ${name}`;
   }
 }
 
@@ -217,9 +218,10 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
     throw new Error(`Model ${options.model} is unavailable`);
   }
 
-  const additionalInstructions = formatAgentInstructions(
-    options.instructions ?? [],
-  );
+  const additionalInstructions = formatAgentInstructions([
+    ...(options.instructions ?? []),
+    ...(log.isEsperanto ? [ESPERANTO_OUTPUT_INSTRUCTION] : []),
+  ]);
 
   const resources = options.resources;
   const settingsManager = SettingsManager.create(cwd, agentDir);
@@ -293,7 +295,7 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
     const unsubscribe = session.subscribe((event) => {
       if (event.type === "agent_start") {
         agentLog.info(
-          `Agent started (model: ${model.provider}/${model.id})`,
+          `${log.text("Agent started", "Agento ekfunkciis")} (${log.text("model", "modelo")}: ${model.provider}/${model.id})`,
         );
       }
 
@@ -310,7 +312,9 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
       }
 
       if (event.type === "tool_execution_end" && event.isError) {
-        agentLog.error(`${event.toolName} failed`);
+        agentLog.error(
+          `${event.toolName} ${log.text("failed", "malsukcesis")}`,
+        );
       }
 
       if (event.type === "auto_retry_start") {
@@ -342,7 +346,12 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
           .join("\n");
 
         accumulateTokenUsage(usage, event.message.usage);
-        agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
+        agentLog.debug(
+          `${log.text("Tokens", "Ĵetonoj")}: ${formatTokenUsage(
+            usage,
+            log.isEsperanto ? "esperanto" : "english",
+          )}`,
+        );
       }
     });
 
@@ -359,8 +368,14 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
         if (activeReport === undefined) {
           agentLog.info(
             finalText !== undefined && containsMalformedToolCall(finalText)
-              ? "Retrying malformed outcome report"
-              : "Retrying missing outcome report",
+              ? log.text(
+                  "Retrying malformed outcome report",
+                  "Reprovante misformitan rezultoraporton",
+                )
+              : log.text(
+                  "Retrying missing outcome report",
+                  "Reprovante mankantan rezultoraporton",
+                ),
           );
           finalText = undefined;
           await session.prompt(
@@ -389,7 +404,12 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
       signal?.removeEventListener("abort", abort);
       unsubscribe();
       running = false;
-      agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
+      agentLog.info(
+        `${log.text("Token usage", "Ĵetonuzado")}: ${formatTokenUsage(
+          usage,
+          log.isEsperanto ? "esperanto" : "english",
+        )}`,
+      );
       recordTokenUsage(usage);
     }
   };

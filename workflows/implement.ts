@@ -7,13 +7,13 @@ const maxValidationAttempts = 3;
 
 const runCheck = (f: Factory) =>
   f.step(
-    "Running checks",
+    f.esperanto ? "Rulante kontrolojn" : "Running checks",
     () => f.shell`bun run check`.nothrow(),
   );
 
 const runTests = (f: Factory) =>
   f.step(
-    "Running tests",
+    f.esperanto ? "Rulante testojn" : "Running tests",
     () => f.shell`bun test`.nothrow(),
   );
 
@@ -32,7 +32,9 @@ async function validate(f: Factory) {
     if (attempt === maxValidationAttempts) {
       throw new Error(
         f.concat(
-          `Project validation failed after ${maxValidationAttempts} attempts.`,
+          f.esperanto
+            ? `Projekta validigo malsukcesis post ${maxValidationAttempts} provoj.`
+            : `Project validation failed after ${maxValidationAttempts} attempts.`,
           result.stdout.toString(),
           result.stderr.toString(),
         ),
@@ -40,7 +42,9 @@ async function validate(f: Factory) {
     }
 
     f.log.info(
-      `Fixing failed validation (attempt ${attempt}/${maxValidationAttempts})`,
+      f.esperanto
+        ? `Riparante malsukcesan validigon (provo ${attempt}/${maxValidationAttempts})`
+        : `Fixing failed validation (attempt ${attempt}/${maxValidationAttempts})`,
     );
 
     await using repairAgent = await f.agent({
@@ -79,12 +83,20 @@ export async function implement(f: Factory): Promise<string> {
   const report = await implementationAgent.run(f.prompt);
 
   if (!(await pwd.hasChanges)) {
-    throw new Error("Agent completed without changing the worktree");
+    throw new Error(
+      f.esperanto
+        ? "La aganto finis sen ŝanĝi la laborarbon"
+        : "Agent completed without changing the worktree",
+    );
   }
 
   await validate(f);
   if (!(await pwd.hasChanges)) {
-    throw new Error("The validated worktree no longer contains any changes");
+    throw new Error(
+      f.esperanto
+        ? "La validigita laborarbo ne plu enhavas ŝanĝojn"
+        : "The validated worktree no longer contains any changes",
+    );
   }
 
   return report.summary;

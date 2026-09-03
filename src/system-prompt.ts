@@ -13,6 +13,9 @@ Use outcome "completed" only when the request has been fulfilled. Use
 work was attempted but could not be completed.
 `.trim();
 
+export const ESPERANTO_OUTPUT_INSTRUCTION =
+  "Write all user-visible output, including the report summary, in Esperanto. Keep code, commands, identifiers, and file paths unchanged.";
+
 export function formatAgentInstructions(instructions: readonly string[]) {
   if (instructions.length === 0) {
     return undefined;

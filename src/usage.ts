@@ -38,14 +38,22 @@ function formatCount(value: number): string {
   return value.toLocaleString("en-US");
 }
 
-export function formatTokenUsage(usage: TokenUsage): string {
+export function formatTokenUsage(
+  usage: TokenUsage,
+  language: "english" | "esperanto" = "english",
+): string {
+  const esperanto = language === "esperanto";
   const parts = [
-    `in ${formatCount(usage.input)}`,
-    `out ${formatCount(usage.output)}`,
+    `${esperanto ? "en" : "in"} ${formatCount(usage.input)}`,
+    `${esperanto ? "el" : "out"} ${formatCount(usage.output)}`,
   ];
   if (usage.cacheRead > 0 || usage.cacheWrite > 0) {
-    parts.push(`cache read ${formatCount(usage.cacheRead)}`);
-    parts.push(`cache write ${formatCount(usage.cacheWrite)}`);
+    parts.push(
+      `${esperanto ? "kaŝmemora legado" : "cache read"} ${formatCount(usage.cacheRead)}`,
+    );
+    parts.push(
+      `${esperanto ? "kaŝmemora skribado" : "cache write"} ${formatCount(usage.cacheWrite)}`,
+    );
   }
   return parts.join(", ");
 }

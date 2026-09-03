@@ -558,6 +558,20 @@ describe("runAgent", () => {
     ]);
   });
 
+  test("instructs agents to report in Esperanto in Esperanto mode", async () => {
+    await log.withLanguage("esperanto", () =>
+      runAgent("Reviziu", {
+        model: "anthropic/claude-opus-4-5",
+      }),
+    );
+
+    expect(resourceOptions.appendSystemPromptOverride(["Baza peto"])).toEqual([
+      "Baza peto",
+      expect.stringContaining("non-interactive software factory"),
+      expect.stringContaining("in Esperanto"),
+    ]);
+  });
+
   test("aborts and disposes an active session", async () => {
     const controller = new AbortController();
     promptImplementation = async () => controller.abort("Stopped");

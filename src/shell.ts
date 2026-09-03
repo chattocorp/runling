@@ -16,7 +16,7 @@ export function createShell(options: CreateShellOptions = {}) {
     ...args: Parameters<typeof $>
   ) {
     log.info(
-      `${log.highlight("Running", COMMAND_COLOR)} ${formatCommand(...args)}`,
+      `${log.highlight(log.text("Running", "Rulante"), COMMAND_COLOR)} ${formatCommand(...args)}`,
     );
     const command = $(...args).quiet(!(options.verbose ?? false));
     const cwd = options.cwd ?? this?.cwd;

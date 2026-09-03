@@ -22,6 +22,7 @@ const INDENT_UNIT = "  ";
 const depthStorage = new AsyncLocalStorage<number>();
 const colorStorage = new AsyncLocalStorage<string>();
 const destinationStorage = new AsyncLocalStorage<"stdout" | "stderr">();
+const languageStorage = new AsyncLocalStorage<"english" | "esperanto">();
 
 function indent(): string {
   return INDENT_UNIT.repeat(depthStorage.getStore() ?? 0);
@@ -55,6 +56,14 @@ export const log = {
     write(`${indent()}${marker("limegreen", "✓")} ${message}`),
   error: (message: string) =>
     write(`${indent()}${marker("crimson", "✗")} ${message}`, true),
+  /** Whether output in the current execution should be written in Esperanto. */
+  get isEsperanto(): boolean {
+    return languageStorage.getStore() === "esperanto";
+  },
+  /** Selects the appropriate text for the current output language. */
+  text(english: string, esperanto: string): string {
+    return languageStorage.getStore() === "esperanto" ? esperanto : english;
+  },
   /** Renders `text` in the active contextual color, if there is one. */
   colorize(text: string): string {
     const color = colorStorage.getStore();
@@ -65,6 +74,13 @@ export const log = {
   /** Runs `work` with log markers rendered in `color`. */
   withColor<T>(color: string, work: LoggedWork<T>): T {
     return colorStorage.run(color, work);
+  },
+  /** Runs `work` with the selected output language. */
+  withLanguage<T>(
+    language: "english" | "esperanto",
+    work: LoggedWork<T>,
+  ): T {
+    return languageStorage.run(language, work);
   },
   /** Runs `work` with informational output written to `destination`. */
   withDestination<T>(

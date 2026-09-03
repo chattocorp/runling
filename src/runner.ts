@@ -110,54 +110,63 @@ export function normalizeWorkflowResult(
 export async function executeWorkflow(
   run: FactoryWorkflow,
   f: Factory,
-  options: { json?: boolean } = {},
+  options: { json?: boolean; esperanto?: boolean } = {},
 ): Promise<WorkflowExecution> {
   return reportExecution(
     () => log.indented(() => run(f)),
-    options,
+    { ...options, esperanto: options.esperanto ?? f.esperanto },
   );
 }
 
 async function reportExecution(
   run: () => Promise<WorkflowReturn> | WorkflowReturn,
-  { json = false }: { json?: boolean } = {},
+  {
+    json = false,
+    esperanto = false,
+  }: { json?: boolean; esperanto?: boolean } = {},
 ): Promise<WorkflowExecution> {
-  const execution = await log.withDestination(
-    json ? "stderr" : "stdout",
-    async () => {
-      resetTokenUsage();
-      const start = performance.now();
-      let result: WorkflowResult | null = null;
-      let error: string | null = null;
+  const execution = await log.withLanguage(
+    esperanto ? "esperanto" : "english",
+    () =>
+      log.withDestination(json ? "stderr" : "stdout", async () => {
+        resetTokenUsage();
+        const start = performance.now();
+        let result: WorkflowResult | null = null;
+        let error: string | null = null;
 
-      log.info("Factory starting");
-      try {
-        result = normalizeWorkflowResult(await run());
-        if (!json && result !== null) {
-          log.success(result.summary);
+        log.info(log.text("Factory starting", "Fabriko ekfunkcias"));
+        try {
+          result = normalizeWorkflowResult(await run());
+          if (!json && result !== null) {
+            log.success(result.summary);
+          }
+        } catch (cause) {
+          result = null;
+          error = cause instanceof Error ? cause.message : String(cause);
+          log.error(error);
+          process.exitCode = 1;
         }
-      } catch (cause) {
-        result = null;
-        error = cause instanceof Error ? cause.message : String(cause);
-        log.error(error);
-        process.exitCode = 1;
-      }
 
-      const usage = getRecordedTokenUsage();
-      if (totalTokens(usage) > 0) {
-        log.info(`Total token usage: ${formatTokenUsage(usage)}`);
-      }
-      const durationMs = performance.now() - start;
-      log.info(`Finished in ${formatDuration(durationMs)}`);
+        const usage = getRecordedTokenUsage();
+        if (totalTokens(usage) > 0) {
+          const language = esperanto ? "esperanto" : "english";
+          log.info(
+            `${log.text("Total token usage", "Totala ĵetonuzado")}: ${formatTokenUsage(usage, language)}`,
+          );
+        }
+        const durationMs = performance.now() - start;
+        log.info(
+          `${log.text("Finished in", "Finita post")} ${formatDuration(durationMs)}`,
+        );
 
-      return {
-        durationMs,
-        usage,
-        result,
-        error,
-        ok: error === null,
-      };
-    },
+        return {
+          durationMs,
+          usage,
+          result,
+          error,
+          ok: error === null,
+        };
+      }),
   );
 
   if (json) {
@@ -180,14 +189,15 @@ export async function loadWorkflow(path: string): Promise<FactoryWorkflow> {
 
 export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
   const json = argv.includes("--json");
+  const esperanto = argv.includes("--esperanto");
   await reportExecution(
     async () => {
       const { workflowPath, prompt, verbose } = cli(argv, "factory");
       const cwd = process.cwd();
       const run = await loadWorkflow(workflowPath);
-      const f = createFactory({ cwd, prompt, verbose });
+      const f = createFactory({ cwd, prompt, verbose, esperanto });
       return log.indented(() => run(f));
     },
-    { json },
+    { json, esperanto },
   );
 }

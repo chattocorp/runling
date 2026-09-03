@@ -9,11 +9,18 @@ describe("cli", () => {
       prompt: "make the change",
       json: false,
       verbose: false,
+      esperanto: false,
     });
   });
 
   test("accepts JSON output mode", () => {
     expect(cli(["workflow.ts", "--json", "make the change"]).json).toBe(true);
+  });
+
+  test("accepts Esperanto output mode", () => {
+    expect(
+      cli(["workflow.ts", "--esperanto", "faru la ŝanĝon"]).esperanto,
+    ).toBe(true);
   });
 
   test("accepts both verbose flags", () => {
@@ -32,9 +39,15 @@ describe("cli", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe(
-        "Usage: factory [-v|--verbose] [--json] <workflow.ts> <prompt>",
+        "Usage: factory [-v|--verbose] [--json] [--esperanto] <workflow.ts> <prompt>",
       );
     }
+  });
+
+  test("reports argument errors in Esperanto when requested", () => {
+    expect(() => cli(["--esperanto"], "factory")).toThrow(
+      "Uzado: factory",
+    );
   });
 
   test("rejects silently truncated prompts", () => {

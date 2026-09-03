@@ -30,6 +30,7 @@ describe("executeWorkflow", () => {
       expect(receivedFactory.step).toBeFunction();
       expect(receivedFactory.cwd).toBe("/project");
       expect(receivedFactory.prompt).toBe("Make the change");
+      expect(receivedFactory.esperanto).toBe(false);
     }, f);
   });
 
@@ -61,6 +62,25 @@ describe("executeWorkflow", () => {
       summary: "Opened the pull request",
       outputs: { pullRequestUrl: "https://example.com/pull/1" },
     });
+  });
+
+  test("writes framework output in Esperanto when requested", async () => {
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (message: string) => logs.push(message);
+
+    try {
+      await executeWorkflow(async () => "Ŝanĝo farita", f, {
+        esperanto: true,
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(logs.some((line) => line.includes("Fabriko ekfunkcias"))).toBe(true);
+    expect(logs.some((line) => line.includes("Ŝanĝo farita"))).toBe(true);
+    expect(logs.some((line) => line.includes("Finita post"))).toBe(true);
+    expect(logs.some((line) => line.includes("Factory starting"))).toBe(false);
   });
 
   test("emits only the execution document to stdout in JSON mode", async () => {

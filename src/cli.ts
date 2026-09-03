@@ -7,6 +7,7 @@ export interface CliArguments {
   prompt: string;
   json: boolean;
   verbose: boolean;
+  esperanto: boolean;
 }
 
 function parseCliArguments(argv: readonly string[]) {
@@ -14,6 +15,10 @@ function parseCliArguments(argv: readonly string[]) {
     args: [...argv],
     options: {
       json: {
+        type: "boolean",
+        default: false,
+      },
+      esperanto: {
         type: "boolean",
         default: false,
       },
@@ -40,19 +45,26 @@ export function cli(
     throw error instanceof Error ? error : new Error(String(error));
   }
 
+  const esperanto = parsed.values.esperanto ?? false;
   const [workflowPath, prompt, ...extraPositionals] = parsed.positionals;
   if (workflowPath === undefined || prompt === undefined) {
     throw new Error(
-      `Usage: ${command} [-v|--verbose] [--json] <workflow.ts> <prompt>`,
+      esperanto
+        ? `Uzado: ${command} [-v|--verbose] [--json] [--esperanto] <workflow.ts> <prompt>`
+        : `Usage: ${command} [-v|--verbose] [--json] [--esperanto] <workflow.ts> <prompt>`,
     );
   }
   if (extraPositionals.length > 0) {
-    throw new Error("The prompt must be passed as a single quoted argument");
+    throw new Error(
+      esperanto
+        ? "La peto devas esti transdonita kiel unu citita argumento"
+        : "The prompt must be passed as a single quoted argument",
+    );
   }
 
   const json = parsed.values.json ?? false;
   const verbose = parsed.values.verbose ?? false;
   log.level = verbose ? "debug" : "info";
 
-  return { workflowPath, prompt, json, verbose };
+  return { workflowPath, prompt, json, verbose, esperanto };
 }

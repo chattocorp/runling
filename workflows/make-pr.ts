@@ -18,7 +18,9 @@ async function makePullRequest(
 
   await mkdir(worktreesPath, { recursive: true });
   await f.shell`git worktree add -b ${branchName} ${worktreePath}`;
-  f.log.info(`Working in ${worktreePath}`);
+  f.log.info(
+    `${f.esperanto ? "Laborante en" : "Working in"} ${worktreePath}`,
+  );
 
   const worktree = { ...f, cwd: worktreePath };
   await worktree.shell`bun install --frozen-lockfile`;
@@ -45,7 +47,7 @@ async function makePullRequest(
   await f.shell`git worktree remove ${worktreePath}`;
 
   return {
-    summary: `Opened ${pullRequestUrl}`,
+    summary: `${f.esperanto ? "Malfermita" : "Opened"} ${pullRequestUrl}`,
     outputs: {
       branchName,
       pullRequestUrl,

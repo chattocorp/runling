@@ -83,6 +83,13 @@ one JSON document to stdout and routes its progress logs to stderr:
 factory workflows/make-pr.ts --json "Add a focused feature and test it"
 ```
 
+Use `--esperanto` to render Factory's progress, diagnostics, and agent reports
+in Esperanto. The flag can be combined with `--verbose` or `--json`:
+
+```bash
+factory workflows/implement.ts --esperanto "Aldonu fokusitan funkcion"
+```
+
 ## Writing a workflow
 
 Export an ordinary function that accepts one `Factory`. It contains framework
@@ -111,8 +118,8 @@ export default async function review(f: Factory) {
 ```
 
 The `Factory` contains the quoted `prompt`, the current working directory as
-`cwd`, the `verbose` flag, and all framework primitives. Use `f` as its
-conventional parameter name. Short local aliases can still help for values used
+`cwd`, the `verbose` and `esperanto` flags, and all framework primitives. Use
+`f` as its conventional parameter name. Short local aliases can still help for values used
 repeatedly. Larger workflows compose smaller ones with ordinary function calls:
 
 ```ts

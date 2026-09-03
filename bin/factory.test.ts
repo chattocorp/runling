@@ -40,9 +40,29 @@ describe("factory executable", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain(
-      "Usage: factory [-v|--verbose] [--json] <workflow.ts> <prompt>",
+      "Usage: factory [-v|--verbose] [--json] [--esperanto] <workflow.ts> <prompt>",
     );
     expect(stderr).not.toContain("at ");
+  });
+
+  test("prints framework output in Esperanto", async () => {
+    const child = Bun.spawn(
+      [process.execPath, executable, fixture, "--esperanto", "Laborflua rezulto"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toContain("Fabriko ekfunkcias");
+    expect(stdout).toContain("Laborflua rezulto");
+    expect(stdout).toContain("Finita post");
+    expect(stdout).not.toContain("Factory starting");
   });
 
   test("prints one structured document to stdout in JSON mode", async () => {
@@ -93,7 +113,8 @@ describe("factory executable", () => {
     expect(JSON.parse(stdout)).toMatchObject({
       ok: false,
       result: null,
-      error: "Usage: factory [-v|--verbose] [--json] <workflow.ts> <prompt>",
+      error:
+        "Usage: factory [-v|--verbose] [--json] [--esperanto] <workflow.ts> <prompt>",
     });
     expect(stderr).toContain("Usage: factory");
   });

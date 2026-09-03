@@ -14,7 +14,13 @@ interface FactoryValues {
   cwd: string;
   prompt: string;
   verbose: boolean;
+  /** Whether user-visible output should be produced in Esperanto. */
+  esperanto: boolean;
 }
+
+type CreateFactoryValues = Omit<FactoryValues, "esperanto"> & {
+  esperanto?: boolean;
+};
 
 export type JsonValue =
   | null
@@ -52,10 +58,11 @@ export type Factory = FactoryPrimitives &
     readonly shell: Shell;
   };
 
-export function createFactory(values: FactoryValues): Factory {
+export function createFactory(values: CreateFactoryValues): Factory {
   return Object.freeze({
     ...factoryPrimitives,
     ...values,
+    esperanto: values.esperanto ?? false,
     shell: createShell({ verbose: values.verbose }),
   });
 }
