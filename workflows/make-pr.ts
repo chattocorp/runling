@@ -5,29 +5,16 @@ import { implement } from "./implement.ts";
 
 const worktreesDirectory = "../factory-worktrees";
 
-function createBranchName(prompt: string, randomId: Factory["randomId"]) {
-  const slug = prompt
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40)
-    .replace(/-$/g, "");
-
-  return `factory/${slug || "change"}-${randomId()}`;
-}
-
 async function makePullRequest(
   f: Factory,
 ): Promise<WorkflowResult> {
   const { cwd } = f;
   await f.shell`gh auth status`;
 
-  const branchName = createBranchName(f.prompt, f.randomId);
+  const worktreeId = f.randomId();
+  const branchName = `factory/${worktreeId}`;
   const worktreesPath = resolve(cwd, worktreesDirectory);
-  const worktreePath = resolve(
-    worktreesPath,
-    branchName.replaceAll("/", "-"),
-  );
+  const worktreePath = resolve(worktreesPath, worktreeId);
 
   await mkdir(worktreesPath, { recursive: true });
   await f.shell`git worktree add -b ${branchName} ${worktreePath}`;

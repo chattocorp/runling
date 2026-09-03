@@ -47,9 +47,11 @@ can run.
 
 The worktree parent directory is configured by `worktreesDirectory` near the
 top of `workflows/make-pr.ts`. Its default is `../factory-worktrees`, relative
-to the directory where the workflow is started. The workflow removes a
-worktree after successfully opening its pull request. A failed run retains its
-worktree so the partial change and failure can be inspected.
+to the directory where the workflow is started. Each worktree directory uses a
+human-friendly random ID such as `bright-otters-2468`, with a matching branch
+named `factory/bright-otters-2468`. The workflow removes a worktree after
+successfully opening its pull request. A failed run retains its worktree so the
+partial change and failure can be inspected.
 
 ## Running the workflows
 
@@ -158,7 +160,7 @@ mode, a successful execution has this shape:
     "summary": "Opened https://github.com/example/project/pull/42",
     "outputs": {
       "pullRequestUrl": "https://github.com/example/project/pull/42",
-      "branchName": "factory/add-caching-bright-otters-2468"
+      "branchName": "factory/bright-otters-2468"
     }
   },
   "error": null,
