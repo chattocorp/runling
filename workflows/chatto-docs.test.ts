@@ -46,8 +46,8 @@ describe("chatto-docs workflow", () => {
       "https://docs.chatto.run/getting-started/introduction/",
     );
     expect(options[0]).toMatchObject({
-      model: "openai-codex/gpt-5.6-sol",
-      thinkingLevel: "medium",
+      model: "openrouter/z-ai/glm-5.3-flash",
+      thinkingLevel: "low",
       tools: ["web_fetch"],
       instructions: expect.arrayContaining([
         "Use only pages on docs.chatto.run as factual sources.",

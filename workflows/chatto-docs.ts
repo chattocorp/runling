@@ -1,6 +1,6 @@
 import { workflow, type WorkflowResult } from "../src/index.ts";
 
-const model = "openai-codex/gpt-5.6-sol";
+const model = "openrouter/z-ai/glm-5.3-flash";
 const documentationRoot =
   "https://docs.chatto.run/getting-started/introduction/";
 
@@ -23,7 +23,7 @@ export const chattoDocs = workflow(
         ),
         {
           model,
-          thinkingLevel: "medium",
+          thinkingLevel: "low",
           tools: ["web_fetch"],
           instructions: [
             "Use only pages on docs.chatto.run as factual sources.",
