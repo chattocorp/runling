@@ -473,6 +473,23 @@ describe("runAgent", () => {
     expect(disposed).toBe(true);
   });
 
+  test("records usage when prompting fails", async () => {
+    promptImplementation = async () => {
+      emitAssistantUsage({ input: 10, output: 5, cacheRead: 20, cacheWrite: 1 });
+      throw new Error("Provider unavailable");
+    };
+
+    await expect(
+      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+    ).rejects.toThrow("Provider unavailable");
+    expect(getRecordedTokenUsage()).toEqual({
+      input: 10,
+      output: 5,
+      cacheRead: 20,
+      cacheWrite: 1,
+    });
+  });
+
   test("rejects unavailable models before creating a session", async () => {
     modelAvailable = false;
 

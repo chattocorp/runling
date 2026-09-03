@@ -21,26 +21,24 @@ export function formatDuration(ms: number): string {
   if (ms < 1000) {
     return `${Math.round(ms)}ms`;
   }
-  const seconds = ms / 1000;
-  if (seconds < 60) {
-    return `${seconds.toFixed(1)}s`;
+
+  const tenths = Math.round(ms / 100);
+  if (tenths < 600) {
+    return `${(tenths / 10).toFixed(1)}s`;
   }
-  const minutes = Math.floor(seconds / 60);
-  const rest = Math.round(seconds - minutes * 60);
-  if (minutes < 60) {
-    return rest > 0 ? `${minutes}m${rest}s` : `${minutes}m`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const restMinutes = minutes - hours * 60;
-  const restSeconds = Math.round(seconds - minutes * 60);
-  const parts = [`${hours}h`];
-  if (restMinutes > 0 || restSeconds > 0) {
-    parts.push(`${restMinutes}m`);
-  }
-  if (restSeconds > 0) {
-    parts.push(`${restSeconds}s`);
-  }
-  return parts.join("");
+
+  // Round before splitting the duration so seconds cannot render as `60s`.
+  const totalSeconds = Math.round(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts: string[] = [];
+
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0) parts.push(`${seconds}s`);
+
+  return parts.join("") || "0s";
 }
 
 export interface WorkflowExecution {

@@ -81,6 +81,9 @@ describe("token usage", () => {
     expect(isTokenUsage(undefined)).toBe(false);
     expect(isTokenUsage({})).toBe(false);
     expect(isTokenUsage({ input: 1 })).toBe(false);
+    expect(isTokenUsage({ input: -1, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(false);
+    expect(isTokenUsage({ input: Number.NaN, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(false);
+    expect(isTokenUsage({ input: 1.5, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(false);
   });
 });
 
@@ -101,5 +104,15 @@ describe("recorded token usage", () => {
     resetTokenUsage();
 
     expect(getRecordedTokenUsage()).toEqual(emptyTokenUsage());
+  });
+
+  test("does not expose mutable internal totals", () => {
+    resetTokenUsage();
+    recordTokenUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
+
+    const snapshot = getRecordedTokenUsage();
+    snapshot.input = 999;
+
+    expect(getRecordedTokenUsage().input).toBe(10);
   });
 });

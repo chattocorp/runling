@@ -258,12 +258,15 @@ describe("formatDuration", () => {
   });
 
   test("formats durations in minutes and seconds", () => {
+    expect(formatDuration(59_949)).toBe("59.9s");
+    expect(formatDuration(59_950)).toBe("1m");
     expect(formatDuration(60_000)).toBe("1m");
     expect(formatDuration(61_000)).toBe("1m1s");
     expect(formatDuration(125_000)).toBe("2m5s");
   });
 
   test("formats durations in hours, minutes, and seconds", () => {
+    expect(formatDuration(3_599_600)).toBe("1h");
     expect(formatDuration(3_600_000)).toBe("1h");
     expect(formatDuration(3_660_000)).toBe("1h1m");
     expect(formatDuration(3_661_000)).toBe("1h1m1s");
