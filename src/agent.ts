@@ -50,6 +50,12 @@ const AGENT_COLORS = [
   "#12b886",
 ] as const;
 const MIN_AGENT_RETRIES = 5;
+const TOOL_ACTION_COLORS: Record<string, string> = {
+  read: "#40c057",
+  bash: "#ae3ec9",
+  edit: "#f76707",
+  write: "#15aabf",
+};
 let nextAgentColor = 0;
 
 function takeAgentColor(): string {
@@ -138,6 +144,14 @@ export function describeTool(name: string, args: Record<string, unknown>) {
     default:
       return `Using ${name}`;
   }
+}
+
+function highlightToolAction(tool: string, description: string): string {
+  const separator = description.indexOf(" ");
+  const color = TOOL_ACTION_COLORS[tool] ?? "white";
+  if (separator === -1) return log.highlight(description, color);
+
+  return `${log.highlight(description.slice(0, separator), color)}${description.slice(separator)}`;
 }
 
 export async function runAgent(
@@ -287,7 +301,12 @@ export async function agent(options: AgentOptions): Promise<FactoryAgent> {
         event.type === "tool_execution_start" &&
         event.toolName !== "report_outcome"
       ) {
-        agentLog.info(describeTool(event.toolName, event.args));
+        agentLog.info(
+          highlightToolAction(
+            event.toolName,
+            describeTool(event.toolName, event.args),
+          ),
+        );
       }
 
       if (event.type === "tool_execution_end" && event.isError) {

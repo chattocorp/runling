@@ -53,6 +53,15 @@ describe("log", () => {
     expect(print).toHaveBeenCalledTimes(2);
   });
 
+  test("highlights text in a bold, bright color", () => {
+    const highlighted = log.highlight("Reading", "#40c057");
+
+    expect(highlighted).toStartWith("\x1b[1m");
+    expect(highlighted).toContain(Bun.color("#40c057", "ansi") ?? "");
+    expect(highlighted).toContain("Reading");
+    expect(highlighted).toEndWith("\x1b[0m");
+  });
+
   test("can route informational output to stderr", async () => {
     const print = spyOn(console, "log");
     const printError = spyOn(console, "error");

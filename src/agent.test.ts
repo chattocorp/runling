@@ -261,6 +261,15 @@ describe("runAgent", () => {
     expect(
       plainLogs.some((line) => line.includes(`[${id}] Reading src/foo.ts`)),
     ).toBe(true);
+    const reading = logs.find(
+      (line) => line.includes("Reading") && line.includes("src/foo.ts"),
+    );
+    expect(reading).toBeDefined();
+    expect(reading).toContain("\x1b[1m");
+    expect(reading).toContain(Bun.color("#40c057", "ansi") ?? "");
+    expect(reading!.indexOf("\x1b[0m", reading!.indexOf("Reading"))).toBeLessThan(
+      reading!.indexOf("src/foo.ts"),
+    );
     expect(
       plainErrors.some((line) => line.includes(`[${id}] bash failed`)),
     ).toBe(true);

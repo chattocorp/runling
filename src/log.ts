@@ -5,6 +5,11 @@ function paint(color: string, text: string) {
   return ansi ? `${ansi}${text}\x1b[0m` : text;
 }
 
+function highlight(text: string, color = "white") {
+  const ansi = Bun.color(color, "ansi") ?? "";
+  return `\x1b[1m${ansi}${text}\x1b[0m`;
+}
+
 export type LogLevel = "info" | "debug";
 
 const INDENT_UNIT = "  ";
@@ -55,6 +60,8 @@ export const log = {
     const color = colorStorage.getStore();
     return color === undefined ? text : paint(color, text);
   },
+  /** Renders `text` in a bold, bright color. */
+  highlight,
   /** Runs `work` with log markers rendered in `color`. */
   withColor<T>(color: string, work: LoggedWork<T>): T {
     return colorStorage.run(color, work);
