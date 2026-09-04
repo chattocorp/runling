@@ -27,7 +27,7 @@ describe("createShell", () => {
     expect(output).toBe(value);
     expect(message).toContain("characters omitted");
     expect(message).not.toContain("the-end");
-    expect(message.length).toBeLessThan(260);
+    expect(Bun.stripANSI(message).length).toBeLessThan(240);
   });
 
   test("creates quiet commands by default", async () => {
