@@ -2,6 +2,7 @@ This repository is an experiment in building the core primitive of an agentic so
 
 ## Repository structure
 
+- Use ASD-STE100 for prose and documentation.
 - The framework lives in `src/`
 - Workflow scripts live in `workflows/`
 - `workflows/implement.ts` is a workflow entrypoint that implements and validates a requested change in the current working directory
