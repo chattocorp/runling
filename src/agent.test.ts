@@ -718,6 +718,26 @@ describe("runAgent", () => {
     ]);
   });
 
+  test("loads explicitly supplied extensions when configured extensions are disabled", async () => {
+    const localExtension = {
+      name: "local-validation",
+      factory() {},
+    };
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+
+    await runAgent("Implement the change", {
+      model: "anthropic/claude-opus-4-5",
+      extensions: [localExtension],
+      resources: { extensions: false },
+    });
+
+    expect(resourceOptions.noExtensions).toBe(true);
+    expect(resourceOptions.extensionFactories).toEqual([localExtension]);
+    expect(sessionOptions.tools).not.toContain("web_fetch");
+  });
+
   test("applies execution and resource boundaries", async () => {
     promptImplementation = async () => {
       await reportOutcome({ outcome: "completed", summary: "Reviewed" });

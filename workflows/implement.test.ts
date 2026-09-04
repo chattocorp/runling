@@ -108,22 +108,20 @@ function runtimeWith({
 }
 
 describe("implement workflow", () => {
-  test("returns the implementing agent's post-validation summary", async () => {
+  test("returns the implementing agent's summary", async () => {
     const prompts: string[] = [];
     const { factory } = runtimeWith({
       runAgent: async (prompt) => {
         prompts.push(prompt);
         return {
           ...completedReport,
-          summary: prompts.length === 1 ? "Initial summary" : "Final summary",
+          summary: "Implementation summary",
         };
       },
     });
 
-    await expect(implement(factory)).resolves.toBe("Final summary");
-    expect(prompts).toHaveLength(2);
-    expect(prompts[1]).toContain("final working-tree diff");
-    expect(prompts[1]).toContain("what changed and why");
+    await expect(implement(factory)).resolves.toBe("Implementation summary");
+    expect(prompts).toEqual(["Make the change"]);
   });
 
   test("runs agents on Sol with medium thinking", async () => {
@@ -157,17 +155,22 @@ describe("implement workflow", () => {
       },
       runAgent: async (prompt) => {
         prompts.push(prompt);
-        return completedReport;
+        return {
+          ...completedReport,
+          summary:
+            prompts.length === 1 ? "Initial summary" : "Repaired summary",
+        };
       },
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.factory)).resolves.toBe("Made the change");
+    await expect(implement(setup.factory)).resolves.toBe("Repaired summary");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
-    expect(prompts).toHaveLength(3);
+    expect(prompts).toHaveLength(2);
     expect(prompts[1]).toContain("Project validation failed");
+    expect(prompts[1]).toContain("summarize the complete implementation");
     expect(prompts[1]).toContain("stdout");
     expect(prompts[1]).toContain("stderr");
   });
@@ -194,7 +197,6 @@ describe("implement workflow", () => {
       "Validate",
       "Run checks",
       "Run tests",
-      "Summarizing changes",
     ]);
   });
 
@@ -233,7 +235,6 @@ describe("implement workflow", () => {
       "Validate",
       "Run checks",
       "Run tests",
-      "Summarizing changes",
     ]);
   });
 });

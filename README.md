@@ -337,6 +337,52 @@ when the workflow needs to inspect and branch on those outcomes instead. Call
 Reports contain a concise, single-line `summary` and may include multiline
 Markdown in `details` when the workflow needs a more substantial artifact.
 
+Agent-local extensions let a workflow observe and intervene in the model loop
+without installing an extension globally or in the target repository. They use
+pi's native extension API and may capture workflow state:
+
+```ts
+import { defineAgentExtension, type Factory } from "factory";
+
+const checkEdits = (f: Factory) =>
+  defineAgentExtension({
+    name: "check-edits",
+    factory(pi) {
+      pi.on("tool_result", async (event) => {
+        if (event.isError) return;
+        if (event.toolName !== "edit" && event.toolName !== "write") return;
+
+        const check = await f.shell`bun run check`.nothrow();
+        if (check.exitCode === 0) return;
+
+        return {
+          content: [
+            ...event.content,
+            {
+              type: "text",
+              text: `The edit succeeded, but a local check failed:\n${check.stderr.toString()}`,
+            },
+          ],
+        };
+      });
+    },
+  });
+
+await using a = await f.agent({
+  model,
+  extensions: [checkEdits(f)],
+});
+await a.run("Implement the change");
+```
+
+Here the diagnostic becomes part of the edit's tool result, so the same agent
+can repair its work immediately. Treat this feedback as advisory and keep
+authoritative validation and bounded repair decisions in the workflow. Other
+useful hooks include `before_agent_start`, `context`, `turn_start`, `turn_end`,
+`tool_call`, and `tool_result`. Extension state declared inside `factory` is
+session-local; forked agents initialize fresh instances. State captured outside
+the factory is shared by those instances.
+
 `runAgent` is the one-shot alternative. It creates an agent, runs one turn, and
 disposes it before returning. Unlike `run`, it returns any reported outcome.
 
@@ -360,8 +406,9 @@ Factory is also a pi package: its `package.json` publishes the resources in
 `extensions/`. Install the package with `pi install /path/to/factory` when you
 want to use `web_fetch` in pi independently of Factory. Factory agents load the
 bundled extension directly, so running Factory does not require this installation.
-Set `resources.extensions` to `false` to prevent all extensions, including the
-bundled one, from loading.
+Set `resources.extensions` to `false` to prevent configured extensions and the
+bundled one from loading. Extensions supplied explicitly through `extensions`
+still load because they are part of the workflow itself.
 
 Callers can narrow those boundaries without putting policy in the framework:
 

@@ -7,6 +7,7 @@ const agentInstructions = [
   "Summarize what you changed and why in your final report.",
 ];
 const maxValidationAttempts = 3;
+const maxValidationFeedbackLength = 18_000;
 
 const runCheck = workflow("Run checks", (f) =>
   f.shell`bun run check`.nothrow(),
@@ -19,6 +20,21 @@ const validate = workflow("Validate", async (f) => {
   return check.exitCode === 0 ? runTests(f) : check;
 });
 
+const validationFailure = (validation: {
+  stdout: Uint8Array;
+  stderr: Uint8Array;
+}) => {
+  const output = [validation.stdout.toString(), validation.stderr.toString()]
+    .filter((part) => part.trim() !== "")
+    .join("\n")
+    .trim();
+  const details = output === "" ? "Validation failed without output." : output;
+
+  return details.length <= maxValidationFeedbackLength
+    ? details
+    : `${details.slice(0, maxValidationFeedbackLength)}\n\n[Validation output truncated]`;
+};
+
 export const implement = workflow("Implement", async (f): Promise<string> => {
   const pwd = await f.getPwd();
 
@@ -28,7 +44,9 @@ export const implement = workflow("Implement", async (f): Promise<string> => {
     instructions: agentInstructions,
   });
 
-  await f.step("Implementing change", () => implementationAgent.run(f.prompt));
+  let implementationReport = await f.step("Implementing change", () =>
+    implementationAgent.run(f.prompt),
+  );
 
   if (!(await pwd.hasChanges)) {
     throw new Error("Agent completed without changing the worktree");
@@ -38,20 +56,20 @@ export const implement = workflow("Implement", async (f): Promise<string> => {
   for (let attempt = 1; validation.exitCode !== 0; attempt++) {
     if (attempt === maxValidationAttempts) {
       throw new Error(
-        `Project validation failed after ${maxValidationAttempts} attempts.\n${validation.stdout}\n${validation.stderr}`,
+        `Project validation failed after ${maxValidationAttempts} attempts.\n${validationFailure(validation)}`,
       );
     }
 
-    await f.step(
+    implementationReport = await f.step(
       `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
       () =>
         implementationAgent.run(
           f.concat(
             "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
+            "In your report, summarize the complete implementation, including this repair.",
             "",
             "Failure output:",
-            validation.stdout.toString(),
-            validation.stderr.toString(),
+            validationFailure(validation),
           ),
         ),
     );
@@ -63,13 +81,7 @@ export const implement = workflow("Implement", async (f): Promise<string> => {
     throw new Error("The validated worktree no longer contains any changes");
   }
 
-  const finalReport = await f.step("Summarizing changes", () =>
-    implementationAgent.run(
-      "Inspect the final working-tree diff, including any validation repairs, and summarize what changed and why. Do not modify the worktree.",
-    ),
-  );
-
-  return finalReport.summary;
+  return implementationReport.summary;
 });
 
 export default implement;

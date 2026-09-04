@@ -1,5 +1,7 @@
 export {
   agent,
+  type AgentExtension,
+  type AgentExtensionAPI,
   AgentOutcomeError,
   type AgentOptions,
   type AgentReport,
@@ -7,6 +9,7 @@ export {
   type AgentResourceOptions,
   type AgentRunOptions,
   type CompletedAgentReport,
+  defineAgentExtension,
   type FactoryAgent,
   runAgent,
   type RunAgentOptions,

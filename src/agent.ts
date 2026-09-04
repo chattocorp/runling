@@ -4,6 +4,8 @@ import {
   defineTool,
   getAgentDir,
   type AgentSessionEvent,
+  type ExtensionAPI,
+  type InlineExtension,
   ModelRuntime,
   SessionManager,
   SettingsManager,
@@ -78,6 +80,15 @@ export type AgentReport = Static<typeof reportSchema>;
 /** A report enriched with the token usage of the agent interaction. */
 export type AgentResult = AgentReport & { usage: TokenUsage };
 export type CompletedAgentReport = AgentResult & { outcome: "completed" };
+/** A named or anonymous pi extension instantiated for one agent session. */
+export type AgentExtension = InlineExtension;
+/** The API available while configuring an agent-local extension. */
+export type AgentExtensionAPI = ExtensionAPI;
+
+/** Preserve contextual typing when declaring a reusable agent extension. */
+export function defineAgentExtension(extension: AgentExtension): AgentExtension {
+  return extension;
+}
 
 export interface AgentResourceOptions {
   /** Directory containing global pi configuration and resources. */
@@ -111,6 +122,8 @@ export interface RunAgentOptions {
   /** Built-in and extension tools to expose. `report_outcome` is always added. */
   tools?: readonly string[];
   resources?: AgentResourceOptions;
+  /** Extensions instantiated only for this agent session. */
+  extensions?: readonly AgentExtension[];
   /** Observe the raw pi event stream for this agent session. */
   onEvent?: (event: AgentSessionEvent) => void;
   /** Abort an active model turn. */
@@ -269,9 +282,12 @@ async function createFactoryAgent(
     cwd,
     agentDir,
     settingsManager,
-    extensionFactories: extensionsEnabled
-      ? [{ name: "factory-web-fetch", factory: webFetchExtension }]
-      : [],
+    extensionFactories: [
+      ...(extensionsEnabled
+        ? [{ name: "factory-web-fetch", factory: webFetchExtension }]
+        : []),
+      ...(options.extensions ?? []),
+    ],
     noExtensions: !extensionsEnabled,
     noSkills: resources?.skills === false,
     noPromptTemplates: resources?.promptTemplates === false,
