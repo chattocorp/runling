@@ -5,7 +5,6 @@ import {
   mkdtemp,
   mkdir,
   readFile,
-  rm,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,6 +12,7 @@ import { resolve, dirname, delimiter } from "node:path";
 import { createServer } from "node:net";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
+import { cleanupConsumer } from "./cleanup-consumer.mjs";
 
 const exec = promisify(execFile);
 // Keep npm and its child executables on the runtime used to launch this test.
@@ -334,13 +334,5 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
   console.error(serverOutput);
   throw error;
 } finally {
-  if (server && server.exitCode === null) {
-    if (process.platform === "win32") server.kill();
-    else process.kill(-server.pid, "SIGTERM");
-    await Promise.race([
-      new Promise((resolve) => server.once("exit", resolve)),
-      delay(5000),
-    ]);
-  }
-  await rm(directory, { recursive: true, force: true });
+  await cleanupConsumer(directory, server);
 }
