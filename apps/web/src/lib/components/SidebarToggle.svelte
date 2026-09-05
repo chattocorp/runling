@@ -7,7 +7,8 @@
   type="button"
   {onclick}
   aria-label={label}
-  title={label}
+  title={`${label} (Cmd/Ctrl+B)`}
+  aria-keyshortcuts="Meta+b Control+b"
   aria-expanded={expanded}
   aria-controls="webhook-sidebar runs-sidebar"
 >

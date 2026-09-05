@@ -1,6 +1,7 @@
 <script lang="ts">
   import ThemePicker from "$lib/components/ThemePicker.svelte";
   import SidebarToggle from "$lib/components/SidebarToggle.svelte";
+  import { isSidebarShortcut } from "$lib/sidebar-shortcut.ts";
   import Usage from "$lib/components/Usage.svelte";
   import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
@@ -39,6 +40,17 @@
   let notice = $state("");
   let configError = $state("");
   let sidebarsExpanded = $state(true);
+
+  function handleSidebarShortcut(event: KeyboardEvent) {
+    if (!isSidebarShortcut(event)) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.isContentEditable || target.closest("input, textarea, select, [role='textbox']"))
+    ) return;
+    event.preventDefault();
+    if (!event.repeat) toggleSidebars();
+  }
 
   function toggleSidebars() {
     sidebarsExpanded = !sidebarsExpanded;
@@ -167,6 +179,8 @@
     };
   });
 </script>
+
+<svelte:window onkeydown={handleSidebarShortcut} />
 
 <svelte:head
   ><title>Runling — Runs</title><meta
