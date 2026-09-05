@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,23 +13,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          target-branch: main
+
   package:
+    needs: release
+    if: >-
+      always() && (github.event_name == 'workflow_dispatch' ||
+      (needs.release.result == 'success' && needs.release.outputs.created == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ needs.release.outputs.tag || github.sha }}
       - name: Check release version
         env:
-          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
         run: |
+          # JavaScript template expressions must not expand in the shell.
+          # shellcheck disable=SC2016
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const { name, version } = JSON.parse(readFileSync("packages/runling/package.json"));
             if (name !== "runling" || !/^\d+\.\d+\.\d+$/.test(version)) throw Error("Expected a stable Runling release version");
-            const ref = process.env.RELEASE_REF;
-            if (ref.startsWith("refs/tags/") && ref !== `refs/tags/v${version}`) throw Error("Tag must match package version");
+            const tag = process.env.RELEASE_TAG;
+            if (tag && tag !== `v${version}`) throw Error("Tag must match package version");
           '
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -53,12 +76,17 @@ jobs:
           if-no-files-found: error
 
   windows:
+    needs: release
+    if: >-
+      always() && (github.event_name == 'workflow_dispatch' ||
+      (needs.release.result == 'success' && needs.release.outputs.created == 'true'))
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ needs.release.outputs.tag || github.sha }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -68,8 +96,8 @@ jobs:
       - run: pnpm exec vitest run packages/runling/src/exec.test.ts
 
   publish:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [package, windows]
+    if: github.event_name == 'push' && needs.release.outputs.created == 'true'
+    needs: [release, package, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: npm
