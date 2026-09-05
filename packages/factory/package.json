@@ -14,6 +14,10 @@
   },
   "types": "./dist/src/index.d.ts",
   "exports": {
+    "./config-reloader": {
+      "types": "./dist/src/config-reloader.d.ts",
+      "default": "./dist/src/config-reloader.js"
+    },
     ".": {
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
@@ -41,9 +45,11 @@
     "@earendil-works/pi-coding-agent": "0.84.4",
     "@earendil-works/pi-tui": "0.84.4",
     "ajv": "^8.20.0",
+    "chokidar": "^5.0.0",
     "color-name": "^2.0.0",
     "execa": "^10.0.1",
     "human-id": "4.2.1",
+    "jiti": "^2.7.0",
     "tsx": "^4.20.0",
     "typebox": "1.3.7"
   },

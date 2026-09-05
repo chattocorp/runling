@@ -9,7 +9,7 @@ export function parseFactoryWebArguments(argv: readonly string[]) {
   const { values } = parseArgs({
     args: [...argv],
     options: {
-      config: { type: "string", default: "factory.web.ts" },
+      config: { type: "string", default: "factory.config.ts" },
       host: { type: "string", default: "localhost" },
       port: { type: "string", default: "5173" },
       open: { type: "boolean", default: false },
@@ -27,7 +27,7 @@ export function parseFactoryWebArguments(argv: readonly string[]) {
 export async function runFactoryWeb(argv = process.argv.slice(2)) {
   const options = parseFactoryWebArguments(argv);
   if (options.help) {
-    console.log(`Usage: factory [web] [--config factory.web.ts] [--host localhost] [--port 5173] [--open]
+    console.log(`Usage: factory [web] [--config factory.config.ts] [--host localhost] [--port 5173] [--open]
        factory <workflow.ts> [prompt] [--log|--json]
 
 With no arguments, start the web UI in the current project.`);

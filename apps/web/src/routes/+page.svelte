@@ -1,5 +1,6 @@
 <script lang="ts">
   import Usage from "$lib/components/Usage.svelte";
+  import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
   import type { PageData } from "./$types";
   import {
@@ -34,6 +35,7 @@
   let hookInfo = $state<WebhookInfo | null>(null);
   let copied = $state("");
   let notice = $state("");
+  let configError = $state("");
   let runStream: EventSource | undefined;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -108,6 +110,24 @@
   }
 
   onMount(() => {
+    const configs = new EventSource("/api/config/events");
+    let revision: number | undefined;
+    configs.onopen = () => {
+      revision = undefined;
+    };
+    configs.addEventListener("config", (event) => {
+      const update = JSON.parse(event.data) as {
+        revision: number;
+        error: string | null;
+      };
+      configError = update.error ?? "";
+      if (revision !== update.revision) {
+        revision = update.revision;
+        composer = null;
+        hookInfo = null;
+        void invalidateAll();
+      }
+    });
     const stream = new EventSource("/api/runs/events");
     stream.addEventListener("runs", (event) => {
       liveRuns = JSON.parse(event.data);
@@ -120,6 +140,7 @@
       new URL(location.href).searchParams.get("run") ?? data.runs[0]?.id;
     if (initial) selectRun(initial);
     return () => {
+      configs.close();
       stream.close();
       runStream?.close();
       clearTimeout(copyTimer);
@@ -135,6 +156,9 @@
 >
 
 <div class="app">
+  {#if configError}<div class="error" role="alert">
+      Configuration reload failed. The last valid configuration is still active. {configError}
+    </div>{/if}
   <header class="app-header">
     <a href="/" class="brand" aria-label="Factory home"
       ><svg
@@ -208,8 +232,8 @@
             </div>
           </div>
         {:else}<p class="sidebar-empty">
-            No webhooks configured. Add one to factory.web.ts, then restart the
-            server.
+            No webhooks configured. Add one to factory.config.ts. Changes load
+            automatically.
           </p>{/each}
       </div>
       <div class="catalog-foot">

@@ -67,7 +67,7 @@ export default workflow(
 );
 ```
 
-Create `factory.web.ts` in your project root:
+Create `factory.config.ts` in your project root:
 
 ```ts
 import { defineWebConfig } from "factory/web";
@@ -327,11 +327,20 @@ Start the bundled production UI in your project:
 npm run factory
 ```
 
-By default, the executable loads `factory.web.ts` from the current directory.
+By default, the executable loads `factory.config.ts` from the current directory.
 Use `--config` to select another file. Use `--host`, `--port`, or `--open` to
 configure the server, for example `npm run factory -- --port 3000`.
 `factory web` also starts the UI. The Vite development server is only for
 work on this repository; consumers run the bundled Node.js server.
+
+The server uses jiti to load the configuration and Chokidar to watch JavaScript,
+TypeScript, and JSON files below the configuration directory. Changes reload
+the configuration and its local imports. Dependency, build, and hidden directories
+are excluded from watching.
+New runs use the new configuration. Active runs keep their original workflow.
+The browser updates the hook list automatically. If a reload fails, the server
+keeps the last valid configuration and shows the error in the UI and server log.
+Installed package changes and changes outside that directory require a server restart.
 
 The configuration defines named webhooks. Each webhook selects a workflow.
 The request body uses that workflow's input schema and is passed directly to

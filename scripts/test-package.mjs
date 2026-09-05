@@ -45,15 +45,17 @@ try {
     resolve(project, ".env"),
     "FACTORY_PACKAGE_TEST_ENV=loaded\n",
   );
+  await writeFile(resolve(project, "helper.ts"), 'export const suffix = "";\n');
   await writeFile(
     resolve(project, "workflow.ts"),
     `import { Type, workflow } from "factory";
+import { suffix } from "./helper.ts";
 export default workflow({ name: "Consumer echo", input: Type.Object({ topic: Type.String() }), output: Type.String() }, async (f, input) => {
   return f.step("Echo input", async () => {
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await new Promise(resolve => setTimeout(resolve, input.topic === "slow" ? 2000 : 250));
     const cwd = await f.exec\`node -e \${"process.stdout.write(require('node:fs').readFileSync('message.txt', 'utf8'))"}\`.text();
     f.log.info(input.topic);
-    return input.topic + ": " + cwd;
+    return input.topic + ": " + cwd + suffix;
   });
 });
 `,
@@ -68,7 +70,7 @@ export default workflow({ name: "CLI echo", input: Type.String(), output: Type.S
 `,
   );
   await writeFile(
-    resolve(project, "factory.web.ts"),
+    resolve(project, "factory.config.ts"),
     `import { defineWebConfig } from "factory/web";
 import echo from "./workflow.ts";
 export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
@@ -116,7 +118,7 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
       "esnext",
       "--allowImportingTsExtensions",
       "--skipLibCheck",
-      "factory.web.ts",
+      "factory.config.ts",
       "workflow.ts",
       "cli.ts",
     ],
@@ -171,6 +173,100 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
   const webhook = await post("/api/webhooks/echo", { topic: "webhook" });
   assert.equal(webhook.status, 200);
   assert.deepEqual(await webhook.json(), { output: "webhook: consumer cwd" });
+  const workflowPath = resolve(project, "workflow.ts");
+  const originalWorkflow = await readFile(workflowPath, "utf8");
+  await writeFile(
+    workflowPath,
+    originalWorkflow.replace("Consumer echo", "Reloaded echo"),
+  );
+  const waitForPage = async (text) => {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if ((await (await fetch(origin)).text()).includes(text)) return;
+      await delay(100);
+    }
+    throw new Error(`Config did not reload: ${text}\n${serverOutput}`);
+  };
+  await waitForPage("Reloaded echo");
+  const active = await post("/api/runs/start/echo", { topic: "slow" });
+  const activeId = (await active.json()).id;
+  await writeFile(
+    resolve(project, "helper.ts"),
+    'export const suffix = " updated";\n',
+  );
+  let updated = false;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const output = await (
+      await post("/api/webhooks/echo", { topic: "new" })
+    ).json();
+    if (output.output === "new: consumer cwd updated") {
+      updated = true;
+      break;
+    }
+    await delay(100);
+  }
+  assert(updated, "Transitive imports reload for new runs");
+  let oldRun;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    oldRun = await (await fetch(`${origin}/api/runs/${activeId}`)).json();
+    if (oldRun.status !== "running") break;
+    await delay(100);
+  }
+  assert.equal(
+    oldRun.output,
+    "slow: consumer cwd",
+    "Active runs keep their original modules",
+  );
+  const configPath = resolve(project, "factory.config.ts");
+  const configState = async () => {
+    const response = await fetch(`${origin}/api/config/events`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    const reader = response.body.getReader();
+    let text = "";
+    try {
+      while (!text.includes("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done)
+          throw new Error("Config event stream closed before its snapshot");
+        text += new TextDecoder().decode(value);
+      }
+      return JSON.parse(
+        text
+          .split("\n")
+          .find((line) => line.startsWith("data: "))
+          .slice(6),
+      );
+    } finally {
+      await reader.cancel();
+    }
+  };
+  const originalConfig = await readFile(configPath, "utf8");
+  await writeFile(configPath, "export default { broken: true };\n");
+  for (
+    let attempt = 0;
+    attempt < 100 && !serverOutput.includes("Config reload failed");
+    attempt++
+  )
+    await delay(100);
+  assert(
+    serverOutput.includes("Config reload failed"),
+    "Invalid reload is reported",
+  );
+  assert((await configState()).error, "Browser clients receive reload errors");
+  assert.equal(
+    (await post("/api/webhooks/echo", { topic: "retained" })).status,
+    200,
+  );
+  await writeFile(configPath, originalConfig.replace("echo: {", "renamed: {"));
+  await waitForPage("/api/webhooks/renamed");
+  assert.equal(
+    (await configState()).error,
+    null,
+    "Recovery clears the browser error",
+  );
+  assert.equal((await fetch(`${origin}/api/webhooks/echo`)).status, 404);
+  await writeFile(configPath, originalConfig);
+  await waitForPage("/api/webhooks/echo");
   const started = await post("/api/runs/start/echo", { topic: "console" });
   assert.equal(started.status, 202);
   const { id } = await started.json();

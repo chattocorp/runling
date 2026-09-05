@@ -11,7 +11,7 @@ export { parseFactoryWebArguments } from "../../../../packages/factory/src/web-s
 const usage = `Usage: factory-web [options]
 
 Options:
-  --config <path>  Configuration file (default: factory.web.ts)
+  --config <path>  Configuration file (default: factory.config.ts)
   --host <host>  Hostname to listen on (default: localhost)
   --port <port>  Port to listen on (default: 5173)
   --open         Open the app in a browser

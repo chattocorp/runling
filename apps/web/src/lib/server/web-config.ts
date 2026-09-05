@@ -1,25 +1,9 @@
-import { pathToFileURL } from "node:url";
-import { isWebConfig, type WebConfig } from "factory/web";
-
-let loadedConfig: Promise<WebConfig> | undefined;
-
-export function loadWebConfig(): Promise<WebConfig> {
-  const configPath = process.env.FACTORY_WEB_CONFIG;
-  if (configPath === undefined) {
-    throw new Error("FACTORY_WEB_CONFIG is not set");
-  }
-
-  loadedConfig ??= import(
-    /* @vite-ignore */ pathToFileURL(configPath).href
-  ).then((module: { default?: unknown }) => {
-    const config = module.default;
-    if (!isWebConfig(config)) {
-      throw new Error(
-        `${configPath} must export a Factory web configuration. Each webhook must select a workflow without a separate body schema or input mapping.`,
-      );
-    }
-    return config as WebConfig;
-  });
-
-  return loadedConfig;
+import { ConfigReloader } from "factory/config-reloader";
+let reloader: ConfigReloader | undefined;
+export function getConfigReloader(): ConfigReloader {
+  const path = process.env.FACTORY_WEB_CONFIG;
+  if (!path) throw new Error("FACTORY_WEB_CONFIG is not set");
+  return (reloader ??= new ConfigReloader(path));
 }
+export const loadWebConfig = () => getConfigReloader().load();
+if (import.meta.hot) import.meta.hot.dispose(() => reloader?.close());

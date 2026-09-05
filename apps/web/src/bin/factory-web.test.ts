@@ -4,7 +4,7 @@ import { parseFactoryWebArguments } from "./factory-web.ts";
 describe("factory-web executable", () => {
   test("uses the local development server defaults", () => {
     expect(parseFactoryWebArguments([])).toEqual({
-      config: "factory.web.ts",
+      config: "factory.config.ts",
       help: false,
       host: "localhost",
       open: false,

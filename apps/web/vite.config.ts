@@ -5,5 +5,9 @@ export default defineConfig({
   plugins: [sveltekit()],
   ssr: { external: ["factory"] },
   // Config files and the server must share one Factory event runtime.
-  build: { rollupOptions: { external: ["factory", "factory/web"] } },
+  build: {
+    rollupOptions: {
+      external: ["factory", "factory/web", "factory/config-reloader"],
+    },
+  },
 });
