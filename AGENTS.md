@@ -3,6 +3,7 @@ This repository is an experiment in building the core primitive of an agentic so
 ## Repository structure
 
 - Use ASD-STE100 for prose and documentation.
+- Use Conventional Commits for commit messages and PR titles.
 - The framework package lives in `packages/runling/`
 - The SvelteKit web app lives in `apps/web/`
 - Workflow scripts live in `workflows/`
