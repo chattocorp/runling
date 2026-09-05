@@ -1,8 +1,8 @@
 import { fitWindow, type TimeWindow } from "./timeline-layout.ts";
 
-/** Include the full run and any empty time the user has explored. */
-export function overviewSpan(elapsed: number, view: TimeWindow): number {
-  return Math.max(fitWindow(elapsed).span, view.start + view.span);
+/** Navigation must not expand the overview beyond the full run's fit range. */
+export function overviewSpan(elapsed: number): number {
+  return fitWindow(elapsed).span;
 }
 
 export function moveOverview(

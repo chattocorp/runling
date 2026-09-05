@@ -9,11 +9,14 @@
   import {
     barPosition,
     fitWindow,
+    clampWindow,
     flattenActivities,
     panWindow,
     timelineTicks,
     tickLabel,
     zoomWindow,
+    dragZoomWindow,
+    dragRowHeight,
     type TimeWindow,
   } from "$lib/timeline-layout.ts";
 
@@ -37,6 +40,21 @@
   let visibleHeight = $state(1);
   let contentHeight = $state(1);
   let rowMetrics = $state<{ top: number; height: number }[]>([]);
+  let rowHeight = $state(48);
+  function beginMiddleZoom(anchor: number, y = visibleHeight / 2) {
+    const initialManual = manual;
+    const initial = { ...view };
+    const initialHeight = rowHeight;
+    const rowAnchor = (board.scrollTop + y) / initialHeight;
+    return async (dx: number, dy: number) => {
+      manual = dx === 0 ? initialManual : dragZoomWindow(initial, -dx, anchor);
+      const height = dragRowHeight(initialHeight, dy);
+      rowHeight = height;
+      await tick();
+      if (rowHeight === height)
+        board.scrollTop = Math.max(0, rowAnchor * height - y);
+    };
+  }
   let panel: HTMLElement;
   let expandButton: HTMLButtonElement;
   let manual = $state<TimeWindow | null>(null);
@@ -44,12 +62,14 @@
   let plotWidth = $state(500);
   let expanded = $state(false);
   let dragging = $state(false);
-  let view = $derived(manual ?? fitWindow(elapsed));
+  let view = $derived(
+    clampWindow(manual ?? fitWindow(elapsed), fitWindow(elapsed).span),
+  );
   let rows = $derived(flattenActivities(nodes, collapsed));
   let miniRows = $derived(
     rows.map(({ node }, index) => ({
       node,
-      ...(rowMetrics[index] ?? { top: index * 76, height: 76 }),
+      ...(rowMetrics[index] ?? { top: index * rowHeight, height: rowHeight }),
     })),
   );
   let ticks = $derived(timelineTicks(view, plotWidth));
@@ -224,14 +244,22 @@
     };
     const stopMiddleDrag = middleDrag(
       board,
-      () => {
-        const initial = { ...view };
-        const scroll = board.scrollTop;
-        const width = plotWidth;
+      (event) => {
+        const anchor =
+          (event.clientX - ruler.getBoundingClientRect().left) / plotWidth;
+        const y = Math.max(
+          0,
+          Math.min(
+            visibleHeight,
+            event.clientY -
+              board.getBoundingClientRect().top -
+              ruler.offsetHeight,
+          ),
+        );
+        const zoomBoth = beginMiddleZoom(anchor, y);
         dragging = true;
         return (dx, dy) => {
-          manual = panWindow(initial, (-dx / width) * initial.span);
-          board.scrollTop = scroll - dy;
+          void zoomBoth(dx, dy);
         };
       },
       () => {
@@ -263,6 +291,9 @@
 <section
   class="timeline"
   class:expanded
+  class:dense={rowHeight < 44}
+  class:compact={rowHeight < 32}
+  style:--row-height={`${rowHeight}px`}
   aria-label="Execution timeline"
   bind:this={panel}
 >
@@ -280,6 +311,7 @@
       <button
         onclick={() => zoomBy(1 / 0.7)}
         aria-label="Zoom out"
+        disabled={zoom <= 1}
         title="Zoom out (−)">−</button
       >
       <button
@@ -367,7 +399,9 @@
               aria-pressed={selected === node.id}
               title={`${node.label} (${node.kind}, ${node.status})`}
               ><strong>{node.label}</strong><small>{node.kind}</small>
-              {#if node.usage}<Usage usage={node.usage} />{/if}</button
+              {#if node.usage}<span class="row-usage"
+                  ><Usage usage={node.usage} /></span
+                >{/if}</button
             >
           </div>
           <div class="lane plot" class:chosen={selected === node.id}>
@@ -425,6 +459,7 @@
       {view}
       {elapsed}
       {selected}
+      onzoomstart={(anchor) => beginMiddleZoom(anchor)}
       onchange={(next, top) => {
         manual = next;
         board.scrollTop = top;
@@ -444,8 +479,9 @@
     </div>
   {/if}
   <footer>
-    <span>Scroll to zoom · Drag to pan · Shift+scroll to pan</span><span
-      class="range"
+    <span
+      >Scroll to zoom time · Middle-drag ↔ time / ↕ rows · Left-drag to pan</span
+    ><span class="range"
       >{duration(view.start)} — {duration(view.start + view.span)}</span
     >
   </footer>
@@ -502,7 +538,19 @@
   }
   .controls {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 5px;
+  }
+  .row-usage {
+    display: block;
+    max-height: 14px;
+    overflow: hidden;
+    line-height: 14px;
+  }
+  .dense .row-usage,
+  .compact .label-select small {
+    display: none;
   }
   .controls button {
     border: 1px solid var(--line);
@@ -546,7 +594,7 @@
   .grid {
     display: grid;
     grid-template-columns: clamp(125px, 29%, 235px) minmax(0, 1fr);
-    grid-template-rows: 35px repeat(var(--row-count), minmax(76px, auto));
+    grid-template-rows: 35px repeat(var(--row-count), var(--row-height));
     min-width: 0;
   }
   .label-heading,
@@ -621,6 +669,7 @@
     font-variant-numeric: tabular-nums;
   }
   .label {
+    overflow: hidden;
     display: flex;
     align-items: center;
     border-bottom: 1px solid #e9edf5;
@@ -649,17 +698,19 @@
   }
   .label-select {
     display: grid;
-    gap: 3px;
+    gap: 2px;
     min-width: 0;
     flex: 1;
     background: none;
     border: 0;
-    padding: 7px 3px;
+    padding: 3px;
+    overflow: hidden;
     text-align: left;
     cursor: pointer;
     color: var(--ink);
   }
   .label-select strong {
+    line-height: 14px;
     font-size: 11px;
     font-weight: 550;
     white-space: nowrap;
@@ -667,6 +718,7 @@
     text-overflow: ellipsis;
   }
   .label-select small {
+    line-height: 11px;
     font-size: 9px;
     color: var(--muted);
   }
@@ -715,8 +767,9 @@
   }
   .bar {
     position: absolute;
-    top: 10px;
-    height: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: clamp(14px, calc(var(--row-height) * 0.55), 30px);
     padding: 0;
     min-width: 6px;
     display: flex;

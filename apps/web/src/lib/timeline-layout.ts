@@ -18,6 +18,12 @@ export function fitWindow(elapsed: number): TimeWindow {
   return { start: 0, span: niceCeiling(Math.max(100, elapsed * 1.05)) };
 }
 
+/** Keep every navigation path within the full timeline's fit range. */
+export function clampWindow(view: TimeWindow, maxSpan: number): TimeWindow {
+  const span = Math.max(1, Math.min(maxSpan, view.span));
+  return { span, start: Math.max(0, Math.min(maxSpan - span, view.start)) };
+}
+
 /** Preserve the time under the pointer while changing scale. */
 export function zoomWindow(
   view: TimeWindow,
@@ -34,6 +40,29 @@ export function zoomWindow(
 
 export function panWindow(view: TimeWindow, deltaMs: number): TimeWindow {
   return { ...view, start: Math.max(0, view.start + deltaMs) };
+}
+
+/** Negative drag deltas zoom in around the initial pointer. */
+export function dragZoomWindow(
+  view: TimeWindow,
+  delta: number,
+  anchor = 0.5,
+): TimeWindow {
+  return zoomWindow(
+    view,
+    Math.exp(Math.max(-1000, Math.min(1000, delta)) * 0.006),
+    anchor,
+  );
+}
+
+export function dragRowHeight(initial: number, dy: number): number {
+  return Math.max(
+    24,
+    Math.min(
+      100,
+      initial * Math.exp(-Math.max(-1000, Math.min(1000, dy)) * 0.006),
+    ),
+  );
 }
 
 export function timelineTicks(view: TimeWindow, width: number): number[] {

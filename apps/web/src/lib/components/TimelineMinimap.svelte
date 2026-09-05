@@ -12,6 +12,7 @@
     selected,
     onchange,
     onfit,
+    onzoomstart,
   }: {
     rows: { node: Activity; top: number; height: number }[];
     view: TimeWindow;
@@ -20,36 +21,22 @@
     selected: string;
     onchange: (view: TimeWindow, top: number) => void;
     onfit: () => void;
+    onzoomstart: (anchor: number) => (dx: number, dy: number) => void;
   } = $props();
   let collapsed = $state(false);
   let middleDragging = $state(false);
   function attachMiddleDrag(element: HTMLElement) {
     return middleDrag(
       element,
-      () => {
+      (event) => {
         const rect = element.getBoundingClientRect();
         if (!rect.width || !rect.height) return;
         const initial = { ...view };
-        const initialTop = top;
-        const horizontalTotal = total;
-        const verticalTotal = axis.total;
-        const height = visible;
+        const time = ((event.clientX - rect.left) / rect.width) * total;
+        const anchor = (time - initial.start) / initial.span;
+        const zoomBoth = onzoomstart(anchor);
         middleDragging = true;
-        return (dx, dy) =>
-          onchange(
-            moveOverview(
-              initial,
-              horizontalTotal,
-              initial.start + (dx / rect.width) * horizontalTotal,
-              0,
-            ),
-            moveOverview(
-              { start: initialTop, span: height },
-              verticalTotal,
-              initialTop + (dy / rect.height) * verticalTotal,
-              0,
-            ).start,
-          );
+        return (dx, dy) => zoomBoth(dx, dy);
       },
       () => {
         middleDragging = false;
@@ -65,7 +52,7 @@
     x: number;
     y: number;
   }>();
-  let total = $derived(gesture?.total ?? overviewSpan(elapsed, view));
+  let total = $derived(gesture?.total ?? overviewSpan(elapsed));
   let axis = $derived(gesture?.axis ?? vertical);
   let visible = $derived(Math.min(axis.span, axis.total));
   let top = $derived(

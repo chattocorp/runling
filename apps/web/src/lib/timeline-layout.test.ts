@@ -1,6 +1,9 @@
 import { expect, test } from "vitest";
 import {
   barPosition,
+  clampWindow,
+  dragZoomWindow,
+  dragRowHeight,
   fitWindow,
   flattenActivities,
   panWindow,
@@ -9,6 +12,51 @@ import {
   zoomWindow,
 } from "./timeline-layout.ts";
 import type { Activity } from "./timeline.ts";
+
+test("middle zoom enlarges rows as time zooms in and respects row limits", () => {
+  expect(dragRowHeight(48, -80)).toBeGreaterThan(48);
+  expect(dragRowHeight(48, 80)).toBeLessThan(48);
+  expect(dragRowHeight(48, 0)).toBe(48);
+  expect(dragRowHeight(48, -1000)).toBe(100);
+  expect(dragRowHeight(48, 1000)).toBe(24);
+});
+
+test("signed drag delta zooms time around its anchor", () => {
+  const view = { start: 300, span: 400 };
+  const zoomed = dragZoomWindow(view, -80, 0.25);
+  expect(zoomed.span).toBeLessThan(view.span);
+  expect(zoomed.start + zoomed.span * 0.25).toBeCloseTo(400);
+  expect(dragZoomWindow(view, 80).span).toBeGreaterThan(view.span);
+  expect(dragZoomWindow(view, 0)).toEqual(view);
+  expect(clampWindow(dragZoomWindow(view, 1000), 1000)).toEqual({
+    start: 0,
+    span: 1000,
+  });
+});
+
+test("clamps zoom-out and panning to the full timeline", () => {
+  expect(clampWindow({ start: 400, span: 1200 }, 1000)).toEqual({
+    start: 0,
+    span: 1000,
+  });
+  expect(clampWindow({ start: 950, span: 200 }, 1000)).toEqual({
+    start: 800,
+    span: 200,
+  });
+  expect(clampWindow({ start: -20, span: 200 }, 1000)).toEqual({
+    start: 0,
+    span: 200,
+  });
+  expect(clampWindow({ start: 300, span: 200 }, 1000)).toEqual({
+    start: 300,
+    span: 200,
+  });
+  for (const elapsed of [0, 1000, 120000]) {
+    const full = fitWindow(elapsed);
+    expect(clampWindow(zoomWindow(full, 2), full.span)).toEqual(full);
+    expect(clampWindow(panWindow(full, 10000), full.span)).toEqual(full);
+  }
+});
 
 test("fit includes the full run and keeps its scale between growth boundaries", () => {
   expect(fitWindow(0).span).toBeGreaterThan(0);
