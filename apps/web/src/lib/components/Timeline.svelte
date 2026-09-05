@@ -577,7 +577,7 @@
     border-color: #aec2ef;
   }
   .board {
-    max-height: 480px;
+    height: 480px;
     overflow-y: auto;
     overflow-x: hidden;
     outline-offset: -3px;

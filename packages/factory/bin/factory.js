@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import "tsx/esm";
 import { existsSync } from "node:fs";
-import { register } from "node:module";
+import { registerHooks } from "node:module";
+import { resolve } from "./workflow-loader.js";
 
-register(new URL("./workflow-loader.js", import.meta.url));
+registerHooks({ resolve });
 
 try {
   if (existsSync(".env")) process.loadEnvFile(".env");

@@ -79,18 +79,22 @@ describe("createExec", () => {
     try {
       const f = createFactory({ cwd, prompt: "", verbose: false });
       const script = "process.stdout.write(process.cwd())";
-      expect(await f.exec`${process.execPath} -e ${script}`.text()).toBe(
-        await realpath(cwd),
-      );
       expect(
-        await f.exec`${process.execPath} -e ${script}`
-          .cwd(process.cwd())
-          .text(),
-      ).toBe(process.cwd());
+        await realpath(await f.exec`${process.execPath} -e ${script}`.text()),
+      ).toBe(await realpath(cwd));
+      expect(
+        await realpath(
+          await f.exec`${process.execPath} -e ${script}`
+            .cwd(process.cwd())
+            .text(),
+        ),
+      ).toBe(await realpath(process.cwd()));
       const copy = { ...f, cwd: process.cwd() };
-      expect(await copy.exec`${process.execPath} -e ${script}`.text()).toBe(
-        process.cwd(),
-      );
+      expect(
+        await realpath(
+          await copy.exec`${process.execPath} -e ${script}`.text(),
+        ),
+      ).toBe(await realpath(process.cwd()));
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
