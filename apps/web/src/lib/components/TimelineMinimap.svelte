@@ -223,7 +223,7 @@
     padding: 8px;
     border: 1px solid var(--line);
     border-radius: 7px;
-    background: #f8faffee;
+    background: var(--overlay);
     box-shadow: 0 3px 14px #24324b26;
   }
   .minimap.collapsed {
@@ -252,7 +252,7 @@
   .map {
     height: 130px;
     position: relative;
-    background: white;
+    background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 4px;
     overflow: hidden;
@@ -288,7 +288,7 @@
     fill: #c4525c;
   }
   rect.selected {
-    stroke: #24324b;
+    stroke: var(--ink);
     stroke-width: 1;
     vector-effect: non-scaling-stroke;
   }
@@ -303,7 +303,7 @@
     min-width: 2px;
     min-height: 2px;
     box-sizing: border-box;
-    box-shadow: 0 0 0 1000px #dce4f288;
+    box-shadow: 0 0 0 1000px var(--map-shade);
   }
   .playhead {
     top: 0;

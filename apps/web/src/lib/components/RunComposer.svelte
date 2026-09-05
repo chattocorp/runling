@@ -190,13 +190,13 @@
     resize: vertical;
     box-sizing: border-box;
     padding: 14px;
-    border: 1px solid #b8c8dd;
+    border: 1px solid var(--selected-border);
     border-radius: 6px;
     font:
       13px/1.7 "SFMono-Regular",
       Consolas,
       monospace;
-    background: #fafcff;
+    background: var(--surface-soft);
     color: var(--ink);
   }
   details {
@@ -219,7 +219,7 @@
     padding: 6px 9px;
     border: 1px solid var(--line);
     border-radius: 5px;
-    background: white;
+    background: var(--surface);
     cursor: pointer;
   }
   .schema-tabs button.active {

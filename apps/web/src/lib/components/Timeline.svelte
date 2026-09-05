@@ -495,7 +495,7 @@
   .timeline {
     border: 1px solid var(--line);
     border-radius: 9px;
-    background: white;
+    background: var(--surface);
     overflow: hidden;
   }
   .timeline.expanded {
@@ -516,7 +516,7 @@
     gap: 10px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--line);
-    background: #f8faff;
+    background: var(--surface-soft);
   }
   .mode {
     display: flex;
@@ -559,7 +559,7 @@
   .controls button {
     border: 1px solid var(--line);
     border-radius: 4px;
-    background: white;
+    background: var(--surface);
     color: var(--ink);
     padding: 3px 8px;
     cursor: pointer;
@@ -572,9 +572,9 @@
     padding: 4px 9px;
   }
   .controls .active {
-    background: #eaf0ff;
+    background: var(--selected);
     color: var(--blue);
-    border-color: #aec2ef;
+    border-color: var(--selected-border);
   }
   .board {
     height: 480px;
@@ -606,7 +606,7 @@
     position: sticky;
     top: 0;
     z-index: 3;
-    background: #f3f6fb;
+    background: var(--surface-raised);
     border-bottom: 1px solid var(--line);
   }
   .label-heading {
@@ -666,7 +666,7 @@
     top: 0;
     height: 100%;
     padding: 10px 0 0 6px;
-    border-left: 1px solid #d3ddec;
+    border-left: 1px solid var(--grid-line);
     white-space: nowrap;
     color: var(--muted);
     font-size: 10px;
@@ -676,14 +676,14 @@
     overflow: hidden;
     display: flex;
     align-items: center;
-    border-bottom: 1px solid #e9edf5;
+    border-bottom: 1px solid var(--grid-line);
     border-right: 1px solid var(--line);
-    background: #fafbfe;
+    background: var(--surface-soft);
     padding-right: 6px;
     min-width: 0;
   }
   .label.chosen {
-    background: #eaf0fc;
+    background: var(--selected);
   }
   .toggle,
   .leaf {
@@ -738,23 +738,23 @@
   }
   .lane {
     position: relative;
-    border-bottom: 1px solid #e9edf5;
+    border-bottom: 1px solid var(--grid-line);
     min-width: 0;
     overflow: hidden;
-    background: #fff;
+    background: var(--surface);
   }
   .lane:nth-child(4n) {
-    background: #f8faff;
+    background: var(--surface-soft);
   }
   .lane.chosen {
-    background: #edf3ff;
+    background: var(--selected);
   }
   .gridline {
     position: absolute;
     top: 0;
     bottom: 0;
     width: 1px;
-    background: #e6ecf5;
+    background: var(--grid-line);
     pointer-events: none;
   }
   .playhead {
@@ -898,7 +898,7 @@
     border-top: 1px solid var(--line);
     font-size: 10px;
     color: var(--muted);
-    background: #f8faff;
+    background: var(--surface-soft);
   }
   .range {
     font-variant-numeric: tabular-nums;

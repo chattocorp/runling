@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ThemePicker from "$lib/components/ThemePicker.svelte";
   import Usage from "$lib/components/Usage.svelte";
   import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
@@ -175,6 +176,7 @@
       >factory<span> / </span><span class="section-name">Run console</span></a
     >
     <div class="header-actions">
+      <ThemePicker />
       <span class="live-label" class:connected={listConnected}
         ><i></i>{listConnected ? "Connected" : "Reconnecting"}</span
       ><button
@@ -371,17 +373,17 @@
     cursor: pointer;
     font-size: 12px;
     font-weight: 550;
-    background: white;
+    background: var(--surface);
     color: var(--ink);
   }
   :global(.button.primary) {
-    background: var(--blue);
+    background: var(--primary-bg);
     color: white;
-    border-color: var(--blue);
+    border-color: var(--primary-bg);
     box-shadow: 0 2px 3px #24479719;
   }
   :global(.button.primary:hover:not(:disabled)) {
-    background: #254dac;
+    background: var(--primary-hover);
   }
   :global(.quiet) {
     border: 0;
@@ -391,8 +393,8 @@
     padding: 5px;
   }
   :global(.error) {
-    background: #fff0ef;
-    color: #98332f;
+    background: var(--error-bg);
+    color: var(--error-text);
     padding: 13px 15px;
     font-size: 12px;
     line-height: 1.7;
@@ -410,7 +412,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: white;
+    background: var(--surface);
   }
   .brand {
     display: flex;
@@ -464,7 +466,7 @@
   }
   .catalog {
     padding: 25px 16px 20px;
-    background: #edf2f9;
+    background: var(--surface-raised);
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
@@ -499,8 +501,8 @@
     margin-bottom: 12px;
   }
   .all-runs.current {
-    background: #dfe8f8;
-    color: #274f9c;
+    background: var(--selected);
+    color: var(--selected-text);
   }
   .webhook {
     border: 1px solid transparent;
@@ -508,8 +510,8 @@
     margin-bottom: 8px;
   }
   .webhook.current {
-    background: #f9fbff;
-    border-color: #b9ccee;
+    background: var(--surface-soft);
+    border-color: var(--selected-border);
   }
   .webhook-name {
     width: 100%;
@@ -585,7 +587,7 @@
   }
   .run-list {
     border-right: 1px solid var(--line);
-    background: #fff;
+    background: var(--surface);
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -607,18 +609,18 @@
     background: transparent;
     border: 0;
     border-left: 3px solid transparent;
-    border-top: 1px solid #eef1f6;
+    border-top: 1px solid var(--surface-raised);
     padding: 17px 19px 16px 17px;
     text-align: left;
     cursor: pointer;
     color: var(--ink);
   }
   .run-row.selected {
-    background: #f0f5ff;
+    background: var(--selected);
     border-left-color: var(--blue);
   }
   .run-row:hover {
-    background: #f7f9fd;
+    background: var(--surface-soft);
   }
   .run-title {
     display: block;
@@ -651,7 +653,7 @@
   }
   .list-empty > span {
     font-size: 25px;
-    color: #aebcd1;
+    color: var(--selected-border);
   }
   .list-empty p {
     margin: 12px 0 5px;
@@ -667,7 +669,7 @@
   }
   .detail-pane {
     min-width: 0;
-    background: #f8faff;
+    background: var(--surface-soft);
   }
   .welcome {
     min-height: 70vh;
@@ -700,18 +702,18 @@
     display: grid;
     gap: 9px;
     padding-left: 20px;
-    border-left: 1px solid #b1c4e7;
+    border-left: 1px solid var(--selected-border);
     transform: rotate(-8deg);
   }
   .welcome-mark span {
     height: 24px;
-    border: 1px solid #adc1e7;
-    background: #e8f0ff;
+    border: 1px solid var(--selected-border);
+    background: var(--selected);
     border-radius: 4px;
   }
   .welcome-mark span:nth-child(2) {
     margin-left: 16px;
-    background: #d8e5ff;
+    background: var(--selected);
   }
   .welcome-mark span:nth-child(3) {
     margin-left: 16px;
@@ -728,7 +730,7 @@
     gap: 10px;
     padding: 12px 30px;
     font-size: 12px;
-    background: #e7effe;
+    background: var(--selected);
     overflow-wrap: anywhere;
   }
   @media (min-width: 1050px) {
