@@ -3,7 +3,8 @@ This repository is an experiment in building the core primitive of an agentic so
 ## Repository structure
 
 - Use ASD-STE100 for prose and documentation.
-- The framework lives in `src/`
+- The framework package lives in `packages/factory/`
+- The SvelteKit web app lives in `apps/web/`
 - Workflow scripts live in `workflows/`
 - `workflows/implement.ts` is a workflow entrypoint that implements and validates a requested change in the current working directory
 - `workflows/make-pr.ts` is a workflow entrypoint that runs the implementation and review workflows in a worktree, opens a pull request, and posts the review as a comment

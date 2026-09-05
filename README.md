@@ -1,6 +1,12 @@
-# factory
+# Factory
 
-`factory` is a TypeScript and Bun framework for agent workflows.
+This Bun monorepo contains a TypeScript framework for agent workflows and the
+applications that use it.
+
+- `packages/factory` contains the `factory` package and command.
+- `workflows` contains workflow scripts.
+- `apps/web` contains the `factory-web` executable and a small SvelteKit
+  app that runs the joke workflow.
 
 A workflow is a TypeScript function. The `factory` command loads the function
 and gives it one `Factory` object. This object contains the request, the working
@@ -28,10 +34,10 @@ mise install
 bun install
 ```
 
-Link the local command during development:
+Link the local executables during development:
 
 ```bash
-bun link
+bun run link
 ```
 
 Configure credentials for each model that a workflow uses.
@@ -167,4 +173,34 @@ Run the static checks and tests:
 ```bash
 bun run check
 bun test
+```
+
+## Run the web app
+
+Start the SvelteKit development server:
+
+```bash
+factory-web
+```
+
+Use `--host`, `--port`, or `--open` to configure the server. The
+`bun run dev:web` command remains available as a repository-local alias.
+
+Send a JSON object with a non-empty `value` string:
+
+```bash
+curl -X POST http://localhost:5173/api/joke \
+  -H 'content-type: application/json' \
+  -d '{"value":"monorepos"}'
+```
+
+The app passes `value` to the joke workflow as its prompt. It waits for the
+workflow, writes the generated joke to the server log, and returns the joke in
+the JSON response. Configure the model credentials before you send a webhook.
+
+Build and start the production server with Bun:
+
+```bash
+bun run --cwd apps/web build
+bun run --cwd apps/web start
 ```
