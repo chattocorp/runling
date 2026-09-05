@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
-import type { Factory } from "factory";
+import type { Runling } from "runling";
 import { ask } from "./ask.ts";
 
 const completedReport = {
   outcome: "completed" as const,
-  summary: "Workflows receive a Factory object",
+  summary: "Workflows receive a Runling object",
   details:
-    "Workflow entrypoints receive one `Factory` containing runtime primitives (`src/runtime.ts:82`).",
+    "Workflow entrypoints receive one `Runling` containing runtime primitives (`src/runtime.ts:82`).",
   usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 };
 
@@ -30,7 +30,7 @@ describe("ask workflow", () => {
         steps.push(name);
         return work();
       },
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(ask(f, "How do workflow entrypoints receive runtime primitives?")).resolves.toEqual({
       summary: completedReport.summary,
@@ -66,7 +66,7 @@ describe("ask workflow", () => {
         return completedReport;
       },
       step: <T>(_name: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await ask(f, "");
 

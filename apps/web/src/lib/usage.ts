@@ -1,4 +1,4 @@
-import type { TokenUsage } from "factory";
+import type { TokenUsage } from "runling";
 
 export const tokenCount = (usage: TokenUsage): number =>
   usage.input + usage.output + usage.cacheRead + usage.cacheWrite;

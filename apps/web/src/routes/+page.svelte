@@ -150,7 +150,7 @@
 </script>
 
 <svelte:head
-  ><title>Factory — Runs</title><meta
+  ><title>Runling — Runs</title><meta
     name="description"
     content="Start workflows and inspect their live execution."
   /></svelte:head
@@ -161,7 +161,7 @@
       Configuration reload failed. The last valid configuration is still active. {configError}
     </div>{/if}
   <header class="app-header">
-    <a href="/" class="brand" aria-label="Factory home"
+    <a href="/" class="brand" aria-label="Runling home"
       ><svg
         viewBox="0 0 28 28"
         width="26"
@@ -173,7 +173,7 @@
           stroke="white"
           stroke-width="2"
         /></svg
-      >factory<span> / </span><span class="section-name">Run console</span></a
+      >runling<span> / </span><span class="section-name">Run console</span></a
     >
     <div class="header-actions">
       <ThemePicker />
@@ -234,7 +234,7 @@
             </div>
           </div>
         {:else}<p class="sidebar-empty">
-            No webhooks configured. Add one to factory.config.ts. Changes load
+            No webhooks configured. Add one to runling.config.ts. Changes load
             automatically.
           </p>{/each}
       </div>

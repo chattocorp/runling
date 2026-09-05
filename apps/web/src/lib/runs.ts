@@ -1,4 +1,4 @@
-import type { FactoryEvent, TokenUsage } from "factory";
+import type { RunlingEvent, TokenUsage } from "runling";
 
 export type RunStatus = "running" | "completed" | "failed" | "interrupted";
 export interface RunSummary {
@@ -16,11 +16,11 @@ export interface RunDetail extends RunSummary {
   input: unknown;
   output: unknown;
   error: string | null;
-  events: FactoryEvent[];
+  events: RunlingEvent[];
 }
 export type RunRecord =
   | { type: "started"; run: RunDetail }
-  | { type: "event"; event: FactoryEvent }
+  | { type: "event"; event: RunlingEvent }
   | {
       type: "finished";
       status: Exclude<RunStatus, "running">;

@@ -1,9 +1,16 @@
 import { afterEach, expect, test } from "vitest";
-import { mkdtemp, readFile, writeFile, rm, readdir } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  writeFile,
+  rm,
+  readdir,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { Type, workflow, recordTokenUsage } from "factory";
-import { RunStore } from "./run-store.ts";
+import { Type, workflow, recordTokenUsage } from "runling";
+import { historyDirectory, RunStore } from "./run-store.ts";
 import { buildTimeline } from "../timeline.ts";
 import type { RunRecord } from "../runs.ts";
 
@@ -13,12 +20,24 @@ afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
 });
 async function store() {
-  const directory = await mkdtemp(resolve(tmpdir(), "factory-runs-test-"));
+  const directory = await mkdtemp(resolve(tmpdir(), "runling-runs-test-"));
   directories.push(directory);
   const store = new RunStore(directory, directory);
   await store.init();
   return store;
 }
+
+test("uses Runling history for new projects and preserves existing Factory history", async () => {
+  const cwd = await mkdtemp(resolve(tmpdir(), "runling-history-test-"));
+  directories.push(cwd);
+  const current = resolve(cwd, ".runling/runs");
+  const legacy = resolve(cwd, ".factory/runs");
+  expect(await historyDirectory(cwd)).toBe(current);
+  await mkdir(legacy, { recursive: true });
+  expect(await historyDirectory(cwd)).toBe(legacy);
+  await mkdir(current, { recursive: true });
+  expect(await historyDirectory(cwd)).toBe(current);
+});
 
 test("streams ordered nested events and restores the completed run", async () => {
   const original = await store();

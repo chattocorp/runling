@@ -1,8 +1,8 @@
-import { ConfigReloader } from "factory/config-reloader";
+import { ConfigReloader } from "runling/config-reloader";
 let reloader: ConfigReloader | undefined;
 export function getConfigReloader(): ConfigReloader {
-  const path = process.env.FACTORY_WEB_CONFIG;
-  if (!path) throw new Error("FACTORY_WEB_CONFIG is not set");
+  const path = process.env.RUNLING_WEB_CONFIG;
+  if (!path) throw new Error("RUNLING_WEB_CONFIG is not set");
   return (reloader ??= new ConfigReloader(path));
 }
 export const loadWebConfig = () => getConfigReloader().load();

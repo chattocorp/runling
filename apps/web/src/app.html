@@ -7,7 +7,9 @@
       (() => {
         let theme;
         try {
-          theme = localStorage.getItem("factory-theme");
+          theme =
+            localStorage.getItem("runling-theme") ??
+            localStorage.getItem("factory-theme");
         } catch {}
         document.documentElement.dataset.theme =
           theme === "light" || theme === "dark"

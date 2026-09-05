@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TokenUsage } from "factory";
+  import type { TokenUsage } from "runling";
   import { estimatedCost, tokenCount } from "$lib/usage.ts";
   let { usage, detail = false }: { usage: TokenUsage; detail?: boolean } =
     $props();

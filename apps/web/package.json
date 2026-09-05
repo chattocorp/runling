@@ -1,5 +1,5 @@
 {
-  "name": "@factory/web",
+  "name": "@runling/web",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
-    "factory": "workspace:*",
+    "runling": "workspace:*",
     "typebox": "1.3.7"
   },
   "devDependencies": {

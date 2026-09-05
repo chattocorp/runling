@@ -8,7 +8,10 @@
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const read = () => {
       try {
-        return localStorage.getItem("factory-theme");
+        return (
+          localStorage.getItem("runling-theme") ??
+          localStorage.getItem("factory-theme")
+        );
       } catch {
         return null;
       }
@@ -28,14 +31,19 @@
     };
     update = () => {
       try {
-        localStorage.setItem("factory-theme", preference);
+        localStorage.setItem("runling-theme", preference);
       } catch {
         /* Session-only preference. */
       }
       apply();
     };
     const storage = (event: StorageEvent) => {
-      if (event.key === "factory-theme" || event.key === null) sync();
+      if (
+        event.key === "runling-theme" ||
+        event.key === "factory-theme" ||
+        event.key === null
+      )
+        sync();
     };
     sync();
     ready = true;

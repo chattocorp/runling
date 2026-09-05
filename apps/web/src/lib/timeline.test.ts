@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
 import { buildTimeline } from "./timeline.ts";
-import type { FactoryEvent } from "factory";
+import type { RunlingEvent } from "runling";
 
 test("uses formatted logs once without deduplicating genuine repeated messages", () => {
-  const events: FactoryEvent[] = [
+  const events: RunlingEvent[] = [
     {
       type: "agent.started",
       agentId: "a",
@@ -58,7 +58,7 @@ test("uses formatted logs once without deduplicating genuine repeated messages",
 });
 
 test("shows legacy tool actions without letting debug or token summaries replace them", () => {
-  const events: FactoryEvent[] = [
+  const events: RunlingEvent[] = [
     {
       type: "agent.started",
       agentId: "a",
@@ -142,7 +142,7 @@ test("rolls live snapshots through nested steps without double counting finishes
     cacheWrite: 1,
     cost: 0.01,
   };
-  const events: FactoryEvent[] = [
+  const events: RunlingEvent[] = [
     { type: "step.started", id: "root", label: "Root", timestamp: 0 },
     {
       type: "step.started",

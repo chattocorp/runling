@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type Factory, type Exec } from "factory";
+import { type Runling, type Exec } from "runling";
 import { implement } from "./implement.ts";
 
 const contextValues = {
@@ -61,11 +61,11 @@ function runtimeWith({
     return shellPromise;
   }) as unknown as Exec;
 
-  const factory = {
+  const runling = {
     ...contextValues,
     exec,
     agent: async function (
-      this: Factory,
+      this: Runling,
       options: Record<string, unknown>,
     ) {
       const resolvedOptions = { ...options, cwd: options.cwd ?? this.cwd };
@@ -94,10 +94,10 @@ function runtimeWith({
       messages.push(label);
       return work();
     },
-  } as unknown as Factory;
+  } as unknown as Runling;
 
   return {
-    factory,
+    runling,
     messages,
     agentOptions,
     get disposedAgents() {
@@ -110,7 +110,7 @@ function runtimeWith({
 describe("implement workflow", () => {
   test("returns the implementing agent's summary", async () => {
     const prompts: string[] = [];
-    const { factory } = runtimeWith({
+    const { runling } = runtimeWith({
       runAgent: async (prompt) => {
         prompts.push(prompt);
         return {
@@ -120,14 +120,14 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement(factory, "Make the change")).resolves.toBe("Implementation summary");
+    await expect(implement(runling, "Make the change")).resolves.toBe("Implementation summary");
     expect(prompts).toEqual(["Make the change"]);
   });
 
   test("runs agents on Sol with medium thinking", async () => {
     const setup = runtimeWith();
 
-    await expect(implement(setup.factory, "Make the change")).resolves.toBe("Made the change");
+    await expect(implement(setup.runling, "Make the change")).resolves.toBe("Made the change");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -164,7 +164,7 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.factory, "Make the change")).resolves.toBe("Repaired summary");
+    await expect(implement(setup.runling, "Make the change")).resolves.toBe("Repaired summary");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -178,7 +178,7 @@ describe("implement workflow", () => {
   test("runs checks and tests once when both pass", async () => {
     let checks = 0;
     let tests = 0;
-    const { factory, messages } = runtimeWith({
+    const { runling, messages } = runtimeWith({
       runCheck: async () => {
         checks++;
       },
@@ -187,7 +187,7 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement(factory, "Make the change")).resolves.toBe("Made the change");
+    await expect(implement(runling, "Make the change")).resolves.toBe("Made the change");
 
     expect(checks).toBe(1);
     expect(tests).toBe(1);
@@ -222,7 +222,7 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.factory, "Make the change")).resolves.toBe("Made the change");
+    await expect(implement(setup.runling, "Make the change")).resolves.toBe("Made the change");
 
     expect(tests).toBe(2);
     expect(setup.messages).toEqual([

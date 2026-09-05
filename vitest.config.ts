@@ -5,15 +5,15 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^factory$/,
+        find: /^runling$/,
         replacement: fileURLToPath(
-          new URL("./packages/factory/src/index.ts", import.meta.url),
+          new URL("./packages/runling/src/index.ts", import.meta.url),
         ),
       },
       {
-        find: /^factory\/web$/,
+        find: /^runling\/web$/,
         replacement: fileURLToPath(
-          new URL("./packages/factory/src/web-config.ts", import.meta.url),
+          new URL("./packages/runling/src/web-config.ts", import.meta.url),
         ),
       },
     ],

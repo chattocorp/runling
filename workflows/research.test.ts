@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Factory } from "factory";
+import type { Runling } from "runling";
 import { research } from "./research.ts";
 
 const completedReport = {
@@ -30,7 +30,7 @@ describe("research workflow", () => {
         steps.push(name);
         return work();
       },
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(research(f, "The Bun JavaScript runtime")).resolves.toEqual({
       summary: completedReport.summary,
@@ -62,7 +62,7 @@ describe("research workflow", () => {
         return completedReport;
       },
       step: <T>(_name: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await research(f, "  ");
 

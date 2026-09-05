@@ -11,16 +11,22 @@ const exec = promisify(execFile);
 // Keep npm and its child executables on the runtime used to launch this test.
 process.env.PATH = `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`;
 const root = resolve(import.meta.dirname, "..");
-const directory = await mkdtemp(resolve(tmpdir(), "factory-consumer-"));
+const directory = await mkdtemp(resolve(tmpdir(), "runling-consumer-"));
 let server;
 let serverOutput = "";
 try {
   const { stdout } = await exec(
     "npm",
     ["pack", "--json", "--pack-destination", directory],
-    { cwd: resolve(root, "packages/factory") },
+    { cwd: resolve(root, "packages/runling") },
   );
   const [packed] = JSON.parse(stdout);
+  assert.equal(packed.name, "runling");
+  assert.equal(packed.version, "0.1.0");
+  assert(packed.files.some(({ path }) => path === "README.md"));
+  assert(packed.files.some(({ path }) => path === "LICENSE"));
+  assert(packed.files.some(({ path }) => path === "bin/runling.js"));
+  assert(!packed.files.some(({ path }) => path === "bin/factory.js"));
   assert(packed.files.some(({ path }) => path === "dist/web/index.js"));
   assert(packed.files.some(({ path }) => path === "dist/src/index.d.ts"));
   assert(!packed.files.some(({ path }) => path.endsWith(".test.ts")));
@@ -29,10 +35,10 @@ try {
   await writeFile(
     resolve(project, "package.json"),
     JSON.stringify({
-      name: "factory-consumer-test",
+      name: "runling-consumer-test",
       private: true,
       type: "module",
-      scripts: { factory: "factory" },
+      scripts: { runling: "runling" },
     }),
   );
   await exec(
@@ -43,12 +49,12 @@ try {
   await writeFile(resolve(project, "message.txt"), "consumer cwd");
   await writeFile(
     resolve(project, ".env"),
-    "FACTORY_PACKAGE_TEST_ENV=loaded\n",
+    "RUNLING_PACKAGE_TEST_ENV=loaded\n",
   );
   await writeFile(resolve(project, "helper.ts"), 'export const suffix = "";\n');
   await writeFile(
     resolve(project, "workflow.ts"),
-    `import { Type, workflow } from "factory";
+    `import { Type, workflow } from "runling";
 import { suffix } from "./helper.ts";
 export default workflow({ name: "Consumer echo", input: Type.Object({ topic: Type.String() }), output: Type.String() }, async (f, input) => {
   return f.step("Echo input", async () => {
@@ -62,23 +68,23 @@ export default workflow({ name: "Consumer echo", input: Type.Object({ topic: Typ
   );
   await writeFile(
     resolve(project, "cli.ts"),
-    `import { Type, workflow } from "factory";
+    `import { Type, workflow } from "runling";
 export default workflow({ name: "CLI echo", input: Type.String(), output: Type.String() }, (_f, input) => {
-  if (process.env.FACTORY_PACKAGE_TEST_ENV !== "loaded") throw new Error("Project .env was not loaded");
+  if (process.env.RUNLING_PACKAGE_TEST_ENV !== "loaded") throw new Error("Project .env was not loaded");
   return input;
 });
 `,
   );
   await writeFile(
-    resolve(project, "factory.config.ts"),
-    `import { defineWebConfig } from "factory/web";
+    resolve(project, "runling.config.ts"),
+    `import { defineWebConfig } from "runling/web";
 import echo from "./workflow.ts";
 export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
 `,
   );
   const cli = await exec(
     "npm",
-    ["run", "--silent", "factory", "--", "cli.ts", "explicit input", "--json"],
+    ["run", "--silent", "runling", "--", "cli.ts", "explicit input", "--json"],
     { cwd: project },
   );
   assert.equal(JSON.parse(cli.stdout).output, "explicit input");
@@ -86,10 +92,10 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
   await writeFile(
     resolve(project, "package.json"),
     JSON.stringify({
-      name: "factory-consumer-test",
+      name: "runling-consumer-test",
       private: true,
-      scripts: { factory: "factory" },
-      dependencies: { factory: "0.0.0" },
+      scripts: { runling: "runling" },
+      dependencies: { runling: "0.1.0" },
     }),
   );
   const commonjsCli = await exec(
@@ -97,7 +103,7 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
     [
       "run",
       "--silent",
-      "factory",
+      "runling",
       "--",
       "cli.ts",
       "commonjs project",
@@ -118,7 +124,7 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
       "esnext",
       "--allowImportingTsExtensions",
       "--skipLibCheck",
-      "factory.config.ts",
+      "runling.config.ts",
       "workflow.ts",
       "cli.ts",
     ],
@@ -132,7 +138,7 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
   const origin = `http://127.0.0.1:${port}`;
   server = spawn(
     "npm",
-    ["run", "factory", "--", "--host", "127.0.0.1", "--port", String(port)],
+    ["run", "runling", "--", "--host", "127.0.0.1", "--port", String(port)],
     {
       cwd: project,
       detached: process.platform !== "win32",
@@ -216,7 +222,7 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
     "slow: consumer cwd",
     "Active runs keep their original modules",
   );
-  const configPath = resolve(project, "factory.config.ts");
+  const configPath = resolve(project, "runling.config.ts");
   const configState = async () => {
     const response = await fetch(`${origin}/api/config/events`, {
       signal: AbortSignal.timeout(5000),
@@ -299,7 +305,7 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
     "Workflow and web UI share the event runtime",
   );
   const history = await readFile(
-    resolve(project, ".factory/runs", `${id}.jsonl`),
+    resolve(project, ".runling/runs", `${id}.jsonl`),
     "utf8",
   );
   assert(history.includes("console: consumer cwd"));

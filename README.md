@@ -1,15 +1,15 @@
-# Factory
+# Runling
 
 This pnpm monorepo contains a TypeScript/Node.js framework for agent workflows and the
 applications that use it.
 
-- `packages/factory` contains the `factory` package and command.
+- `packages/runling` contains the `runling` package and command.
 - `workflows` contains workflow scripts.
 - `apps/web` contains the SvelteKit run console. Its production build is
-  included in the `factory` package.
+  included in the `runling` package.
 
 A workflow is a TypeScript function with JSON Schema input and output. The
-`factory` command loads the function and passes a `Factory` object and an
+`runling` command loads the function and passes a `Runling` object and an
 explicit input value. The object contains the working directory and the
 framework functions.
 
@@ -26,37 +26,37 @@ The framework can:
 The workflow controls all decisions. Put loops, validation, retries, model
 selection, and outcome handling in the workflow.
 
-## Use Factory in a project
+## Use Runling in a project
 
-Use Node.js 22.18 or later. Factory includes the TypeScript loader and the
+Use Node.js 22.18 or later. Runling includes the TypeScript loader and the
 built web UI. You do not need Bun, Vite, or SvelteKit in your project.
 `f.exec` runs programs across platforms without a shell. Explicit `f.shell`
 commands require a POSIX `sh` executable, as supplied by macOS and Linux.
 
-The package name is temporary. Until publication, build and pack this repo:
+Until the first npm release is published, build and pack this repo:
 
 ```bash
 pnpm install
 pnpm build
-pnpm --filter factory pack --pack-destination ../..
+pnpm --filter runling pack --pack-destination ../..
 ```
 
 In your own npm project, install that tarball:
 
 ```bash
-npm install /path/to/factory/factory-0.0.0.tgz
+npm install /path/to/runling/runling-0.1.0.tgz
 ```
 
 Add a script to your project's `package.json`:
 
 ```json
-{ "scripts": { "factory": "factory" } }
+{ "scripts": { "runling": "runling" } }
 ```
 
 Create `workflows/echo.ts`:
 
 ```ts
-import { Type, workflow } from "factory";
+import { Type, workflow } from "runling";
 
 export default workflow(
   { name: "Echo", input: Type.String(), output: Type.String() },
@@ -67,10 +67,10 @@ export default workflow(
 );
 ```
 
-Create `factory.config.ts` in your project root:
+Create `runling.config.ts` in your project root:
 
 ```ts
-import { defineWebConfig } from "factory/web";
+import { defineWebConfig } from "runling/web";
 import echo from "./workflows/echo.ts";
 
 export default defineWebConfig({
@@ -81,7 +81,7 @@ export default defineWebConfig({
 Start the UI:
 
 ```bash
-npm run factory
+npm run runling
 ```
 
 Open `http://localhost:5173`. Use **Run** to send a JSON string to the workflow,
@@ -95,7 +95,7 @@ curl http://localhost:5173/api/webhooks/echo \
 The config and workflow files can use TypeScript imports. Both ESM projects
 and projects without `"type": "module"` are supported. The server reads files,
 runs commands, and stores history relative to your project, not the installed
-package. Restart the server after config or workflow changes.
+package. Configuration and local workflow changes reload automatically.
 The command loads `.env` from the project directory without replacing existing
 environment variables. Keep credentials out of version control.
 
@@ -112,7 +112,7 @@ pnpm build
 Start the packaged UI from the repository root:
 
 ```bash
-pnpm factory
+pnpm runling
 ```
 
 Configure credentials for each model that a workflow uses.
@@ -124,7 +124,7 @@ Rebuild the framework after changing its source. No global package link is requi
 Pass the workflow file and one optional request:
 
 ```bash
-npm run factory -- path/to/workflow.ts "Implement the requested change"
+npm run runling -- path/to/workflow.ts "Implement the requested change"
 ```
 
 Use `--log` for append-only output. Use `--verbose` for detailed output. Use
@@ -149,7 +149,7 @@ for object, array, or other JSON inputs.
 
 ## Run a command
 
-Use `workflow` to give the workflow a name and TypeBox schemas. Factory checks
+Use `workflow` to give the workflow a name and TypeBox schemas. Runling checks
 the input before the workflow starts and checks the output before it finishes.
 Use `f.exec` to run a program in the current working directory. Execa handles
 process execution without a shell. Interpolated strings and numbers become
@@ -172,7 +172,7 @@ await f.shell`printf hello | tr a-z A-Z`;
 ```
 
 ```ts
-import { Type, workflow } from "factory";
+import { Type, workflow } from "runling";
 
 export default workflow(
   {
@@ -194,7 +194,7 @@ Use `f.runAgent` for one agent turn. This function creates and disposes the
 agent session.
 
 ```ts
-import { Type, workflow } from "factory";
+import { Type, workflow } from "runling";
 
 export default workflow(
   {
@@ -218,7 +218,7 @@ export default workflow(
 );
 ```
 
-Agents must call `report_outcome` at the end of each run. Factory adds this tool
+Agents must call `report_outcome` at the end of each run. Runling adds this tool
 to every agent.
 
 ## Reuse an agent session
@@ -227,7 +227,7 @@ Use `f.agent` when multiple turns must share one conversation. Dispose the
 session with `await using`.
 
 ```ts
-import { Type, workflow } from "factory";
+import { Type, workflow } from "runling";
 
 export default workflow(
   {
@@ -263,7 +263,7 @@ An agent-local extension can inspect agent events. It can add local diagnostics
 to a tool result. Keep final validation in the workflow.
 
 ```ts
-import { defineAgentExtension, Type, workflow } from "factory";
+import { defineAgentExtension, Type, workflow } from "runling";
 
 export default workflow(
   {
@@ -308,7 +308,7 @@ export default workflow(
 An agent can read and change files in its working directory. Use the `tools`
 option to restrict its tools.
 
-## Validate factory
+## Validate runling
 
 Run the static checks and tests:
 
@@ -324,13 +324,13 @@ pnpm test:package
 Start the bundled production UI in your project:
 
 ```bash
-npm run factory
+npm run runling
 ```
 
-By default, the executable loads `factory.config.ts` from the current directory.
+By default, the executable loads `runling.config.ts` from the current directory.
 Use `--config` to select another file. Use `--host`, `--port`, or `--open` to
-configure the server, for example `npm run factory -- --port 3000`.
-`factory web` also starts the UI. The Vite development server is only for
+configure the server, for example `npm run runling -- --port 3000`.
+`runling web` also starts the UI. The Vite development server is only for
 work on this repository; consumers run the bundled Node.js server.
 
 The server uses jiti to load the configuration and Chokidar to watch JavaScript,
@@ -347,7 +347,7 @@ The request body uses that workflow's input schema and is passed directly to
 the workflow. Do not define a separate body schema or input mapping.
 
 ```ts
-import { defineWebConfig } from "factory/web";
+import { defineWebConfig } from "runling/web";
 import joke from "./workflows/joke.ts";
 
 export default defineWebConfig({
@@ -368,7 +368,7 @@ curl -X POST http://localhost:5173/api/webhooks/joke \
 ```
 
 The app checks the request body, passes it to the joke workflow, checks
-the workflow output, and writes the output to the server log. The response has
+the workflow output, and stores the result in run history. The response has
 the output in its `output` field. Configure the model credentials before you
 send a webhook.
 
@@ -398,11 +398,18 @@ Expand or collapse steps, then select a bar to inspect its logs and command outp
 arrive through Server-Sent Events. The connection restores a snapshot after
 a disconnect. Browser-started runs continue if you close the page.
 
-The web server records runs in `.factory/runs/<run-id>.jsonl`, relative to
+The web server records runs in `.runling/runs/<run-id>.jsonl`, relative to
 the workflow working directory. Each file contains the validated workflow
 input, events, and final result. The directory is excluded from Git. History
 includes runs started by both the console and webhook requests. Runs started
-with the `factory` CLI are not recorded here.
+with the `runling` CLI are not recorded here.
+
+For projects that used Factory, rename `factory.config.ts` to `runling.config.ts`,
+replace package imports and commands with `runling`, and replace `Factory` types
+with `Runling`. Environment variable names now start with `RUNLING_`.
+If `.runling/runs` does not exist, the server uses an existing `.factory/runs`
+directory for both reading and writing. Stop the server before moving history
+to `.runling/runs`. The web console also reads the old saved theme preference.
 
 On restart, the server restores history and marks unfinished runs as
 interrupted. It does not resume them. Use one server process per history

@@ -1,4 +1,4 @@
-import { Type, workflow } from "factory";
+import { Type, workflow } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";

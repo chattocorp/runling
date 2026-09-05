@@ -1,4 +1,4 @@
-import type { FactoryEvent, TokenUsage } from "factory";
+import type { RunlingEvent, TokenUsage } from "runling";
 import { mergeUsage } from "./usage.ts";
 import type { RunStatus } from "./runs.ts";
 
@@ -17,7 +17,7 @@ export interface Activity {
 }
 
 export function buildTimeline(
-  events: FactoryEvent[],
+  events: RunlingEvent[],
   runStatus: RunStatus,
 ): Activity[] {
   const nodes = new Map<string, Activity>();

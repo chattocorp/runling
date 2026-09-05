@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Factory, FactoryAgent, Exec } from "factory";
+import type { Runling, RunlingAgent, Exec } from "runling";
 import { review } from "./review.ts";
 
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -18,7 +18,7 @@ describe("review workflow", () => {
       allReviewsStarted = resolve;
     });
 
-    const branch = (): FactoryAgent => ({
+    const branch = (): RunlingAgent => ({
       id: `reviewer-${forks}`,
       async run(prompt) {
         prompts.push(prompt);
@@ -50,7 +50,7 @@ describe("review workflow", () => {
     });
 
     let orchestratorRuns = 0;
-    const orchestrator: FactoryAgent = {
+    const orchestrator: RunlingAgent = {
       id: "orchestrator",
       async run(prompt) {
         prompts.push(prompt);
@@ -104,7 +104,7 @@ describe("review workflow", () => {
         steps.push(name);
         return run();
       },
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(review(f, "Review the current change")).resolves.toEqual({
       summary: "Found two issues",
@@ -168,7 +168,7 @@ describe("review workflow", () => {
           async [Symbol.asyncDispose]() {
             this.dispose();
           },
-        } satisfies FactoryAgent;
+        } satisfies RunlingAgent;
       },
       dispose: () => {
         disposed++;
@@ -176,7 +176,7 @@ describe("review workflow", () => {
       async [Symbol.asyncDispose]() {
         this.dispose();
       },
-    } satisfies FactoryAgent;
+    } satisfies RunlingAgent;
 
     const exec = ((strings: TemplateStringsArray) => ({
       text: async () =>
@@ -190,7 +190,7 @@ describe("review workflow", () => {
       concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       agent: async () => orchestrator,
       step: <T>(_name: string, run: () => T) => run(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(review(f, "Review the current change")).rejects.toThrow("review failed");
     expect(finishedReviews).toBe(2);
@@ -205,7 +205,7 @@ describe("review workflow", () => {
       agent: () => {
         throw new Error("agent should not be created");
       },
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(review(f, "")).resolves.toEqual({
       summary: "No changes to review",

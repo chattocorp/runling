@@ -5,6 +5,7 @@ import {
   appendFile,
   writeFile,
   truncate,
+  stat,
 } from "node:fs/promises";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -15,7 +16,7 @@ import {
   type WorkflowExecution,
   type Static,
   type TSchema,
-} from "factory";
+} from "runling";
 import {
   applyRecord,
   type RunDetail,
@@ -193,14 +194,28 @@ export class RunStore {
 
 // Preserve active executions through Vite module reloads.
 const state = globalThis as typeof globalThis & {
-  __factoryRunStore?: Promise<RunStore>;
+  __runlingRunStore?: Promise<RunStore>;
 };
+export async function historyDirectory(cwd: string): Promise<string> {
+  const current = resolve(cwd, ".runling/runs");
+  const legacy = resolve(cwd, ".factory/runs");
+  for (const path of [current, legacy]) {
+    try {
+      if ((await stat(path)).isDirectory()) return path;
+      throw new Error(`Run history path is not a directory: ${path}`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  return current;
+}
+
 export function getRunStore(): Promise<RunStore> {
-  state.__factoryRunStore ??= (async () => {
-    const cwd = process.env.FACTORY_WEB_WORKFLOW_CWD ?? process.cwd();
-    const store = new RunStore(resolve(cwd, ".factory/runs"), cwd);
+  state.__runlingRunStore ??= (async () => {
+    const cwd = process.env.RUNLING_WEB_WORKFLOW_CWD ?? process.cwd();
+    const store = new RunStore(await historyDirectory(cwd), cwd);
     await store.init();
     return store;
   })();
-  return state.__factoryRunStore;
+  return state.__runlingRunStore;
 }

@@ -1,5 +1,5 @@
 {
-  "name": "factory-monorepo",
+  "name": "runling-monorepo",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -12,16 +12,16 @@
     "apps/*"
   ],
   "scripts": {
-    "factory": "node packages/factory/bin/factory.js",
-    "dev:web": "node --import tsx apps/web/src/bin/factory-web.ts",
-    "build": "pnpm --filter factory build && pnpm --filter @factory/web build && node scripts/bundle-web.mjs",
+    "runling": "node packages/runling/bin/runling.js",
+    "dev:web": "node --import tsx apps/web/src/bin/runling-web.ts",
+    "build": "pnpm --filter runling build && pnpm --filter @runling/web build && node scripts/bundle-web.mjs",
     "test": "vitest run",
     "check": "pnpm run check:root && pnpm -r check",
     "check:root": "tsc --noEmit",
     "test:package": "node scripts/test-package.mjs"
   },
   "dependencies": {
-    "factory": "workspace:*"
+    "runling": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",

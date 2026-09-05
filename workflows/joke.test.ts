@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Factory } from "factory";
+import type { Runling } from "runling";
 import { joke } from "./joke.ts";
 
 describe("joke workflow", () => {
@@ -27,7 +27,7 @@ describe("joke workflow", () => {
         steps.push(name);
         return work();
       },
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(joke(f, "")).resolves.toBe(
       "# Joke\n\nTypeScript walked into a bar, but JavaScript let it in anyway.",
@@ -67,7 +67,7 @@ describe("joke workflow", () => {
         };
       },
       step: <T>(_name: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await joke(f, "webhooks");
 

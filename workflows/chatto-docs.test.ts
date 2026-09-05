@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Factory } from "factory";
+import type { Runling } from "runling";
 import { chattoDocs } from "./chatto-docs.ts";
 
 const completedReport = {
@@ -30,7 +30,7 @@ describe("chatto-docs workflow", () => {
         steps.push(name);
         return work();
       },
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(chattoDocs(f, "What is Chatto?")).resolves.toEqual({
       summary: completedReport.summary,
@@ -70,7 +70,7 @@ describe("chatto-docs workflow", () => {
         return completedReport;
       },
       step: <T>(_name: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await chattoDocs(f, " ");
 

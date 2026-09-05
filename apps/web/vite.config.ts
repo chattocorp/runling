@@ -3,11 +3,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [sveltekit()],
-  ssr: { external: ["factory"] },
-  // Config files and the server must share one Factory event runtime.
+  ssr: { external: ["runling"] },
+  // Config files and the server must share one Runling event runtime.
   build: {
     rollupOptions: {
-      external: ["factory", "factory/web", "factory/config-reloader"],
+      external: ["runling", "runling/web", "runling/config-reloader"],
     },
   },
 });

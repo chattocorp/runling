@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { AgentResult, Factory } from "factory";
+import type { AgentResult, Runling } from "runling";
 import { plan } from "./plan.ts";
 
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -23,7 +23,7 @@ const runtimeWith = (
       return answers.shift() ?? "";
     },
     agent: async function (
-      this: Factory,
+      this: Runling,
       options: Record<string, unknown>,
     ) {
       agentOptions = { ...options, cwd: options.cwd ?? this.cwd };
@@ -44,7 +44,7 @@ const runtimeWith = (
       };
     },
     step: <T>(_label: string, work: () => T) => work(),
-  } as unknown as Factory;
+  } as unknown as Runling;
 
   return {
     f,

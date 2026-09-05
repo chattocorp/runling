@@ -1,5 +1,5 @@
-import { runWorkflow, type Workflow, type WorkflowExecution } from "factory";
-import type { WebConfig } from "factory/web";
+import { runWorkflow, type Workflow, type WorkflowExecution } from "runling";
+import type { WebConfig } from "runling/web";
 import { Check, Errors } from "typebox/value";
 
 type WebhookRunner = (
@@ -15,7 +15,7 @@ export interface WebhookDependencies {
 
 const runConfiguredWorkflow: WebhookRunner = (workflow, input) =>
   runWorkflow(workflow, {
-    cwd: process.env.FACTORY_WEB_WORKFLOW_CWD,
+    cwd: process.env.RUNLING_WEB_WORKFLOW_CWD,
     input,
   });
 

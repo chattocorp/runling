@@ -1,16 +1,16 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { Type, workflow, type Factory, type WorkflowResult } from "factory";
+import { Type, workflow, type Runling, type WorkflowResult } from "runling";
 import { implement } from "./implement.ts";
 import { review } from "./review.ts";
 
-const worktreesDirectory = "../factory-worktrees";
+const worktreesDirectory = "../runling-worktrees";
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
 
 // Ground generated PR copy in both the agent's intent and the committed diff.
 export const describePullRequest = (
-  f: Factory,
+  f: Runling,
   implementationSummary: string,
   committedChange: string,
 ) => f.step("Describe pull request", async () => {
@@ -43,7 +43,7 @@ export const describePullRequest = (
   });
 
 export const postReview = (
-  f: Factory,
+  f: Runling,
   pullRequestUrl: string,
   result: WorkflowResult,
 ) => f.step("Post review", async () => {
@@ -52,7 +52,7 @@ export const postReview = (
   });
 
 export const createWorktree = (
-  f: Factory,
+  f: Runling,
   branchName: string,
   worktreePath: string,
 ) => f.step("Create worktree", async () => {
@@ -85,7 +85,7 @@ const makePullRequest = workflow(
     await f.exec`gh auth status`;
 
     const worktreeId = f.randomId();
-    const branchName = `factory/${worktreeId}`;
+    const branchName = `runling/${worktreeId}`;
     const worktreesPath = resolve(cwd, worktreesDirectory);
     const worktreePath = resolve(worktreesPath, worktreeId);
 

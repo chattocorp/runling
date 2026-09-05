@@ -1,4 +1,4 @@
-import { Type, workflow, type Factory } from "factory";
+import { Type, workflow, type Runling } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -9,7 +9,7 @@ const agentInstructions = [
 const maxValidationAttempts = 3;
 const maxValidationFeedbackLength = 18_000;
 
-const validate = (f: Factory) =>
+const validate = (f: Runling) =>
   f.step("Validate", async () => {
     const check = await f.step("Run checks", () =>
       f.exec`pnpm run check`.nothrow(),

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Factory, Exec, WorkflowResult } from "factory";
+import type { Runling, Exec, WorkflowResult } from "runling";
 import {
   createWorktree,
   describePullRequest,
@@ -18,11 +18,11 @@ describe("make-pr workflow", () => {
     const f = {
       exec,
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await createWorktree(
       f,
-      "factory/bright-otters-2468",
+      "runling/bright-otters-2468",
       "/worktrees/bright-otters-2468",
     );
 
@@ -41,7 +41,7 @@ describe("make-pr workflow", () => {
         template:
           "git worktree add -b _argument_ _argument_ origin/_argument_",
         values: [
-          "factory/bright-otters-2468",
+          "runling/bright-otters-2468",
           "/worktrees/bright-otters-2468",
           "master",
         ],
@@ -57,7 +57,7 @@ describe("make-pr workflow", () => {
       cwd: "/worktree",
       concat: (...parts: string[]) => parts.join("\n"),
       agent: async function (
-        this: Factory,
+        this: Runling,
         options: Record<string, unknown>,
       ) {
         agentOptions = { ...options, cwd: options.cwd ?? this.cwd };
@@ -82,7 +82,7 @@ describe("make-pr workflow", () => {
         };
       },
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await expect(
       describePullRequest(
@@ -117,7 +117,7 @@ describe("make-pr workflow", () => {
     const f = {
       exec,
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
     const result: WorkflowResult = {
       summary: "Found one issue",
       details: "## Findings\n\nFix the race.",
@@ -143,7 +143,7 @@ describe("make-pr workflow", () => {
     const f = {
       exec,
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Factory;
+    } as unknown as Runling;
 
     await postReview(f, "https://github.com/example/project/pull/42", {
       summary: "No issues found",
