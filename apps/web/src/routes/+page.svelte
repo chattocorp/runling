@@ -309,7 +309,6 @@
     --red: #b13f3c;
     --line: #dce3ee;
     --wash: #edf2f8;
-    font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
     color: var(--ink);
     background: #f6f8fc;
     font-synthesis: none;
