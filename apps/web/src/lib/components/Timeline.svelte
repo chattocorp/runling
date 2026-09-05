@@ -780,32 +780,47 @@
     align-items: center;
     gap: 8px;
     overflow: hidden;
-    background: #507dc6;
+    background-color: #507dc6;
+    background-image: linear-gradient(
+      to bottom,
+      #ffffff1c 0%,
+      #ffffff05 42%,
+      #00000008 65%,
+      #00000020 100%
+    );
     border: 1px solid #3c69b1;
     color: white;
     border-radius: 4px;
     cursor: pointer;
     text-align: left;
-    box-shadow: 0 1px 2px #1d38651a;
+    box-shadow:
+      inset 0 1px 0 #ffffff38,
+      inset 0 -1px 0 #00000024,
+      0 1px 2px #00000026,
+      0 2px 4px #00000014;
+    text-shadow: 0 1px 1px #00000026;
+  }
+  .bar:hover {
+    filter: brightness(1.06);
   }
   .bar[data-kind="agent"] {
-    background: #8864bb;
+    background-color: #8864bb;
     border-color: #73519f;
   }
   .bar[data-kind="command"] {
-    background: #338c86;
+    background-color: #338c86;
     border-color: #27716d;
   }
   .bar[data-kind="input"] {
-    background: #ad772e;
+    background-color: #ad772e;
     border-color: #956320;
   }
   .bar.failed {
-    background: #b65252;
+    background-color: #b65252;
     border-color: #9c3939;
   }
   .bar.interrupted {
-    background: #7f8b9d;
+    background-color: #7f8b9d;
     border-style: dashed;
     border-color: #55647b;
   }
