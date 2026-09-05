@@ -63,6 +63,11 @@ export type FactoryEventPayload =
       color: string;
     }
   | {
+      type: "agent.progress";
+      agentId: string;
+      text: string;
+    }
+  | {
       type: "agent.action";
       agentId: string;
       action: string;

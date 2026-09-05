@@ -432,13 +432,17 @@
                 aria-label={`${node.label}, ${node.status}, starts at ${duration(node.startedAt)}, duration ${duration(end - node.startedAt)}`}
                 aria-pressed={selected === node.id}
                 onclick={() => onselect(node.id)}
-                title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}`}
+                title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}${node.preview ? `\n${node.preview}` : ""}`}
               >
                 {#if bar.clippedStart}
                   <span class="continuation start" aria-hidden="true">‹‹</span>
                 {/if}
                 <span class="bar-label"
-                  >{bar.clippedStart ? "" : node.label}</span
+                  >{node.kind === "agent" && node.preview
+                    ? node.preview
+                    : bar.clippedStart
+                      ? ""
+                      : node.label}</span
                 >
                 {#if !bar.clippedEnd}
                   <span class="bar-duration"

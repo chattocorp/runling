@@ -187,7 +187,6 @@ export class RunStore {
     } finally {
       this.pending.delete(id);
     }
-    if (execution.ok) console.log(execution.output);
     return execution;
   }
 }

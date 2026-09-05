@@ -13,6 +13,7 @@ export interface Activity {
   logs: string[];
   children: Activity[];
   usage?: TokenUsage;
+  preview?: string;
 }
 
 export function buildTimeline(
@@ -21,6 +22,7 @@ export function buildTimeline(
 ): Activity[] {
   const nodes = new Map<string, Activity>();
   const agents = new Map<string, string>();
+  const progressAgents = new Set<string>();
   const roots: Activity[] = [];
   const add = (node: Activity) => {
     nodes.set(node.id, node);
@@ -74,8 +76,29 @@ export function buildTimeline(
       const node = nodes.get(agents.get(event.agentId) ?? "");
       if (node) node.usage = { ...event.usage };
     }
-    if (event.type === "agent.action")
-      nodes.get(agents.get(event.agentId) ?? "")?.logs.push(event.action);
+    if (event.type === "agent.progress") {
+      const node = nodes.get(agents.get(event.agentId) ?? "");
+      if (node) {
+        progressAgents.add(node.id);
+        node.preview = event.text;
+      }
+    }
+    if (event.type === "agent.action") {
+      const node = nodes.get(agents.get(event.agentId) ?? "");
+      if (node) {
+        node.logs.push(event.action);
+        // Old journals and already-running servers have no progress events.
+        if (
+          !progressAgents.has(node.id) &&
+          !/^(?:Agent started|Agent finished|Turn \d+|Tokens:|Token usage:)/.test(
+            event.action,
+          )
+        ) {
+          const text = event.action.replace(/\s+/g, " ").trim();
+          if (text) node.preview = text.slice(-500);
+        }
+      }
+    }
     if (event.type === "log") {
       const node = nodes.get(
         event.source === "agent"

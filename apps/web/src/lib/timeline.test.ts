@@ -2,6 +2,83 @@ import { expect, test } from "vitest";
 import { buildTimeline } from "./timeline.ts";
 import type { FactoryEvent } from "factory";
 
+test("shows legacy tool actions without letting debug or token summaries replace them", () => {
+  const events: FactoryEvent[] = [
+    {
+      type: "agent.started",
+      agentId: "a",
+      model: "model",
+      color: "blue",
+      timestamp: 0,
+    },
+    ...[
+      "Agent started (model: model)",
+      "Reading\n src/file.ts",
+      "Turn 2 started",
+      "Token usage: in 10, out 2",
+    ].map((action, index) => ({
+      type: "agent.action" as const,
+      agentId: "a",
+      action,
+      timestamp: index + 1,
+    })),
+  ];
+  expect(buildTimeline(events, "completed")[0]?.preview).toBe(
+    "Reading src/file.ts",
+  );
+  expect(buildTimeline(events, "running")[0]?.logs).toHaveLength(4);
+});
+
+test("keeps agent previews separate from logs and retains them on completion", () => {
+  const nodes = buildTimeline(
+    [
+      {
+        type: "agent.started",
+        agentId: "a",
+        model: "model",
+        color: "blue",
+        timestamp: 0,
+      },
+      {
+        type: "agent.started",
+        agentId: "b",
+        model: "model",
+        color: "blue",
+        timestamp: 1,
+      },
+      {
+        type: "agent.progress",
+        agentId: "a",
+        text: "Reading file.ts",
+        timestamp: 2,
+      },
+      {
+        type: "agent.progress",
+        agentId: "b",
+        text: "Running tests",
+        timestamp: 3,
+      },
+      {
+        type: "agent.action",
+        agentId: "a",
+        action: "Turn 2 started",
+        timestamp: 4,
+      },
+      {
+        type: "agent.finished",
+        agentId: "a",
+        outcome: "completed",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        timestamp: 5,
+      },
+    ],
+    "running",
+  );
+  expect(nodes[0]?.preview).toBe("Reading file.ts");
+  expect(nodes[0]?.logs).toEqual(["Turn 2 started"]);
+  expect(nodes[1]?.preview).toBe("Running tests");
+});
+
 test("rolls live snapshots through nested steps without double counting finishes or parallel agents", () => {
   const usage = {
     input: 10,

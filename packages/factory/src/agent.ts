@@ -13,7 +13,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import webFetchExtension from "../extensions/web-fetch.ts";
-import { emitFactoryEvent } from "./events.ts";
+import { bindFactoryContext, emitFactoryEvent } from "./events.ts";
 import { randomId } from "./id.ts";
 import { log, withLogSource } from "./log.ts";
 import { parseModelReference } from "./model.ts";
@@ -209,13 +209,21 @@ async function createFactoryAgent(
 ): Promise<FactoryAgent> {
   const agentId = randomId();
   const color = takeAgentColor();
+  const progress = (text: string) => {
+    const line = stripVTControlCharacters(text).replace(/\s+/g, " ").trim();
+    if (line) {
+      emitFactoryEvent({ type: "agent.progress", agentId, text: line.slice(-500) });
+    }
+  };
 
   const prefixLog = (message: string) =>
     `${log.colorize(`[${agentId}]`)} ${message}`;
   const writeAgentLog = (
     level: "debug" | "error" | "info" | "success",
     message: string,
+    showProgress = true,
   ) => {
+    if (showProgress && level !== "debug") progress(message);
     if (level !== "debug" || log.level === "debug") {
       emitFactoryEvent({
         type: "agent.action",
@@ -352,10 +360,37 @@ async function createFactoryAgent(
     let finalText: string | undefined;
     const usage = emptyTokenUsage();
     let turn = 0;
+    let lastTextUpdate = -Infinity;
+    let preparingReport = false;
     const toolStartedAt = new Map<string, number>();
 
-    const unsubscribe = session.subscribe((event) => {
+    const unsubscribe = session.subscribe(bindFactoryContext((event) => {
       options.onEvent?.(event);
+
+      if (event.type === "message_update") {
+        const update = event.assistantMessageEvent;
+        if (
+          !preparingReport &&
+          (update.type === "toolcall_start" ||
+            update.type === "toolcall_delta" ||
+            update.type === "toolcall_end")
+        ) {
+          const part = update.partial.content[update.contentIndex];
+          if (part?.type === "toolCall" && part.name === "report_outcome") {
+            progress("Preparing result…");
+            preparingReport = true;
+          }
+        }
+        if (update.type === "text_start") lastTextUpdate = -Infinity;
+        if (update.type === "text_delta" || update.type === "text_end") {
+          const now = performance.now();
+          if (update.type === "text_end" || now - lastTextUpdate >= 100) {
+            const part = update.partial.content[update.contentIndex];
+            if (part?.type === "text") progress(part.text);
+            lastTextUpdate = now;
+          }
+        }
+      }
 
       if (event.type === "agent_start") {
         emitFactoryEvent({
@@ -482,12 +517,14 @@ async function createFactoryAgent(
           .map((part) => part.text)
           .join("\n");
 
+        if (finalText.trim()) agentLog.info(finalText);
+
         accumulateTokenUsage(usage, event.message.usage);
         recordTokenUsage(event.message.usage);
         emitFactoryEvent({ type: "agent.usage", agentId, usage: { ...usage } });
         agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
       }
-    });
+    }));
 
     const abort = () => abortSession(session, agentLog);
 
@@ -514,6 +551,7 @@ async function createFactoryAgent(
         }
 
         if (activeReport !== undefined) {
+          agentLog.info(activeReport.details?.trim() || activeReport.summary);
           return { ...activeReport, usage };
         }
 
@@ -534,7 +572,7 @@ async function createFactoryAgent(
       signal?.removeEventListener("abort", abort);
       unsubscribe();
       running = false;
-      agentLog.info(`Token usage: ${formatTokenUsage(usage)}`);
+      writeAgentLog("info", `Token usage: ${formatTokenUsage(usage)}`, false);
       emitFactoryEvent({
         type: "agent.finished",
         agentId,

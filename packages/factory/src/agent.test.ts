@@ -1,4 +1,5 @@
 import { ansiColor } from "./ansi.ts";
+import { AsyncResource } from "node:async_hooks";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { observeFactoryEvents, type FactoryEvent } from "./events.ts";
 
@@ -150,6 +151,58 @@ function emitAssistantUsage(usage: {
     },
   });
 }
+
+test("streams bounded text previews, throttles deltas, and shows tools without debug noise", async () => {
+  const events: FactoryEvent[] = [];
+  const clock = vi.spyOn(performance, "now").mockReturnValue(1000);
+  promptImplementation = async () => {
+    eventHandler?.({ type: "agent_start" });
+    const update = (type: string, text: string) => eventHandler?.({
+      type: "message_update",
+      assistantMessageEvent: { type, contentIndex: 0, partial: { content: [{ type: "text", text }] } },
+    });
+    update("text_start", "");
+    update("text_delta", "Looking\n at files");
+    update("text_delta", "This update is throttled");
+    update("text_end", "x".repeat(600));
+    eventHandler?.({ type: "tool_execution_start", toolCallId: "read-1", toolName: "read", args: { path: "src/foo.ts" } });
+    eventHandler?.({ type: "turn_start" });
+    await reportOutcome({ outcome: "completed", summary: "Done" });
+  };
+  try {
+    await observeFactoryEvents(e => events.push(e), () => runAgent("Test", { model: "anthropic/claude-opus-4-5" }));
+    const previews = events.filter(e => e.type === "agent.progress").map(e => e.text);
+    expect(previews).toContain("Looking at files");
+    expect(previews).not.toContain("This update is throttled");
+    expect(previews).toContain("x".repeat(500));
+    expect(previews).toContain("Reading src/foo.ts");
+    expect(previews.at(-1)).toBe("Done");
+  } finally { clock.mockRestore(); }
+});
+
+test("previews report-only output such as the joke workflow", async () => {
+  const events: FactoryEvent[] = [];
+  // The SDK can dispatch from an async resource created outside the run.
+  const sdk = new AsyncResource("sdk-dispatch");
+  promptImplementation = async () => {
+    sdk.runInAsyncScope(() => eventHandler?.({ type: "agent_start" }));
+    for (const type of ["toolcall_start", "toolcall_delta", "toolcall_end"]) {
+      sdk.runInAsyncScope(() => eventHandler?.({
+        type: "message_update",
+        assistantMessageEvent: {
+          type, contentIndex: 0,
+          partial: { content: [{ type: "toolCall", name: "report_outcome", arguments: {} }] },
+        },
+      }));
+    }
+    await sdk.runInAsyncScope(() => reportOutcome({ outcome: "completed", summary: "Joke written", details: "A joke\nwith a punchline." }));
+  };
+  await observeFactoryEvents(e => events.push(e), () => runAgent("Write a joke", { model: "anthropic/claude-opus-4-5", tools: [] }));
+  const previews = events.filter(e => e.type === "agent.progress").map(e => e.text);
+  expect(previews.filter(text => text === "Preparing result…")).toHaveLength(1);
+  expect(previews.at(-1)).toBe("A joke with a punchline.");
+  expect(events.some(e => e.type === "agent.action" && e.action === "A joke\nwith a punchline.")).toBe(true);
+});
 
 describe("describeTool", () => {
   test("describes known tools", () => {
