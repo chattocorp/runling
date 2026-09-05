@@ -106,7 +106,7 @@ describe("review workflow", () => {
       },
     } as unknown as Factory;
 
-    await expect(review(f)).resolves.toEqual({
+    await expect(review(f, "Review the current change")).resolves.toEqual({
       summary: "Found two issues",
       details: "## Findings\n\nTwo actionable issues.",
       outputs: { review: "## Findings\n\nTwo actionable issues." },
@@ -192,7 +192,7 @@ describe("review workflow", () => {
       step: <T>(_name: string, run: () => T) => run(),
     } as unknown as Factory;
 
-    await expect(review(f)).rejects.toThrow("review failed");
+    await expect(review(f, "Review the current change")).rejects.toThrow("review failed");
     expect(finishedReviews).toBe(2);
     expect(disposed).toBe(4);
   });
@@ -207,7 +207,7 @@ describe("review workflow", () => {
       },
     } as unknown as Factory;
 
-    await expect(review(f)).resolves.toEqual({
+    await expect(review(f, "")).resolves.toEqual({
       summary: "No changes to review",
     });
   });

@@ -32,7 +32,7 @@ describe("ask workflow", () => {
       },
     } as unknown as Factory;
 
-    await expect(ask(f)).resolves.toEqual({
+    await expect(ask(f, "How do workflow entrypoints receive runtime primitives?")).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { answer: completedReport.details },
@@ -68,7 +68,7 @@ describe("ask workflow", () => {
       step: <T>(_name: string, work: () => T) => work(),
     } as unknown as Factory;
 
-    await ask(f);
+    await ask(f, "");
 
     expect(questions).toEqual([
       "What would you like to know about the repository?",

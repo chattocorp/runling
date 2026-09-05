@@ -32,7 +32,7 @@ describe("research workflow", () => {
       },
     } as unknown as Factory;
 
-    await expect(research(f)).resolves.toEqual({
+    await expect(research(f, "The Bun JavaScript runtime")).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { research: completedReport.details },
@@ -64,7 +64,7 @@ describe("research workflow", () => {
       step: <T>(_name: string, work: () => T) => work(),
     } as unknown as Factory;
 
-    await research(f);
+    await research(f, "  ");
 
     expect(questions).toEqual(["What topic should I research?"]);
     expect(prompts[0]).toContain("Agentic software factories");

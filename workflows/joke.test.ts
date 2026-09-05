@@ -29,7 +29,7 @@ describe("joke workflow", () => {
       },
     } as unknown as Factory;
 
-    await expect(joke(f)).resolves.toBe(
+    await expect(joke(f, "")).resolves.toBe(
       "# Joke\n\nTypeScript walked into a bar, but JavaScript let it in anyway.",
     );
     expect(questions).toEqual(["What should the joke be about?"]);
@@ -69,7 +69,7 @@ describe("joke workflow", () => {
       step: <T>(_name: string, work: () => T) => work(),
     } as unknown as Factory;
 
-    await joke(f);
+    await joke(f, "webhooks");
 
     expect(askedForInput).toBe(false);
     expect(prompts[0]).toContain('"webhooks"');

@@ -17,7 +17,7 @@ export type Workflow<
   OutputSchema extends TSchema = TSchema,
 > = ((
   f: Factory,
-  input?: Static<InputSchema>,
+  input: Static<InputSchema>,
 ) => Promise<Static<OutputSchema>> | Static<OutputSchema>) &
   Readonly<WorkflowDefinition<InputSchema, OutputSchema>>;
 
@@ -55,8 +55,7 @@ export function workflow<
       );
     }
   }
-  const defined = (async (f: Factory, suppliedInput?: Static<InputSchema>) => {
-    const input = suppliedInput === undefined ? (f.prompt ?? "") : suppliedInput;
+  const defined = (async (f: Factory, input: Static<InputSchema>) => {
     if (!Check(definition.input, input)) {
       throw new TypeError(
         validationMessage(definition.name, "input", definition.input, input),

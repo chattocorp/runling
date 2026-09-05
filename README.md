@@ -9,9 +9,9 @@ applications that use it.
   app that runs the joke workflow.
 
 A workflow is a TypeScript function with JSON Schema input and output. The
-`factory` command loads the function and gives it one `Factory` object. This
-object contains the request, the working directory, and the framework
-functions.
+`factory` command loads the function and passes a `Factory` object and an
+explicit input value. The object contains the working directory and the
+framework functions.
 
 The framework can:
 
@@ -53,6 +53,20 @@ factory path/to/workflow.ts "Implement the requested change"
 
 Use `--log` for append-only output. Use `--verbose` for detailed output. Use
 `--json` for machine-readable output.
+
+The CLI passes the request string as the workflow input. If no request is
+given, it passes an empty string. A workflow can choose to ask for user input.
+
+In code, always pass the input explicitly. Workflows do not read `f.prompt`
+as a fallback:
+
+```ts
+const result = await review(f, "Check error handling");
+```
+
+For headless execution, use `runWorkflow(review, { input: "Check error handling" })`.
+The `input` option is required; the old `prompt` option is not supported.
+Each workflow call still runs as a named step, including nested calls.
 
 ## Run a shell command
 

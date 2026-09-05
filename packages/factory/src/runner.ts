@@ -73,9 +73,7 @@ export interface ExecutionOptions {
 
 export interface RunWorkflowOptions<Input = unknown> {
   cwd?: string;
-  input?: Input;
-  /** @deprecated Use input. */
-  prompt?: string;
+  input: Input;
   verbose?: boolean;
   onInput?: InputHandler;
   onEvent?: FactoryEventListener;
@@ -173,23 +171,21 @@ export async function runWorkflow<
   {
     cwd = process.cwd(),
     input,
-    prompt = "",
     verbose = false,
     onInput,
     onEvent = () => {},
-  }: RunWorkflowOptions<Static<InputSchema>> = {},
+  }: RunWorkflowOptions<Static<InputSchema>>,
 ): Promise<WorkflowExecution<Static<OutputSchema>>> {
-  const workflowInput = (input === undefined ? prompt : input) as Static<InputSchema>;
   const f = createFactory({
     cwd,
-    prompt: typeof workflowInput === "string" ? workflowInput : prompt,
+    prompt: typeof input === "string" ? input : "",
     verbose,
     handleInput: onInput,
   });
 
   return observeFactoryEvents(onEvent, () =>
     log.withDestination("silent", () =>
-      captureExecution(() => log.indented(() => run(f, workflowInput))),
+      captureExecution(() => log.indented(() => run(f, input))),
     ),
   );
 }

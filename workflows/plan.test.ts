@@ -84,7 +84,7 @@ describe("plan workflow", () => {
       ["Fly.io", "Yes, for main"],
     );
 
-    await expect(plan(runtime.f)).resolves.toEqual({
+    await expect(plan(runtime.f, "Add deployment support")).resolves.toEqual({
       summary: "Plan deployment support",
       details: "## Plan\n\n1. Add the deployment adapter.\n2. Test it.",
       outputs: {
@@ -122,7 +122,7 @@ describe("plan workflow", () => {
       ["Add a cache"],
     );
 
-    await plan(runtime.f);
+    await plan(runtime.f, "");
 
     expect(runtime.questions).toEqual([
       "What would you like to build or change?",
@@ -143,7 +143,7 @@ describe("plan workflow", () => {
       [],
     );
 
-    await expect(plan(runtime.f)).rejects.toThrow(
+    await expect(plan(runtime.f, "Plan something")).rejects.toThrow(
       "Planning failed: Could not inspect the repository",
     );
     expect(runtime.disposed).toBe(true);

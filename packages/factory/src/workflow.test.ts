@@ -1,9 +1,54 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, expectTypeOf, test } from "bun:test";
 import { Type } from "typebox";
 import type { Factory } from "./runtime.ts";
 import { workflow } from "./workflow.ts";
 
 describe("workflow", () => {
+  test("requires explicit input and never falls back to the factory prompt", async () => {
+    const steps: string[] = [];
+    const f = {
+      prompt: "Do not use this",
+      step: <T>(name: string, run: () => T) => {
+        steps.push(name);
+        return run();
+      },
+    } as Factory;
+    const echo = workflow(
+      { name: "Echo", input: Type.String(), output: Type.String() },
+      (_f, input) => input,
+    );
+    expectTypeOf<Parameters<typeof echo>>().toEqualTypeOf<[Factory, string]>();
+    // @ts-expect-error Workflow calls require the input argument.
+    await expect(echo(f)).rejects.toThrow('Workflow "Echo" input is invalid');
+    // @ts-expect-error Undefined is not a string input.
+    await expect(echo(f, undefined)).rejects.toThrow('Workflow "Echo" input is invalid');
+    expect(steps).toEqual([]);
+    await expect(echo(f, "")).resolves.toBe("");
+    expect(steps).toEqual(["Echo"]);
+  });
+
+  test("nested workflows use explicit inputs and remain nested steps", async () => {
+    const steps: string[] = [];
+    const f = {
+      prompt: "Unrelated request",
+      step: async <T>(name: string, run: () => T) => {
+        steps.push(`start:${name}`);
+        const result = await run();
+        steps.push(`end:${name}`);
+        return result;
+      },
+    } as Factory;
+    const child = workflow(
+      { name: "Child", input: Type.String(), output: Type.String() },
+      (_f, input) => input,
+    );
+    const parent = workflow(
+      { name: "Parent", input: Type.String(), output: Type.String() },
+      (f, input) => child(f, `${input} to child`),
+    );
+    await expect(parent(f, "Passed")).resolves.toBe("Passed to child");
+    expect(steps).toEqual(["start:Parent", "start:Child", "end:Child", "end:Parent"]);
+  });
   test.each(["input", "output"] as const)("rejects an invalid %s schema when defined", (boundary) => {
     expect(() => workflow({
       name: "Invalid schema",

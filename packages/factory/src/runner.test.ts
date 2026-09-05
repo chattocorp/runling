@@ -289,6 +289,19 @@ describe("executeWorkflow", () => {
 });
 
 describe("runWorkflow", () => {
+  test("does not use the removed prompt option as workflow input", async () => {
+    let started = false;
+    const echo = workflow(
+      { name: "Echo", input: Type.String(), output: Type.String() },
+      (_f, input) => { started = true; return input; },
+    );
+    // @ts-expect-error Callers must provide input, not a legacy prompt option.
+    const execution = await runWorkflow(echo, { prompt: "Legacy fallback" });
+    expect(execution.ok).toBe(false);
+    expect(execution.error).toContain('Workflow "Echo" input is invalid');
+    expect(started).toBe(false);
+    expect(await runWorkflow(echo, { input: "" })).toMatchObject({ ok: true, output: "" });
+  });
   test("runs headlessly with host-provided input and event handling", async () => {
     const events: FactoryEvent[] = [];
     const requested = Promise.withResolvers<InputRequest>();
@@ -347,7 +360,7 @@ describe("runWorkflow", () => {
         throw new Error("Nope");
       },
     );
-    const execution = await runWorkflow(failing);
+    const execution = await runWorkflow(failing, { input: "" });
 
     expect(execution).toMatchObject({ ok: false, error: "Nope", result: null });
     expect(process.exitCode).toBe(exitCode);

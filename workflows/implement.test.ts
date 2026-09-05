@@ -120,14 +120,14 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement(factory)).resolves.toBe("Implementation summary");
+    await expect(implement(factory, "Make the change")).resolves.toBe("Implementation summary");
     expect(prompts).toEqual(["Make the change"]);
   });
 
   test("runs agents on Sol with medium thinking", async () => {
     const setup = runtimeWith();
 
-    await expect(implement(setup.factory)).resolves.toBe("Made the change");
+    await expect(implement(setup.factory, "Make the change")).resolves.toBe("Made the change");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -164,7 +164,7 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.factory)).resolves.toBe("Repaired summary");
+    await expect(implement(setup.factory, "Make the change")).resolves.toBe("Repaired summary");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -187,7 +187,7 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement(factory)).resolves.toBe("Made the change");
+    await expect(implement(factory, "Make the change")).resolves.toBe("Made the change");
 
     expect(checks).toBe(1);
     expect(tests).toBe(1);
@@ -222,7 +222,7 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.factory)).resolves.toBe("Made the change");
+    await expect(implement(setup.factory, "Make the change")).resolves.toBe("Made the change");
 
     expect(tests).toBe(2);
     expect(setup.messages).toEqual([

@@ -32,7 +32,7 @@ describe("chatto-docs workflow", () => {
       },
     } as unknown as Factory;
 
-    await expect(chattoDocs(f)).resolves.toEqual({
+    await expect(chattoDocs(f, "What is Chatto?")).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { answer: completedReport.details },
@@ -72,7 +72,7 @@ describe("chatto-docs workflow", () => {
       step: <T>(_name: string, work: () => T) => work(),
     } as unknown as Factory;
 
-    await chattoDocs(f);
+    await chattoDocs(f, " ");
 
     expect(questions).toEqual(["What would you like to know about Chatto?"]);
     expect(prompts[0]).toContain("How do I get started?");
