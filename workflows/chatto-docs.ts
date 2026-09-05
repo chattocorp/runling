@@ -1,16 +1,24 @@
-import { workflow, type WorkflowResult } from "factory";
+import { Type, workflow } from "factory";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
 const documentationRoot =
   "https://docs.chatto.run/getting-started/introduction/";
 
 export const chattoDocs = workflow(
-  "Answer Chatto documentation question",
-  async (f): Promise<WorkflowResult> => {
+  {
+    name: "Answer Chatto documentation question",
+    input: Type.String({ description: "A question about Chatto" }),
+    output: Type.Object({
+      summary: Type.String(),
+      details: Type.Optional(Type.String()),
+      outputs: Type.Object({ answer: Type.String() }),
+    }),
+  },
+  async (f, input) => {
     const question =
-      f.prompt.trim() === ""
+      input.trim() === ""
         ? await f.input("What would you like to know about Chatto?")
-        : f.prompt;
+        : input;
 
     const report = await f.step("Consulting Chatto documentation", () =>
       f.runAgent(

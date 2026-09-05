@@ -1,18 +1,23 @@
 #!/usr/bin/env bun
 
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { createServer } from "vite";
+import { isWebConfig } from "../config.ts";
 
 const usage = `Usage: factory-web [options]
 
 Options:
+  --config <path>  Configuration file (default: factory.web.ts)
   --host <host>  Hostname to listen on (default: localhost)
   --port <port>  Port to listen on (default: 5173)
   --open         Open the app in a browser
   -h, --help     Show this help`;
 
 export interface FactoryWebArguments {
+  config: string;
   help: boolean;
   host: string;
   open: boolean;
@@ -25,6 +30,7 @@ export function parseFactoryWebArguments(
   const parsed = parseArgs({
     args: [...argv],
     options: {
+      config: { type: "string", default: "factory.web.ts" },
       help: { type: "boolean", short: "h", default: false },
       host: { type: "string", default: "localhost" },
       open: { type: "boolean", default: false },
@@ -40,6 +46,7 @@ export function parseFactoryWebArguments(
   }
 
   return {
+    config: parsed.values.config ?? "factory.web.ts",
     help: parsed.values.help ?? false,
     host: parsed.values.host ?? "localhost",
     open: parsed.values.open ?? false,
@@ -57,7 +64,20 @@ export async function runFactoryWeb(
   }
 
   const appRoot = resolve(import.meta.dir, "../..");
-  process.env.FACTORY_WEB_WORKFLOW_CWD = process.cwd();
+  const workflowCwd = process.cwd();
+  const configPath = resolve(workflowCwd, options.config);
+  if (!existsSync(configPath)) {
+    throw new Error(`Factory web configuration not found: ${configPath}`);
+  }
+  const configModule = await import(pathToFileURL(configPath).href);
+  if (!isWebConfig(configModule.default)) {
+    throw new Error(
+      `${configPath} must export a valid Factory web configuration`,
+    );
+  }
+
+  process.env.FACTORY_WEB_CONFIG = configPath;
+  process.env.FACTORY_WEB_WORKFLOW_CWD = workflowCwd;
   process.chdir(appRoot);
 
   const server = await createServer({

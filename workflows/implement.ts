@@ -1,4 +1,4 @@
-import { workflow } from "factory";
+import { Type, workflow, type Factory } from "factory";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -9,16 +9,15 @@ const agentInstructions = [
 const maxValidationAttempts = 3;
 const maxValidationFeedbackLength = 18_000;
 
-const runCheck = workflow("Run checks", (f) =>
-  f.shell`bun run check`.nothrow(),
-);
-
-const runTests = workflow("Run tests", (f) => f.shell`bun test`.nothrow());
-
-const validate = workflow("Validate", async (f) => {
-  const check = await runCheck(f);
-  return check.exitCode === 0 ? runTests(f) : check;
-});
+const validate = (f: Factory) =>
+  f.step("Validate", async () => {
+    const check = await f.step("Run checks", () =>
+      f.shell`bun run check`.nothrow(),
+    );
+    return check.exitCode === 0
+      ? f.step("Run tests", () => f.shell`bun test`.nothrow())
+      : check;
+  });
 
 const validationFailure = (validation: {
   stdout: Uint8Array;
@@ -35,53 +34,60 @@ const validationFailure = (validation: {
     : `${details.slice(0, maxValidationFeedbackLength)}\n\n[Validation output truncated]`;
 };
 
-export const implement = workflow("Implement", async (f): Promise<string> => {
-  const pwd = await f.getPwd();
+export const implement = workflow(
+  {
+    name: "Implement",
+    input: Type.String({ description: "The requested code change" }),
+    output: Type.String({ description: "A summary of the implementation" }),
+  },
+  async (f, input): Promise<string> => {
+    const pwd = await f.getPwd();
 
-  await using implementationAgent = await f.agent({
-    model,
-    thinkingLevel,
-    instructions: agentInstructions,
-  });
+    await using implementationAgent = await f.agent({
+      model,
+      thinkingLevel,
+      instructions: agentInstructions,
+    });
 
-  let implementationReport = await f.step("Implementing change", () =>
-    implementationAgent.run(f.prompt),
-  );
-
-  if (!(await pwd.hasChanges)) {
-    throw new Error("Agent completed without changing the worktree");
-  }
-
-  let validation = await validate(f);
-  for (let attempt = 1; validation.exitCode !== 0; attempt++) {
-    if (attempt === maxValidationAttempts) {
-      throw new Error(
-        `Project validation failed after ${maxValidationAttempts} attempts.\n${validationFailure(validation)}`,
-      );
-    }
-
-    implementationReport = await f.step(
-      `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
-      () =>
-        implementationAgent.run(
-          f.concat(
-            "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
-            "In your report, summarize the complete implementation, including this repair.",
-            "",
-            "Failure output:",
-            validationFailure(validation),
-          ),
-        ),
+    let implementationReport = await f.step("Implementing change", () =>
+      implementationAgent.run(input),
     );
 
-    validation = await validate(f);
-  }
+    if (!(await pwd.hasChanges)) {
+      throw new Error("Agent completed without changing the worktree");
+    }
 
-  if (!(await pwd.hasChanges)) {
-    throw new Error("The validated worktree no longer contains any changes");
-  }
+    let validation = await validate(f);
+    for (let attempt = 1; validation.exitCode !== 0; attempt++) {
+      if (attempt === maxValidationAttempts) {
+        throw new Error(
+          `Project validation failed after ${maxValidationAttempts} attempts.\n${validationFailure(validation)}`,
+        );
+      }
 
-  return implementationReport.summary;
-});
+      implementationReport = await f.step(
+        `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
+        () =>
+          implementationAgent.run(
+            f.concat(
+              "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
+              "In your report, summarize the complete implementation, including this repair.",
+              "",
+              "Failure output:",
+              validationFailure(validation),
+            ),
+          ),
+      );
+
+      validation = await validate(f);
+    }
+
+    if (!(await pwd.hasChanges)) {
+      throw new Error("The validated worktree no longer contains any changes");
+    }
+
+    return implementationReport.summary;
+  },
+);
 
 export default implement;

@@ -1,22 +1,27 @@
 <svelte:head>
-  <title>Factory webhook</title>
+  <title>Factory webhooks</title>
   <meta
     name="description"
-    content="A small webhook that runs the Factory joke workflow."
+    content="Schemaful webhooks for Factory workflows."
   />
 </svelte:head>
 
 <main>
   <p class="eyebrow">Factory</p>
-  <h1>Jokes on demand.</h1>
+  <h1>Workflows on demand.</h1>
   <p class="summary">
-    Send a JSON webhook to <code>/api/joke</code>. The app runs the joke
-    workflow and logs its result.
+    Send JSON to <code>/api/webhooks/joke</code>. The app validates the request,
+    runs the joke workflow, and logs its output.
   </p>
 
-  <pre><code>curl -X POST http://localhost:5173/api/joke \
+  <pre><code>curl -X POST http://localhost:5173/api/webhooks/joke \
   -H 'content-type: application/json' \
   -d {'\'{"value":"monorepos"}\''}</code></pre>
+
+  <p class="hint">
+    Send a <code>GET</code> request to the same URL to inspect the body, workflow
+    input, and workflow output schemas.
+  </p>
 </main>
 
 <style>
@@ -57,6 +62,12 @@
     max-width: 35rem;
     margin: 2rem 0;
     font: 1.1rem/1.6 system-ui, sans-serif;
+  }
+
+  .hint {
+    max-width: 35rem;
+    color: #526052;
+    font: 0.9rem/1.6 system-ui, sans-serif;
   }
 
   code {

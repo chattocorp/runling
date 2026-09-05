@@ -41,7 +41,7 @@ export interface WorkflowResult {
   outputs?: Record<string, JsonValue>;
 }
 
-export type WorkflowReturn = WorkflowResult | string | undefined | void;
+export type WorkflowReturn = WorkflowResult | JsonValue | undefined | void;
 
 function agent(this: FactoryValues, options: AgentOptions) {
   return createAgent({ ...options, cwd: options.cwd ?? this.cwd });
@@ -96,7 +96,3 @@ export function createFactory({
     shell: createShell({ verbose: values.verbose }),
   });
 }
-
-export type FactoryWorkflow = (
-  f: Factory,
-) => Promise<WorkflowReturn> | WorkflowReturn;

@@ -1,8 +1,17 @@
 import { describe, expect, test } from "bun:test";
+import { Type } from "typebox";
 import type { Factory } from "./runtime.ts";
 import { workflow } from "./workflow.ts";
 
 describe("workflow", () => {
+  test.each(["input", "output"] as const)("rejects an invalid %s schema when defined", (boundary) => {
+    expect(() => workflow({
+      name: "Invalid schema",
+      input: Type.String(),
+      output: Type.String(),
+      [boundary]: { type: "invalid" },
+    } as never, () => "unused")).toThrow(`${boundary} schema is invalid`);
+  });
   test("runs with its name as a step and preserves arguments and results", async () => {
     const steps: string[] = [];
     const f = {
@@ -11,9 +20,78 @@ describe("workflow", () => {
         return run();
       },
     } as Factory;
-    const greet = workflow("Greet", async (_f, name: string) => `Hello ${name}`);
+    const greet = workflow(
+      {
+        name: "Greet",
+        input: Type.String(),
+        output: Type.String(),
+      },
+      async (_f, name) => `Hello ${name}`,
+    );
 
     await expect(greet(f, "Factory")).resolves.toBe("Hello Factory");
     expect(steps).toEqual(["Greet"]);
+    expect(greet.input).toMatchObject({ type: "string" });
+    expect(greet.output).toMatchObject({ type: "string" });
+  });
+
+  test("validates workflow input before starting its step", async () => {
+    let started = false;
+    const f = {
+      prompt: "",
+      step: <T>(_name: string, run: () => T) => {
+        started = true;
+        return run();
+      },
+    } as Factory;
+    const greet = workflow(
+      {
+        name: "Greet",
+        input: Type.Object({ name: Type.String() }),
+        output: Type.String(),
+      },
+      async (_f, { name }) => `Hello ${name}`,
+    );
+
+    await expect(greet(f, { name: 42 } as never)).rejects.toThrow(
+      'Workflow "Greet" input is invalid',
+    );
+    expect(started).toBe(false);
+  });
+
+  test("validates workflow output", async () => {
+    const f = {
+      prompt: "",
+      step: <T>(_name: string, run: () => T) => run(),
+    } as Factory;
+    const broken = workflow(
+      {
+        name: "Broken",
+        input: Type.String(),
+        output: Type.Object({ result: Type.String() }),
+      },
+      async () => ({ result: 42 }) as never,
+    );
+
+    await expect(broken(f, "input")).rejects.toThrow(
+      'Workflow "Broken" output is invalid',
+    );
+  });
+
+  test("preserves null as an explicit input", async () => {
+    const f = {
+      prompt: "fallback",
+      step: <T>(_name: string, run: () => T) => run(),
+    } as Factory;
+    const nullable = workflow(
+      {
+        name: "Nullable",
+        input: Type.Union([Type.String(), Type.Null()]),
+        output: Type.Union([Type.String(), Type.Null()]),
+      },
+      async (_f, input) => input,
+    );
+
+    await expect(nullable(f, null)).resolves.toBeNull();
   });
 });

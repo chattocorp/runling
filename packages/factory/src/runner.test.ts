@@ -11,6 +11,8 @@ import type { FactoryEvent } from "./events.ts";
 import type { InputRequest } from "./input.ts";
 import { createFactory } from "./runtime.ts";
 import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
+import { Type } from "typebox";
+import { workflow } from "./workflow.ts";
 
 const initialExitCode = process.exitCode;
 
@@ -291,16 +293,25 @@ describe("runWorkflow", () => {
     const events: FactoryEvent[] = [];
     const requested = Promise.withResolvers<InputRequest>();
     const answer = Promise.withResolvers<string>();
-    const running = runWorkflow(
-      async (f) => {
+    const joke = workflow(
+      {
+        name: "Tell joke",
+        input: Type.String(),
+        output: Type.String(),
+      },
+      async (f, input) => {
         expect(f.cwd).toBe("/project");
         expect(f.prompt).toBe("Make me laugh");
+        expect(input).toBe("Make me laugh");
         const topic = await f.input("What is the topic?");
         return `A joke about ${topic}`;
       },
+    );
+    const running = runWorkflow(
+      joke,
       {
         cwd: "/project",
-        prompt: "Make me laugh",
+        input: "Make me laugh",
         onInput: (request) => {
           requested.resolve(request);
           return answer.promise;
@@ -316,6 +327,7 @@ describe("runWorkflow", () => {
     expect(execution).toMatchObject({
       ok: true,
       error: null,
+      output: "A joke about robots",
       result: { summary: "A joke about robots" },
     });
     expect(events).toContainEqual(
@@ -329,9 +341,13 @@ describe("runWorkflow", () => {
 
   test("captures failures without changing the process exit code", async () => {
     const exitCode = process.exitCode;
-    const execution = await runWorkflow(async () => {
-      throw new Error("Nope");
-    });
+    const failing = workflow(
+      { name: "Fail", input: Type.String(), output: Type.String() },
+      async () => {
+        throw new Error("Nope");
+      },
+    );
+    const execution = await runWorkflow(failing);
 
     expect(execution).toMatchObject({ ok: false, error: "Nope", result: null });
     expect(process.exitCode).toBe(exitCode);
@@ -391,6 +407,21 @@ describe("shouldUseTui", () => {
 });
 
 describe("normalizeWorkflowResult", () => {
+  test("rejects non-JSON values even when a summary is present", () => {
+    const circular: Record<string, unknown> = { summary: "Invalid" };
+    circular.self = circular;
+    for (const output of [
+      circular,
+      { summary: "Invalid", extra: 1n },
+      { summary: "Invalid", extra: () => "value" },
+      { values: [undefined] },
+    ]) {
+      expect(() => normalizeWorkflowResult(output)).toThrow(
+        "Workflow output must be valid JSON",
+      );
+    }
+  });
+
   test("keeps string-returning workflows compatible", () => {
     expect(normalizeWorkflowResult("Made the change")).toEqual({
       summary: "Made the change",
@@ -403,7 +434,7 @@ describe("normalizeWorkflowResult", () => {
         summary: "Invalid",
         outputs: { value: Number.NaN },
       }),
-    ).toThrow("Workflow must return a string, a structured result, or nothing");
+    ).toThrow("Workflow output must be valid JSON");
   });
 });
 

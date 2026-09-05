@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { workflow, type WorkflowResult } from "factory";
+import { Type, workflow, type Factory, type WorkflowResult } from "factory";
 import { implement } from "./implement.ts";
 import { review } from "./review.ts";
 
@@ -9,9 +9,11 @@ const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
 
 // Ground generated PR copy in both the agent's intent and the committed diff.
-export const describePullRequest = workflow(
-  "Describe pull request",
-  async (f, implementationSummary: string, committedChange: string) => {
+export const describePullRequest = (
+  f: Factory,
+  implementationSummary: string,
+  committedChange: string,
+) => f.step("Describe pull request", async () => {
     await using writer = await f.agent({
       model,
       thinkingLevel,
@@ -38,20 +40,22 @@ export const describePullRequest = workflow(
       title: report.summary.slice(0, 120),
       body: report.details ?? implementationSummary,
     };
-  },
-);
+  });
 
-export const postReview = workflow(
-  "Post review",
-  async (f, pullRequestUrl: string, result: WorkflowResult) => {
+export const postReview = (
+  f: Factory,
+  pullRequestUrl: string,
+  result: WorkflowResult,
+) => f.step("Post review", async () => {
     const body = result.details ?? result.summary;
     await f.shell`gh pr comment ${pullRequestUrl} --body ${body}`;
-  },
-);
+  });
 
-export const createWorktree = workflow(
-  "Create worktree",
-  async (f, branchName: string, worktreePath: string) => {
+export const createWorktree = (
+  f: Factory,
+  branchName: string,
+  worktreePath: string,
+) => f.step("Create worktree", async () => {
     // Ask GitHub instead of assuming the default branch is named main.
     const baseBranch = (
       await f.shell`gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`.text()
@@ -62,12 +66,21 @@ export const createWorktree = workflow(
 
     await f.shell`git fetch origin +refs/heads/${baseBranch}:refs/remotes/origin/${baseBranch}`;
     await f.shell`git worktree add -b ${branchName} ${worktreePath} origin/${baseBranch}`;
-  },
-);
+  });
 
 const makePullRequest = workflow(
-  "Make pull request",
-  async (f): Promise<WorkflowResult> => {
+  {
+    name: "Make pull request",
+    input: Type.String({ description: "The requested code change" }),
+    output: Type.Object({
+      summary: Type.String(),
+      outputs: Type.Object({
+        branchName: Type.String(),
+        pullRequestUrl: Type.String(),
+      }),
+    }),
+  },
+  async (f, input) => {
     const { cwd } = f;
     await f.shell`gh auth status`;
 
@@ -81,13 +94,13 @@ const makePullRequest = workflow(
     await createWorktree(f, branchName, worktreePath);
     f.log.info(`Working in ${worktreePath}`);
 
-    const worktree = { ...f, cwd: worktreePath };
+    const worktree = { ...f, cwd: worktreePath, prompt: input };
     await worktree.shell`bun install --frozen-lockfile`;
-    const implementationSummary = await implement(worktree);
+    const implementationSummary = await implement(worktree, input);
 
     // Review the complete staged change before capturing it in a commit.
     await worktree.shell`git add --all`;
-    const reviewResult = await review(worktree);
+    const reviewResult = await review(worktree, "");
     await worktree.shell`git commit -m ${implementationSummary}`;
 
     // Describe exactly what will appear in the pull request.

@@ -38,12 +38,18 @@ export {
   type Shell,
 } from "./shell.ts";
 export { concat, type ConcatPart } from "./utils.ts";
-export { workflow, type Workflow } from "./workflow.ts";
+export {
+  isWorkflow,
+  workflow,
+  type Workflow,
+  type WorkflowDefinition,
+} from "./workflow.ts";
+export { Type, type Static, type TSchema } from "typebox";
+export { isWorkflowSchema } from "./schema.ts";
 export {
   createFactory,
   type Factory,
   type CreateFactoryOptions,
-  type FactoryWorkflow,
   type JsonValue,
   type WorkflowResult,
   type WorkflowReturn,

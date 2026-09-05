@@ -201,6 +201,10 @@ test("renders the final Markdown report and completion state", () => {
     error: null,
     durationMs: 1_000,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    output: {
+      summary: "Review complete",
+      details: "## Findings\n\nEverything looks **good**.",
+    },
     result: {
       summary: "Review complete",
       details: "## Findings\n\nEverything looks **good**.",
@@ -226,6 +230,11 @@ test("wraps and Markdown-renders the final summary when details are present", ()
     error: null,
     durationMs: 1_000,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    output: {
+      summary:
+        "Chatto **deliberately** keeps servers independent, according to the documentation.",
+      details: "Supporting details.",
+    },
     result: {
       summary:
         "Chatto **deliberately** keeps servers independent, according to the documentation.",
@@ -250,6 +259,7 @@ test("renders a Markdown result supplied as the workflow summary", () => {
     error: null,
     durationMs: 1_000,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    output: "# Joke\n\nA factory walks into a **bar**.",
     result: {
       summary: "# Joke\n\nA factory walks into a **bar**.",
     },
@@ -335,6 +345,7 @@ test("drives pi-tui through the main-screen reporter lifecycle", () => {
     error: null,
     durationMs: 100,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    output: "Done",
     result: { summary: "Done" },
   });
   reporter.stop();

@@ -1,14 +1,22 @@
-import { workflow, type WorkflowResult } from "factory";
+import { Type, workflow } from "factory";
 
 const model = "openai-codex/gpt-5.6-sol";
 
 export const ask = workflow(
-  "Answer repository question",
-  async (f): Promise<WorkflowResult> => {
+  {
+    name: "Answer repository question",
+    input: Type.String({ description: "A question about the repository" }),
+    output: Type.Object({
+      summary: Type.String(),
+      details: Type.Optional(Type.String()),
+      outputs: Type.Object({ answer: Type.String() }),
+    }),
+  },
+  async (f, input) => {
     const question =
-      f.prompt.trim() === ""
+      input.trim() === ""
         ? await f.input("What would you like to know about the repository?")
-        : f.prompt;
+        : input;
 
     const report = await f.step("Investigating repository", () =>
       f.runAgent(
