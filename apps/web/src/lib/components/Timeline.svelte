@@ -773,7 +773,7 @@
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    height: clamp(14px, calc(var(--row-height) * 0.55), 30px);
+    height: calc(100% - 6px);
     padding: 0;
     min-width: 6px;
     display: flex;
