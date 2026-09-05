@@ -9,8 +9,6 @@ and web UI; consumer projects do not need Bun, Vite, or SvelteKit.
 
 ## Install
 
-After the first release is published:
-
 ```sh
 npm install runling
 ```
@@ -55,7 +53,7 @@ Keep the console local: it does not provide authentication. Workflows can
 execute commands and modify files with the server's permissions. Configure
 model credentials before running workflows that use agents.
 
-See the [repository documentation](https://github.com/hmans/runling#readme)
+See the [repository documentation](https://github.com/chattocorp/runling#readme)
 for agent sessions, configuration, and workflow examples.
 
 ## License

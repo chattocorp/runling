@@ -33,7 +33,13 @@ built web UI. You do not need Bun, Vite, or SvelteKit in your project.
 `f.exec` runs programs across platforms without a shell. Explicit `f.shell`
 commands require a POSIX `sh` executable, as supplied by macOS and Linux.
 
-Until the first npm release is published, build and pack this repo:
+Install the published package:
+
+```bash
+npm install runling
+```
+
+To test local changes instead, build and pack this repo:
 
 ```bash
 pnpm install
@@ -44,7 +50,7 @@ pnpm --filter runling pack --pack-destination ../..
 In your own npm project, install that tarball:
 
 ```bash
-npm install /path/to/runling/runling-0.1.0.tgz
+npm install /path/to/runling/runling-0.3.0.tgz
 ```
 
 Add a script to your project's `package.json`:
@@ -427,3 +433,8 @@ and returns the workflow output.
 `pnpm test:package` creates a temporary npm project, installs the packed
 package, and checks the CLI, UI assets, TypeScript config loading, webhooks,
 live events, and history. It does not call an AI model.
+
+## Publish a release
+
+See [the release guide](docs/RELEASING.md) for trusted-publisher setup and
+version-tag releases. Manual workflow runs test the package but do not publish it.

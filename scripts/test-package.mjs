@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, dirname, delimiter } from "node:path";
 import { createServer } from "node:net";
@@ -22,7 +29,10 @@ try {
   );
   const [packed] = JSON.parse(stdout);
   assert.equal(packed.name, "runling");
-  assert.equal(packed.version, "0.1.0");
+  const manifest = JSON.parse(
+    await readFile(resolve(root, "packages/runling/package.json"), "utf8"),
+  );
+  assert.equal(packed.version, manifest.version);
   assert(packed.files.some(({ path }) => path === "README.md"));
   assert(packed.files.some(({ path }) => path === "LICENSE"));
   assert(packed.files.some(({ path }) => path === "bin/runling.js"));
@@ -95,7 +105,7 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
       name: "runling-consumer-test",
       private: true,
       scripts: { runling: "runling" },
-      dependencies: { runling: "0.1.0" },
+      dependencies: { runling: packed.version },
     }),
   );
   const commonjsCli = await exec(
@@ -309,6 +319,14 @@ export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
     "utf8",
   );
   assert(history.includes("console: consumer cwd"));
+  if (process.env.RUNLING_RELEASE_DIR) {
+    const destination = resolve(process.env.RUNLING_RELEASE_DIR);
+    await mkdir(destination, { recursive: true });
+    await copyFile(
+      resolve(directory, packed.filename),
+      resolve(destination, packed.filename),
+    );
+  }
   console.log(
     "Packed npm consumer passed: CLI, UI/assets, TS config, webhook, live events, and history.",
   );

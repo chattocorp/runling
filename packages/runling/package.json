@@ -1,13 +1,13 @@
 {
   "name": "runling",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "TypeScript workflows for coding agents, with a CLI and live web console.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hmans/runling.git",
+    "url": "git+https://github.com/chattocorp/runling.git",
     "directory": "packages/runling"
   },
-  "homepage": "https://github.com/hmans/runling#readme",
+  "homepage": "https://github.com/chattocorp/runling#readme",
   "engines": {
     "node": ">=22.18.0"
   },
@@ -40,7 +40,7 @@
     "bin/workflow-loader.js"
   ],
   "bin": {
-    "runling": "./bin/runling.js"
+    "runling": "bin/runling.js"
   },
   "type": "module",
   "license": "MIT",

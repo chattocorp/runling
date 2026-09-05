@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check release version
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const { name, version } = JSON.parse(readFileSync("packages/runling/package.json"));
+            if (name !== "runling" || !/^\d+\.\d+\.\d+$/.test(version)) throw Error("Expected a stable Runling release version");
+            const ref = process.env.RELEASE_REF;
+            if (ref.startsWith("refs/tags/") && ref !== `refs/tags/v${version}`) throw Error("Tag must match package version");
+          '
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Reject previously published versions
+        if: github.event_name == 'push'
+        run: node scripts/check-release.mjs
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm check
+      - run: pnpm test
+      - name: Test and retain the release tarball
+        run: pnpm test:package
+        env:
+          RUNLING_RELEASE_DIR: ${{ runner.temp }}/runling-release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runling-package
+          path: ${{ runner.temp }}/runling-release/*.tgz
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter runling build
+      - run: pnpm exec vitest run packages/runling/src/exec.test.ts
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [package, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm install --global npm@11.19.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: runling-package
+          path: release
+      - name: Publish the tested tarball with trusted publishing
+        run: |
+          shopt -s nullglob
+          packages=(release/*.tgz)
+          test "${#packages[@]}" -eq 1
+          npm publish "${packages[0]}" --access public --provenance --ignore-scripts --registry=https://registry.npmjs.org
