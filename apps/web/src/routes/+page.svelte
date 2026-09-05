@@ -1,5 +1,6 @@
 <script lang="ts">
   import ThemePicker from "$lib/components/ThemePicker.svelte";
+  import SidebarToggle from "$lib/components/SidebarToggle.svelte";
   import Usage from "$lib/components/Usage.svelte";
   import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
@@ -37,6 +38,19 @@
   let copied = $state("");
   let notice = $state("");
   let configError = $state("");
+  let sidebarsExpanded = $state(true);
+
+  function toggleSidebars() {
+    sidebarsExpanded = !sidebarsExpanded;
+    try {
+      localStorage.setItem(
+        "runling-sidebars",
+        sidebarsExpanded ? "expanded" : "collapsed",
+      );
+    } catch {
+      // Layout controls also work when browser storage is unavailable.
+    }
+  }
   let runStream: EventSource | undefined;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -111,6 +125,11 @@
   }
 
   onMount(() => {
+    try {
+      sidebarsExpanded = localStorage.getItem("runling-sidebars") !== "collapsed";
+    } catch {
+      // Keep the default layout when browser storage is unavailable.
+    }
     const configs = new EventSource("/api/config/events");
     let revision: number | undefined;
     configs.onopen = () => {
@@ -176,6 +195,7 @@
       >runling<span> / </span><span class="section-name">Run console</span></a
     >
     <div class="header-actions">
+      <SidebarToggle expanded={sidebarsExpanded} onclick={toggleSidebars} />
       <ThemePicker />
       <span class="live-label" class:connected={listConnected}
         ><i></i>{listConnected ? "Connected" : "Reconnecting"}</span
@@ -197,8 +217,8 @@
         aria-label="Dismiss notice">×</button
       >
     </div>{/if}
-  <div class="workspace">
-    <aside class="catalog">
+  <div class="workspace" class:sidebars-collapsed={!sidebarsExpanded}>
+    <aside class="catalog" id="webhook-sidebar" hidden={!sidebarsExpanded}>
       <div class="sidebar-heading">
         <h2>Webhooks</h2>
         <span>{data.webhooks.length}</span>
@@ -244,7 +264,12 @@
         >
       </div>
     </aside>
-    <section class="run-list" aria-label="Workflow runs">
+    <section
+      class="run-list"
+      id="runs-sidebar"
+      hidden={!sidebarsExpanded}
+      aria-label="Workflow runs"
+    >
       <div class="list-header">
         <h2>{filter || "Recent runs"}</h2>
         <span>{visibleRuns.length}</span>
@@ -784,8 +809,11 @@
   }
   @media (max-width: 580px) {
     .app-header {
-      padding: 0 16px;
-      height: 64px;
+      padding: 12px 16px;
+      min-height: 64px;
+      height: auto;
+      flex-wrap: wrap;
+      gap: 12px;
     }
     .header-actions {
       gap: 10px;
@@ -824,5 +852,13 @@
     .welcome {
       min-height: 50vh;
     }
+  }
+
+  .workspace.sidebars-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .catalog[hidden],
+  .run-list[hidden] {
+    display: none;
   }
 </style>
