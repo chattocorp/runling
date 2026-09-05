@@ -132,6 +132,7 @@
     width: min(650px, calc(100vw - 32px));
     padding: 0;
     color: var(--ink);
+    background: var(--surface);
     box-shadow: 0 30px 120px #15274738;
     max-height: 90vh;
   }
@@ -190,13 +191,13 @@
     resize: vertical;
     box-sizing: border-box;
     padding: 14px;
-    border: 1px solid #b8c8dd;
+    border: 1px solid var(--line);
     border-radius: 6px;
     font:
       13px/1.7 "SFMono-Regular",
       Consolas,
       monospace;
-    background: #fafcff;
+    background: var(--subtle);
     color: var(--ink);
   }
   details {
@@ -219,7 +220,8 @@
     padding: 6px 9px;
     border: 1px solid var(--line);
     border-radius: 5px;
-    background: white;
+    background: var(--surface);
+    color: var(--ink);
     cursor: pointer;
   }
   .schema-tabs button.active {

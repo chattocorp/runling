@@ -202,7 +202,7 @@
     border-radius: 8px;
     margin-top: 20px;
     padding: 16px;
-    background: white;
+    background: var(--surface);
   }
   .detail-head {
     display: flex;

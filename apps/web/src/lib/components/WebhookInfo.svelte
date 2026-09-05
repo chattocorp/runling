@@ -93,6 +93,7 @@
     width: min(700px, calc(100vw - 32px));
     padding: 0;
     color: var(--ink);
+    background: var(--surface);
     box-shadow: 0 30px 120px #15274738;
     max-height: 90vh;
   }

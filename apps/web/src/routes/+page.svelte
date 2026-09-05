@@ -14,6 +14,7 @@
   import RunInspector from "$lib/components/RunInspector.svelte";
   import RunComposer from "$lib/components/RunComposer.svelte";
   import WebhookInfoModal from "$lib/components/WebhookInfo.svelte";
+  import ThemeToggle from "$lib/components/ThemeToggle.svelte";
 
   let { data }: { data: PageData } = $props();
   let liveRuns = $state<RunSummary[] | null>(null);
@@ -151,6 +152,7 @@
       >factory<span> / </span><span class="section-name">Run console</span></a
     >
     <div class="header-actions">
+      <ThemeToggle />
       <span class="live-label" class:connected={listConnected}
         ><i></i>{listConnected ? "Connected" : "Reconnecting"}</span
       ><button
@@ -311,9 +313,40 @@
     --red: #b13f3c;
     --line: #dce3ee;
     --wash: #edf2f8;
+    --page: #f6f8fc;
+    --surface: #ffffff;
+    --surface-alt: #f8faff;
+    --sidebar: #edf2f9;
+    --subtle: #fafcff;
+    --selected: #f0f5ff;
+    --selected-strong: #dfe8f8;
+    --hover: #f7f9fd;
+    --error-bg: #fff0ef;
+    --notice-bg: #e7effe;
     color: var(--ink);
-    background: #f6f8fc;
+    background: var(--page);
+    color-scheme: light;
     font-synthesis: none;
+  }
+  :global(:root[data-theme="dark"]) {
+    --ink: #dbe6f5;
+    --muted: #91a2b9;
+    --blue: #82aaff;
+    --green: #67c5a5;
+    --red: #ff8985;
+    --line: #2b3b51;
+    --wash: #1b293a;
+    --page: #0c131d;
+    --surface: #131d2a;
+    --surface-alt: #101925;
+    --sidebar: #162231;
+    --subtle: #111c29;
+    --selected: #1a2b43;
+    --selected-strong: #213650;
+    --hover: #182535;
+    --error-bg: #3a2024;
+    --notice-bg: #172d4b;
+    color-scheme: dark;
   }
   :global(*) {
     box-sizing: border-box;
@@ -347,7 +380,7 @@
     cursor: pointer;
     font-size: 12px;
     font-weight: 550;
-    background: white;
+    background: var(--surface);
     color: var(--ink);
   }
   :global(.button.primary) {
@@ -357,7 +390,7 @@
     box-shadow: 0 2px 3px #24479719;
   }
   :global(.button.primary:hover:not(:disabled)) {
-    background: #254dac;
+    background: color-mix(in srgb, var(--blue), black 18%);
   }
   :global(.quiet) {
     border: 0;
@@ -367,8 +400,8 @@
     padding: 5px;
   }
   :global(.error) {
-    background: #fff0ef;
-    color: #98332f;
+    background: var(--error-bg);
+    color: var(--red);
     padding: 13px 15px;
     font-size: 12px;
     line-height: 1.7;
@@ -386,7 +419,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: white;
+    background: var(--surface);
   }
   .brand {
     display: flex;
@@ -402,7 +435,7 @@
     color: var(--blue);
   }
   .brand > span {
-    color: #b1bccd;
+    color: var(--muted);
     margin-left: 9px;
     font-weight: 400;
   }
@@ -440,7 +473,7 @@
   }
   .catalog {
     padding: 25px 16px 20px;
-    background: #edf2f9;
+    background: var(--sidebar);
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
@@ -475,8 +508,8 @@
     margin-bottom: 12px;
   }
   .all-runs.current {
-    background: #dfe8f8;
-    color: #274f9c;
+    background: var(--selected-strong);
+    color: var(--blue);
   }
   .webhook {
     border: 1px solid transparent;
@@ -484,8 +517,8 @@
     margin-bottom: 8px;
   }
   .webhook.current {
-    background: #f9fbff;
-    border-color: #b9ccee;
+    background: var(--surface-alt);
+    border-color: var(--blue);
   }
   .webhook-name {
     width: 100%;
@@ -561,7 +594,7 @@
   }
   .run-list {
     border-right: 1px solid var(--line);
-    background: #fff;
+    background: var(--surface);
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -583,18 +616,18 @@
     background: transparent;
     border: 0;
     border-left: 3px solid transparent;
-    border-top: 1px solid #eef1f6;
+    border-top: 1px solid var(--line);
     padding: 17px 19px 16px 17px;
     text-align: left;
     cursor: pointer;
     color: var(--ink);
   }
   .run-row.selected {
-    background: #f0f5ff;
+    background: var(--selected);
     border-left-color: var(--blue);
   }
   .run-row:hover {
-    background: #f7f9fd;
+    background: var(--hover);
   }
   .run-title {
     display: block;
@@ -616,7 +649,7 @@
   }
   .run-bottom {
     margin-top: 15px;
-    color: #7e8b9f;
+    color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
   .list-empty {
@@ -627,7 +660,7 @@
   }
   .list-empty > span {
     font-size: 25px;
-    color: #aebcd1;
+    color: var(--muted);
   }
   .list-empty p {
     margin: 12px 0 5px;
@@ -637,13 +670,13 @@
   }
   .list-foot {
     border-top: 1px solid var(--line);
-    color: #7e8b9f;
+    color: var(--muted);
     font-size: 10px;
     padding: 16px 20px;
   }
   .detail-pane {
     min-width: 0;
-    background: #f8faff;
+    background: var(--surface-alt);
   }
   .welcome {
     min-height: 70vh;
@@ -676,18 +709,18 @@
     display: grid;
     gap: 9px;
     padding-left: 20px;
-    border-left: 1px solid #b1c4e7;
+    border-left: 1px solid var(--blue);
     transform: rotate(-8deg);
   }
   .welcome-mark span {
     height: 24px;
-    border: 1px solid #adc1e7;
-    background: #e8f0ff;
+    border: 1px solid var(--blue);
+    background: var(--selected);
     border-radius: 4px;
   }
   .welcome-mark span:nth-child(2) {
     margin-left: 16px;
-    background: #d8e5ff;
+    background: var(--selected-strong);
   }
   .welcome-mark span:nth-child(3) {
     margin-left: 16px;
@@ -704,7 +737,7 @@
     gap: 10px;
     padding: 12px 30px;
     font-size: 12px;
-    background: #e7effe;
+    background: var(--notice-bg);
     overflow-wrap: anywhere;
   }
   @media (min-width: 1050px) {
