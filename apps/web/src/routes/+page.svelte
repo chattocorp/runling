@@ -180,22 +180,24 @@
       Configuration reload failed. The last valid configuration is still active. {configError}
     </div>{/if}
   <header class="app-header">
-    <a href="/" class="brand" aria-label="Runling home"
-      ><svg
-        viewBox="0 0 28 28"
-        width="26"
-        height="26"
-        fill="none"
-        aria-hidden="true"
-        ><path d="M3 25V12l7 4V9l7 4V3h7v22H3Z" fill="currentColor" /><path
-          d="M7 21h3m4 0h3m3 0h2"
-          stroke="white"
-          stroke-width="2"
-        /></svg
-      >runling<span> / </span><span class="section-name">Run console</span></a
-    >
-    <div class="header-actions">
+    <div class="header-navigation">
       <SidebarToggle expanded={sidebarsExpanded} onclick={toggleSidebars} />
+      <a href="/" class="brand" aria-label="Runling home"
+        ><svg
+          viewBox="0 0 28 28"
+          width="26"
+          height="26"
+          fill="none"
+          aria-hidden="true"
+          ><path d="M3 25V12l7 4V9l7 4V3h7v22H3Z" fill="currentColor" /><path
+            d="M7 21h3m4 0h3m3 0h2"
+            stroke="white"
+            stroke-width="2"
+          /></svg
+        >runling<span> / </span><span class="section-name">Run console</span></a
+      >
+    </div>
+    <div class="header-actions">
       <ThemePicker />
       <span class="live-label" class:connected={listConnected}
         ><i></i>{listConnected ? "Connected" : "Reconnecting"}</span
@@ -438,6 +440,11 @@
     align-items: center;
     justify-content: space-between;
     background: var(--surface);
+  }
+  .header-navigation {
+    display: flex;
+    align-items: center;
+    gap: 14px;
   }
   .brand {
     display: flex;
