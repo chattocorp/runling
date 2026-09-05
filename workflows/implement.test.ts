@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type Factory, type Shell } from "factory";
+import { type Factory, type Exec } from "factory";
 import { implement } from "./implement.ts";
 
 const contextValues = {
@@ -35,7 +35,7 @@ function runtimeWith({
     stdout = Buffer.from("stdout");
     stderr = Buffer.from("stderr");
   }
-  const shell = ((strings: TemplateStringsArray) => {
+  const exec = ((strings: TemplateStringsArray) => {
     const command = strings.join("");
     const run = command === "pnpm run check" ? runCheck : runTests;
     const shellPromise = {
@@ -59,11 +59,11 @@ function runtimeWith({
       },
     };
     return shellPromise;
-  }) as unknown as Shell;
+  }) as unknown as Exec;
 
   const factory = {
     ...contextValues,
-    shell,
+    exec,
     agent: async function (
       this: Factory,
       options: Record<string, unknown>,
@@ -86,7 +86,7 @@ function runtimeWith({
       };
     },
     concat: (...parts: string[]) => parts.join("\n"),
-    createShell: () => shell,
+    createExec: () => exec,
     getPwd: async () => ({ hasChanges: Promise.resolve(true) }),
     log: { info: (message: string) => messages.push(message) },
     ShellError: TestShellError,

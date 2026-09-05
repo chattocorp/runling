@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Factory, FactoryAgent, Shell } from "factory";
+import type { Factory, FactoryAgent, Exec } from "factory";
 import { review } from "./review.ts";
 
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -83,18 +83,18 @@ describe("review workflow", () => {
       },
     };
 
-    const shell = ((strings: TemplateStringsArray) => ({
+    const exec = ((strings: TemplateStringsArray) => ({
       async text() {
         return strings.join("").startsWith("git status")
           ? " M src/example.ts\n"
           : "diff --git a/src/example.ts b/src/example.ts";
       },
-    })) as unknown as Shell;
+    })) as unknown as Exec;
     let agentOptions: Record<string, unknown> | undefined;
     const f = {
       cwd: "/project",
       prompt: "Review the current change",
-      shell,
+      exec,
       concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       agent: async (options: Record<string, unknown>) => {
         agentOptions = options;
@@ -178,14 +178,14 @@ describe("review workflow", () => {
       },
     } satisfies FactoryAgent;
 
-    const shell = ((strings: TemplateStringsArray) => ({
+    const exec = ((strings: TemplateStringsArray) => ({
       text: async () =>
         strings.join("").startsWith("git status")
           ? " M src/example.ts\n"
           : "diff --git a/src/example.ts b/src/example.ts",
-    })) as unknown as Shell;
+    })) as unknown as Exec;
     const f = {
-      shell,
+      exec,
       prompt: "Review the current change",
       concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       agent: async () => orchestrator,
@@ -198,9 +198,9 @@ describe("review workflow", () => {
   });
 
   test("returns without creating an agent when there are no changes", async () => {
-    const shell = (() => ({ text: async () => "" })) as unknown as Shell;
+    const exec = (() => ({ text: async () => "" })) as unknown as Exec;
     const f = {
-      shell,
+      exec,
       step: <T>(_name: string, run: () => T) => run(),
       agent: () => {
         throw new Error("agent should not be created");

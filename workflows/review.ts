@@ -31,11 +31,11 @@ export const review = workflow(
     }),
   },
   async (f, input) => {
-    const status = await f.shell`git status --short`.text();
+    const status = await f.exec`git status --short`.text();
     if (status.trim() === "") return { summary: "No changes to review" };
 
     const diff =
-      await f.shell`git diff HEAD --stat --patch --no-ext-diff`.text();
+      await f.exec`git diff HEAD --stat --patch --no-ext-diff`.text();
 
     await using orchestrator = await f.agent({
       model,

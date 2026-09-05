@@ -25,7 +25,8 @@
   },
   "files": [
     "dist",
-    "bin/factory.js"
+    "bin/factory.js",
+    "bin/workflow-loader.js"
   ],
   "bin": {
     "factory": "./bin/factory.js"
@@ -40,14 +41,15 @@
     "@earendil-works/pi-coding-agent": "0.84.4",
     "@earendil-works/pi-tui": "0.84.4",
     "ajv": "^8.20.0",
+    "color-name": "^2.0.0",
+    "execa": "^10.0.1",
     "human-id": "4.2.1",
-    "typebox": "1.3.7",
     "tsx": "^4.20.0",
-    "color-name": "^2.0.0"
+    "typebox": "1.3.7"
   },
   "devDependencies": {
-    "@types/node": "^22",
     "@types/color-name": "^2.0.0",
+    "@types/node": "^22",
     "typescript": "~5.9.3"
   }
 }

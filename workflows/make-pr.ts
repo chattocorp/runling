@@ -48,7 +48,7 @@ export const postReview = (
   result: WorkflowResult,
 ) => f.step("Post review", async () => {
     const body = result.details ?? result.summary;
-    await f.shell`gh pr comment ${pullRequestUrl} --body ${body}`;
+    await f.exec`gh pr comment ${pullRequestUrl} --body ${body}`;
   });
 
 export const createWorktree = (
@@ -58,14 +58,14 @@ export const createWorktree = (
 ) => f.step("Create worktree", async () => {
     // Ask GitHub instead of assuming the default branch is named main.
     const baseBranch = (
-      await f.shell`gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`.text()
+      await f.exec`gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`.text()
     ).trim();
     if (baseBranch === "") {
       throw new Error("GitHub did not report a default branch");
     }
 
-    await f.shell`git fetch origin +refs/heads/${baseBranch}:refs/remotes/origin/${baseBranch}`;
-    await f.shell`git worktree add -b ${branchName} ${worktreePath} origin/${baseBranch}`;
+    await f.exec`git fetch origin +refs/heads/${baseBranch}:refs/remotes/origin/${baseBranch}`;
+    await f.exec`git worktree add -b ${branchName} ${worktreePath} origin/${baseBranch}`;
   });
 
 const makePullRequest = workflow(
@@ -82,7 +82,7 @@ const makePullRequest = workflow(
   },
   async (f, input) => {
     const { cwd } = f;
-    await f.shell`gh auth status`;
+    await f.exec`gh auth status`;
 
     const worktreeId = f.randomId();
     const branchName = `factory/${worktreeId}`;
@@ -95,30 +95,30 @@ const makePullRequest = workflow(
     f.log.info(`Working in ${worktreePath}`);
 
     const worktree = { ...f, cwd: worktreePath, prompt: input };
-    await worktree.shell`pnpm install --frozen-lockfile`;
+    await worktree.exec`pnpm install --frozen-lockfile`;
     const implementationSummary = await implement(worktree, input);
 
     // Review the complete staged change before capturing it in a commit.
-    await worktree.shell`git add --all`;
+    await worktree.exec`git add --all`;
     const reviewResult = await review(worktree, "");
-    await worktree.shell`git commit -m ${implementationSummary}`;
+    await worktree.exec`git commit -m ${implementationSummary}`;
 
     // Describe exactly what will appear in the pull request.
     const committedChange =
-      await worktree.shell`git show --format=fuller --stat --patch --no-ext-diff HEAD`.text();
+      await worktree.exec`git show --format=fuller --stat --patch --no-ext-diff HEAD`.text();
     const pullRequest = await describePullRequest(
       worktree,
       implementationSummary,
       committedChange,
     );
-    await worktree.shell`git push --set-upstream origin ${branchName}`;
+    await worktree.exec`git push --set-upstream origin ${branchName}`;
     const createdPullRequest =
-      await worktree.shell`gh pr create --head ${branchName} --title ${pullRequest.title} --body ${pullRequest.body}`.quiet();
+      await worktree.exec`gh pr create --head ${branchName} --title ${pullRequest.title} --body ${pullRequest.body}`.quiet();
     const pullRequestUrl = createdPullRequest.stdout.toString().trim();
     await postReview(worktree, pullRequestUrl, reviewResult);
 
     // Failed runs intentionally retain their worktree for inspection.
-    await f.shell`git worktree remove ${worktreePath}`;
+    await f.exec`git worktree remove ${worktreePath}`;
 
     return {
       summary: `Opened ${pullRequestUrl}`,

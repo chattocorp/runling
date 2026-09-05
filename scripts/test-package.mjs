@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { resolve, dirname, delimiter } from "node:path";
 import { createServer } from "node:net";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 
 const exec = promisify(execFile);
+// Keep npm and its child executables on the runtime used to launch this test.
+process.env.PATH = `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ""}`;
 const root = resolve(import.meta.dirname, "..");
 const directory = await mkdtemp(resolve(tmpdir(), "factory-consumer-"));
 let server;
@@ -39,14 +41,17 @@ try {
     { cwd: project, maxBuffer: 8 * 1024 * 1024 },
   );
   await writeFile(resolve(project, "message.txt"), "consumer cwd");
-  await writeFile(resolve(project, ".env"), "FACTORY_PACKAGE_TEST_ENV=loaded\n");
+  await writeFile(
+    resolve(project, ".env"),
+    "FACTORY_PACKAGE_TEST_ENV=loaded\n",
+  );
   await writeFile(
     resolve(project, "workflow.ts"),
     `import { Type, workflow } from "factory";
 export default workflow({ name: "Consumer echo", input: Type.Object({ topic: Type.String() }), output: Type.String() }, async (f, input) => {
   return f.step("Echo input", async () => {
     await new Promise(resolve => setTimeout(resolve, 250));
-    const cwd = await f.shell\`cat message.txt\`.text();
+    const cwd = await f.exec\`node -e \${"process.stdout.write(require('node:fs').readFileSync('message.txt', 'utf8'))"}\`.text();
     f.log.info(input.topic);
     return input.topic + ": " + cwd;
   });

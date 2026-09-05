@@ -1,6 +1,11 @@
 import { emitFactoryEvent } from "./events.ts";
 import { log, logCommand } from "./log.ts";
-import { spawn } from "node:child_process";
+import {
+  execa,
+  ExecaError,
+  type Options,
+  type TemplateExpression,
+} from "execa";
 
 const COMMAND_COLOR = "#ae3ec9";
 const COMMAND_PREVIEW_LENGTH = 200;
@@ -10,18 +15,8 @@ export interface ShellOutput {
   stderr: Buffer;
   exitCode: number;
 }
-export class ShellError extends Error implements ShellOutput {
-  constructor(
-    readonly stdout: Buffer,
-    readonly stderr: Buffer,
-    readonly exitCode: number,
-  ) {
-    super(
-      `Command failed with exit code ${exitCode}${stderr.length ? `: ${stderr.toString().trim()}` : ""}`,
-    );
-    this.name = "ShellError";
-  }
-}
+export { ExecaError as ShellError, ExecaError as CommandError };
+type ProcessResult = { stdout?: unknown; stderr?: unknown; exitCode?: number };
 
 type ShellExpression =
   | string
@@ -33,13 +28,15 @@ type ShellExpression =
   | readonly ShellExpression[];
 type ShellArguments = [TemplateStringsArray, ...ShellExpression[]];
 
-/** A configurable, single-execution shell command. Interpolated values are quoted. */
-export class ShellCommand implements PromiseLike<ShellOutput> {
+/** A configurable, single-execution Execa command with buffered output. */
+export class Command implements PromiseLike<ShellOutput> {
   private execution?: Promise<ShellOutput>;
   private directory?: string;
   private silent = true;
   private throwOnError = true;
-  constructor(private readonly command: string) {}
+  constructor(
+    private readonly launch: (options: Options) => PromiseLike<ProcessResult>,
+  ) {}
   cwd(path: string) {
     this.directory = path;
     return this;
@@ -66,32 +63,33 @@ export class ShellCommand implements PromiseLike<ShellOutput> {
     return JSON.parse(await this.text());
   }
   private run(): Promise<ShellOutput> {
-    return (this.execution ??= new Promise((resolve, reject) => {
-      const child = spawn("sh", ["-c", this.command], {
-        cwd: this.directory,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      const stdout: Buffer[] = [],
-        stderr: Buffer[] = [];
-      child.stdout.on("data", (chunk: Buffer) => {
-        stdout.push(chunk);
-        if (!this.silent) process.stdout.write(chunk);
-      });
-      child.stderr.on("data", (chunk: Buffer) => {
-        stderr.push(chunk);
-        if (!this.silent) process.stderr.write(chunk);
-      });
-      child.on("error", reject);
-      child.on("close", (code) => {
-        const output = {
-          stdout: Buffer.concat(stdout),
-          stderr: Buffer.concat(stderr),
-          exitCode: code ?? 1,
+    return (this.execution ??= Promise.resolve().then(async () => {
+      try {
+        const output = await this.launch({
+          cwd: this.directory,
+          encoding: "buffer",
+          stripFinalNewline: false,
+          reject: this.throwOnError,
+          stdin: "ignore",
+          stdout: this.silent ? "pipe" : ["pipe", "inherit"],
+          stderr: this.silent ? "pipe" : ["pipe", "inherit"],
+          preferLocal: true,
+        });
+        return {
+          ...output,
+          stdout: toBuffer(output.stdout),
+          stderr: toBuffer(output.stderr),
+          exitCode: output.exitCode ?? 1,
         };
-        if (output.exitCode !== 0 && this.throwOnError)
-          reject(new ShellError(output.stdout, output.stderr, output.exitCode));
-        else resolve(output);
-      });
+      } catch (error) {
+        if (error instanceof ExecaError) {
+          Object.assign(error, {
+            stdout: toBuffer(error.stdout),
+            stderr: toBuffer(error.stderr),
+          });
+        }
+        throw error;
+      }
     }));
   }
 }
@@ -100,59 +98,99 @@ export interface CreateShellOptions {
   verbose?: boolean;
   cwd?: string;
 }
+export { Command as ShellCommand };
 
 export function createShell(options: CreateShellOptions = {}) {
   return function (this: { cwd?: string } | void, ...args: ShellArguments) {
-    const id = crypto.randomUUID();
-    const startedAt = performance.now();
-    const formattedCommand = formatCommand(...args);
-    emitFactoryEvent({
-      type: "command.started",
-      id,
-      command: formattedCommand,
-    });
-    logCommand(
-      id,
-      `${log.highlight("Running", COMMAND_COLOR)} ${formattedCommand}`,
-    );
     const [strings, ...expressions] = args;
-    const command = new ShellCommand(
-      strings
-        .map(
-          (part, index) =>
-            part +
-            (index < expressions.length
-              ? formatExpression(expressions[index])
-              : ""),
-        )
-        .join(""),
-    ).quiet(!(options.verbose ?? false));
-    const cwd = options.cwd ?? this?.cwd;
-    const configured = cwd === undefined ? command : command.cwd(cwd);
-
-    queueMicrotask(() => {
-      void configured.then(
-        (output) =>
-          emitFactoryEvent({
-            type: "command.finished",
-            id,
-            status: output.exitCode === 0 ? "completed" : "failed",
-            durationMs: performance.now() - startedAt,
-            output: shellOutput(output),
-          }),
-        (error) =>
-          emitFactoryEvent({
-            type: "command.finished",
-            id,
-            status: "failed",
-            durationMs: performance.now() - startedAt,
-            output: shellOutput(error),
-          }),
-      );
-    });
-
-    return configured;
+    const command = strings
+      .map(
+        (part, index) =>
+          part +
+          (index < expressions.length
+            ? formatExpression(expressions[index])
+            : ""),
+      )
+      .join("");
+    return track(
+      new Command((config) => execa("sh", ["-c", command], config)),
+      formatCommand(...args),
+      options,
+      this?.cwd,
+    );
   };
+}
+
+/** Execute a program directly. Execa parses the template without a shell. */
+export function createExec(options: CreateShellOptions = {}) {
+  return function (
+    this: { cwd?: string } | void,
+    strings: TemplateStringsArray,
+    ...expressions: TemplateExpression[]
+  ) {
+    const preview = strings
+      .map(
+        (part, index) =>
+          part +
+          (index < expressions.length
+            ? JSON.stringify(expressions[index])
+            : ""),
+      )
+      .join("");
+    return track(
+      new Command((config) => execa(config)(strings, ...expressions)),
+      truncateCommand(preview),
+      options,
+      this?.cwd,
+    );
+  };
+}
+export type Exec = ReturnType<typeof createExec>;
+export type CreateExecOptions = CreateShellOptions;
+
+function track(
+  command: Command,
+  formattedCommand: string,
+  options: CreateShellOptions,
+  contextCwd?: string,
+) {
+  const id = crypto.randomUUID();
+  const startedAt = performance.now();
+  emitFactoryEvent({
+    type: "command.started",
+    id,
+    command: formattedCommand,
+  });
+  logCommand(
+    id,
+    `${log.highlight("Running", COMMAND_COLOR)} ${formattedCommand}`,
+  );
+  command.quiet(!(options.verbose ?? false));
+  const cwd = options.cwd ?? contextCwd;
+  const configured = cwd === undefined ? command : command.cwd(cwd);
+
+  queueMicrotask(() => {
+    void configured.then(
+      (output) =>
+        emitFactoryEvent({
+          type: "command.finished",
+          id,
+          status: output.exitCode === 0 ? "completed" : "failed",
+          durationMs: performance.now() - startedAt,
+          output: shellOutput(output),
+        }),
+      (error) =>
+        emitFactoryEvent({
+          type: "command.finished",
+          id,
+          status: "failed",
+          durationMs: performance.now() - startedAt,
+          output: shellOutput(error),
+        }),
+    );
+  });
+
+  return configured;
 }
 
 export type Shell = ReturnType<typeof createShell>;
@@ -171,6 +209,10 @@ const shellOutput = (value: unknown): { stdout: string; stderr: string } => {
 
 const bufferText = (value: unknown): string =>
   value instanceof Uint8Array ? new TextDecoder().decode(value) : "";
+const toBuffer = (value: unknown): Buffer =>
+  value instanceof Uint8Array
+    ? Buffer.from(value)
+    : Buffer.from(typeof value === "string" ? value : "");
 
 function formatCommand(...[strings, ...expressions]: ShellArguments) {
   const command = strings
@@ -184,6 +226,11 @@ function formatCommand(...[strings, ...expressions]: ShellArguments) {
     .trim()
     .replaceAll("\n", " ");
 
+  return truncateCommand(command);
+}
+
+function truncateCommand(value: string) {
+  const command = value.trim().replaceAll("\n", " ");
   if (command.length <= COMMAND_PREVIEW_LENGTH) return command;
 
   return `${command.slice(0, COMMAND_PREVIEW_LENGTH)}… (${(command.length - COMMAND_PREVIEW_LENGTH).toLocaleString()} characters omitted)`;

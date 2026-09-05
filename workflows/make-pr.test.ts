@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Factory, Shell, WorkflowResult } from "factory";
+import type { Factory, Exec, WorkflowResult } from "factory";
 import {
   createWorktree,
   describePullRequest,
@@ -9,14 +9,14 @@ import {
 describe("make-pr workflow", () => {
   test("updates the remote default branch and branches the worktree from it", async () => {
     const commands: Array<{ template: string; values: unknown[] }> = [];
-    const shell = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const exec = ((strings: TemplateStringsArray, ...values: unknown[]) => {
       commands.push({ template: strings.join("_argument_"), values });
       return Object.assign(Promise.resolve(), {
         text: async () => "master\n",
       });
-    }) as unknown as Shell;
+    }) as unknown as Exec;
     const f = {
-      shell,
+      exec,
       step: <T>(_label: string, work: () => T) => work(),
     } as unknown as Factory;
 
@@ -109,13 +109,13 @@ describe("make-pr workflow", () => {
   test("posts a workflow review as a pull request comment", async () => {
     let command: TemplateStringsArray | undefined;
     let expressions: unknown[] = [];
-    const shell = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const exec = ((strings: TemplateStringsArray, ...values: unknown[]) => {
       command = strings;
       expressions = values;
       return Promise.resolve();
-    }) as unknown as Shell;
+    }) as unknown as Exec;
     const f = {
-      shell,
+      exec,
       step: <T>(_label: string, work: () => T) => work(),
     } as unknown as Factory;
     const result: WorkflowResult = {
@@ -136,12 +136,12 @@ describe("make-pr workflow", () => {
 
   test("uses the review summary when it has no details", async () => {
     let body: unknown;
-    const shell = ((_strings: TemplateStringsArray, ...values: unknown[]) => {
+    const exec = ((_strings: TemplateStringsArray, ...values: unknown[]) => {
       body = values[1];
       return Promise.resolve();
-    }) as unknown as Shell;
+    }) as unknown as Exec;
     const f = {
-      shell,
+      exec,
       step: <T>(_label: string, work: () => T) => work(),
     } as unknown as Factory;
 

@@ -33,6 +33,10 @@ export { log, type LogLevel } from "./log.ts";
 export { step, type StepWork } from "./step.ts";
 export {
   createShell,
+  createExec,
+  CommandError,
+  type Exec,
+  type CreateExecOptions,
   type CreateShellOptions,
   ShellError,
   type Shell,

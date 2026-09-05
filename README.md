@@ -30,7 +30,8 @@ selection, and outcome handling in the workflow.
 
 Use Node.js 22.18 or later. Factory includes the TypeScript loader and the
 built web UI. You do not need Bun, Vite, or SvelteKit in your project.
-Shell commands use a POSIX `sh` executable, as supplied by macOS and Linux.
+`f.exec` runs programs across platforms without a shell. Explicit `f.shell`
+commands require a POSIX `sh` executable, as supplied by macOS and Linux.
 
 The package name is temporary. Until publication, build and pack this repo:
 
@@ -146,17 +147,29 @@ Each workflow call still runs as a named step, including nested calls.
 The workflow CLI accepts a string. Use a configured webhook or `runWorkflow`
 for object, array, or other JSON inputs.
 
-## Run a shell command
+## Run a command
 
 Use `workflow` to give the workflow a name and TypeBox schemas. Factory checks
 the input before the workflow starts and checks the output before it finishes.
-Use `f.shell` to run a command in the current working directory.
-Interpolated values are quoted as shell arguments. Commands return buffered
+Use `f.exec` to run a program in the current working directory. Execa handles
+process execution without a shell. Interpolated strings and numbers become
+literal arguments; arrays supply multiple arguments. Do not add shell quotes
+around interpolations. Commands return buffered
 `stdout`, `stderr`, and an `exitCode`. Use `.text()` or `.json()` to read stdout,
 `.nothrow()` to inspect a failed command, `.cwd(path)` to set its directory,
-and `.quiet(false)` to stream output. Shell syntax uses POSIX `sh`; Bash-only
-syntax must be run through Bash explicitly. Bun-specific shell objects and
-file-redirection helpers are not supported.
+and `.quiet(false)` to stream output. Nonzero exits throw `CommandError`
+(Execa's error type), unless `.nothrow()` is used. Project-local executables
+in `node_modules/.bin` are available. The program must exist on the target OS.
+
+For pipes, redirects, or shell operators, use `f.shell` explicitly. This also
+uses Execa, but invokes POSIX `sh` and is not a portable alternative to
+`f.exec`. Interpolations are shell-quoted; `{ raw: "..." }` bypasses quoting
+and must never contain untrusted data. `ShellError` is an alias of `CommandError`.
+
+```ts
+const status = await f.exec`git status --short`.text();
+await f.shell`printf hello | tr a-z A-Z`;
+```
 
 ```ts
 import { Type, workflow } from "factory";
@@ -169,7 +182,7 @@ export default workflow(
   },
   async (f, input) => {
     f.log.info(input);
-    await f.shell`npm test`;
+    await f.exec`npm test`;
     return "Tests passed";
   },
 );
@@ -229,7 +242,7 @@ export default workflow(
     });
 
     const firstReport = await agent.run(input);
-    const tests = await f.shell`npm test`.nothrow();
+    const tests = await f.exec`npm test`.nothrow();
 
     if (tests.exitCode === 0) return firstReport.summary;
 
@@ -266,7 +279,7 @@ export default workflow(
           if (event.isError) return;
           if (event.toolName !== "edit" && event.toolName !== "write") return;
 
-          const check = await f.shell`npm run check`.nothrow();
+          const check = await f.exec`npm run check`.nothrow();
           if (check.exitCode === 0) return;
 
           return {

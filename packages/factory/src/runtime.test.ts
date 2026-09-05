@@ -12,6 +12,8 @@ describe("factory", () => {
     expect(f.agent).toBeTypeOf("function");
     expect(f.input).toBeTypeOf("function");
     expect(f.shell).toBeTypeOf("function");
+    expect(f.exec).toBeTypeOf("function");
+    expect(f.createExec).toBeTypeOf("function");
     expect(f.createShell).toBeTypeOf("function");
     expect(f.cwd).toBe("/project");
     expect(f.prompt).toBe("Make the change");

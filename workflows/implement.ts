@@ -12,10 +12,10 @@ const maxValidationFeedbackLength = 18_000;
 const validate = (f: Factory) =>
   f.step("Validate", async () => {
     const check = await f.step("Run checks", () =>
-      f.shell`pnpm run check`.nothrow(),
+      f.exec`pnpm run check`.nothrow(),
     );
     return check.exitCode === 0
-      ? f.step("Run tests", () => f.shell`pnpm test`.nothrow())
+      ? f.step("Run tests", () => f.exec`pnpm test`.nothrow())
       : check;
   });
 

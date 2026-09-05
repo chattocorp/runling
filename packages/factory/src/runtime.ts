@@ -12,7 +12,14 @@ import {
 import { randomId } from "./id.ts";
 import { createInput, type Input, type InputHandler } from "./input.ts";
 import { log } from "./log.ts";
-import { createShell, ShellError, type Shell } from "./shell.ts";
+import {
+  createShell,
+  createExec,
+  CommandError,
+  ShellError,
+  type Shell,
+  type Exec,
+} from "./shell.ts";
 import { step } from "./step.ts";
 import { concat } from "./utils.ts";
 
@@ -27,12 +34,7 @@ export interface CreateFactoryOptions extends FactoryValues {
 }
 
 export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export interface WorkflowResult {
   summary: string;
@@ -73,6 +75,8 @@ const factoryPrimitives = Object.freeze({
   log,
   step,
   createShell,
+  createExec,
+  CommandError,
   ShellError,
   concat,
 });
@@ -83,6 +87,7 @@ export type Factory = FactoryPrimitives &
   FactoryValues & {
     readonly input: Input;
     readonly shell: Shell;
+    readonly exec: Exec;
   };
 
 export function createFactory({
@@ -94,5 +99,6 @@ export function createFactory({
     ...values,
     input: createInput(handleInput),
     shell: createShell({ verbose: values.verbose }),
+    exec: createExec({ verbose: values.verbose }),
   });
 }
