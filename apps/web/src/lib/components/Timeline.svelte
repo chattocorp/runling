@@ -2,6 +2,7 @@
   import { onMount, tick } from "svelte";
   import Usage from "./Usage.svelte";
   import AnsiText from "./AnsiText.svelte";
+  import TimelineMinimap from "./TimelineMinimap.svelte";
   import { duration } from "$lib/runs.ts";
   import { findActivity, type Activity } from "$lib/timeline.ts";
   import {
@@ -30,6 +31,11 @@
   } = $props();
   let board: HTMLDivElement;
   let ruler: HTMLDivElement;
+  let grid: HTMLDivElement;
+  let scrollTop = $state(0);
+  let visibleHeight = $state(1);
+  let contentHeight = $state(1);
+  let rowMetrics = $state<{ top: number; height: number }[]>([]);
   let panel: HTMLElement;
   let expandButton: HTMLButtonElement;
   let manual = $state<TimeWindow | null>(null);
@@ -39,6 +45,12 @@
   let dragging = $state(false);
   let view = $derived(manual ?? fitWindow(elapsed));
   let rows = $derived(flattenActivities(nodes, collapsed));
+  let miniRows = $derived(
+    rows.map(({ node }, index) => ({
+      node,
+      ...(rowMetrics[index] ?? { top: index * 76, height: 76 }),
+    })),
+  );
   let ticks = $derived(timelineTicks(view, plotWidth));
   let cursor = $derived(((elapsed - view.start) / view.span) * 100);
   let zoom = $derived(fitWindow(elapsed).span / view.span);
@@ -99,8 +111,20 @@
   onMount(() => {
     const observer = new ResizeObserver(() => {
       plotWidth = Math.max(1, ruler.clientWidth);
+      visibleHeight = Math.max(1, board.clientHeight - ruler.offsetHeight);
+      contentHeight = Math.max(1, grid.scrollHeight - ruler.offsetHeight);
+      scrollTop = board.scrollTop;
+      const top = grid.getBoundingClientRect().top + ruler.offsetHeight;
+      rowMetrics = [...grid.querySelectorAll<HTMLElement>(".lane")].map(
+        (lane) => ({
+          top: lane.getBoundingClientRect().top - top,
+          height: lane.offsetHeight,
+        }),
+      );
     });
     observer.observe(ruler);
+    observer.observe(board);
+    observer.observe(grid);
     const wheel = (event: WheelEvent) => {
       if (!(event.target instanceof Element) || !event.target.closest(".plot"))
         return;
@@ -150,11 +174,12 @@
     };
     const down = (event: PointerEvent) => {
       if (
-        event.button !== 0 ||
+        (event.button !== 0 && event.button !== 1) ||
         !(event.target instanceof Element) ||
-        !event.target.closest(".plot")
+        (event.button !== 1 && !event.target.closest(".plot"))
       )
         return;
+      if (event.button === 1) event.preventDefault();
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       begin();
     };
@@ -195,8 +220,13 @@
         event.stopPropagation();
       }
     };
+    const preventMiddleDefault = (event: MouseEvent) => {
+      if (event.button === 1) event.preventDefault();
+    };
     board.addEventListener("wheel", wheel, { passive: false });
     board.addEventListener("pointerdown", down);
+    board.addEventListener("mousedown", preventMiddleDefault);
+    board.addEventListener("auxclick", preventMiddleDefault);
     board.addEventListener("click", click, true);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -205,6 +235,8 @@
       observer.disconnect();
       board.removeEventListener("wheel", wheel);
       board.removeEventListener("pointerdown", down);
+      board.removeEventListener("mousedown", preventMiddleDefault);
+      board.removeEventListener("auxclick", preventMiddleDefault);
       board.removeEventListener("click", click, true);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -257,119 +289,135 @@
       >
     </div>
   </div>
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (The scrollable chart is focusable for its documented pan and zoom keyboard controls.) -->
-  <div
-    class="board"
-    class:dragging
-    bind:this={board}
-    tabindex="0"
-    role="region"
-    aria-roledescription="Interactive timeline"
-    aria-label="Timeline chart. Drag to pan, scroll to zoom. Arrow keys pan, plus and minus zoom, F fits the timeline."
-    onkeydown={keyboard}
-  >
-    <div class="grid" style:--row-count={rows.length}>
-      <div class="label-heading">Activity <span>{rows.length}</span></div>
-      <div class="ruler plot" bind:this={ruler}>
-        {#each ticks as tick (tick)}
-          <span
-            class="tick"
-            style:left={`${((tick - view.start) / view.span) * 100}%`}
-            >{tickLabel(
-              tick,
-              ticks.length > 1 ? ticks[1]! - ticks[0]! : view.span / 5,
-            )}</span
-          >
-        {/each}
-        {#if cursor >= 0 && cursor <= 100}
-          <span
-            class="cursor-label"
-            class:live={running}
-            style:left={`${cursor}%`}>{running ? "Now" : "End"}</span
-          >
-        {/if}
-      </div>
-      {#each rows as { node, depth } (node.id)}
-        {@const end =
-          node.startedAt +
-          (node.durationMs ?? Math.max(0, elapsed - node.startedAt))}
-        {@const bar = barPosition(node.startedAt, end, view)}
-        <div
-          class="label"
-          class:chosen={selected === node.id}
-          style:padding-left={`${8 + Math.min(depth, 6) * 13}px`}
-        >
-          {#if node.children.length}
-            <button
-              class="toggle"
-              aria-label={`${collapsed.has(node.id) ? "Expand" : "Collapse"} ${node.label}`}
-              aria-expanded={!collapsed.has(node.id)}
-              onclick={() => toggle(node.id)}
-              >{collapsed.has(node.id) ? "▸" : "▾"}</button
-            >
-          {:else}<span class="leaf" aria-hidden="true"
-              >{node.kind === "agent"
-                ? "◈"
-                : node.kind === "command"
-                  ? "›_"
-                  : "◇"}</span
-            >{/if}
-          <button
-            class="label-select"
-            onclick={() => onselect(node.id)}
-            aria-pressed={selected === node.id}
-            title={`${node.label} (${node.kind}, ${node.status})`}
-            ><strong>{node.label}</strong><small>{node.kind}</small>
-            {#if node.usage}<Usage usage={node.usage} />{/if}</button
-          >
-        </div>
-        <div class="lane plot" class:chosen={selected === node.id}>
-          {#each ticks as tick (tick)}<span
-              class="gridline"
+  <div class="chart">
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (The scrollable chart is focusable for its documented pan and zoom keyboard controls.) -->
+    <div
+      class="board"
+      class:dragging
+      bind:this={board}
+      tabindex="0"
+      role="region"
+      aria-roledescription="Interactive timeline"
+      aria-label="Timeline chart. Drag to pan, scroll to zoom. Arrow keys pan, plus and minus zoom, F fits the timeline."
+      onkeydown={keyboard}
+      onscroll={() => (scrollTop = board.scrollTop)}
+    >
+      <div class="grid" bind:this={grid} style:--row-count={rows.length}>
+        <div class="label-heading">Activity <span>{rows.length}</span></div>
+        <div class="ruler plot" bind:this={ruler}>
+          {#each ticks as tick (tick)}
+            <span
+              class="tick"
               style:left={`${((tick - view.start) / view.span) * 100}%`}
-              aria-hidden="true"
-            ></span>{/each}
-          {#if cursor >= 0 && cursor <= 100}<span
-              class="playhead"
-              class:live={running}
-              style:left={`${cursor}%`}
-              aria-hidden="true"
-            ></span>{/if}
-          {#if bar}
-            <button
-              class="bar"
-              class:running={node.status === "running"}
-              class:failed={node.status === "failed" ||
-                node.status === "blocked"}
-              class:interrupted={node.status === "interrupted"}
-              class:selected={selected === node.id}
-              class:clipped-start={bar.clippedStart}
-              class:clipped-end={bar.clippedEnd}
-              data-kind={node.kind}
-              style:left={`${bar.left}%`}
-              style:width={`max(6px, ${bar.width}%)`}
-              aria-label={`${node.label}, ${node.status}, starts at ${duration(node.startedAt)}, duration ${duration(end - node.startedAt)}`}
-              aria-pressed={selected === node.id}
-              onclick={() => onselect(node.id)}
-              title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}`}
+              >{tickLabel(
+                tick,
+                ticks.length > 1 ? ticks[1]! - ticks[0]! : view.span / 5,
+              )}</span
             >
-              {#if bar.clippedStart}
-                <span class="continuation start" aria-hidden="true">‹‹</span>
-              {/if}
-              <span class="bar-label">{bar.clippedStart ? "" : node.label}</span
-              >
-              {#if !bar.clippedEnd}
-                <span class="bar-duration"
-                  >{duration(end - node.startedAt)}</span
-                >
-              {:else}
-                <span class="continuation end" aria-hidden="true">››</span>
-              {/if}
-            </button>
+          {/each}
+          {#if cursor >= 0 && cursor <= 100}
+            <span
+              class="cursor-label"
+              class:live={running}
+              style:left={`${cursor}%`}>{running ? "Now" : "End"}</span
+            >
           {/if}
         </div>
-      {/each}
+        {#each rows as { node, depth } (node.id)}
+          {@const end =
+            node.startedAt +
+            (node.durationMs ?? Math.max(0, elapsed - node.startedAt))}
+          {@const bar = barPosition(node.startedAt, end, view)}
+          <div
+            class="label"
+            class:chosen={selected === node.id}
+            style:padding-left={`${8 + Math.min(depth, 6) * 13}px`}
+          >
+            {#if node.children.length}
+              <button
+                class="toggle"
+                aria-label={`${collapsed.has(node.id) ? "Expand" : "Collapse"} ${node.label}`}
+                aria-expanded={!collapsed.has(node.id)}
+                onclick={() => toggle(node.id)}
+                >{collapsed.has(node.id) ? "▸" : "▾"}</button
+              >
+            {:else}<span class="leaf" aria-hidden="true"
+                >{node.kind === "agent"
+                  ? "◈"
+                  : node.kind === "command"
+                    ? "›_"
+                    : "◇"}</span
+              >{/if}
+            <button
+              class="label-select"
+              onclick={() => onselect(node.id)}
+              aria-pressed={selected === node.id}
+              title={`${node.label} (${node.kind}, ${node.status})`}
+              ><strong>{node.label}</strong><small>{node.kind}</small>
+              {#if node.usage}<Usage usage={node.usage} />{/if}</button
+            >
+          </div>
+          <div class="lane plot" class:chosen={selected === node.id}>
+            {#each ticks as tick (tick)}<span
+                class="gridline"
+                style:left={`${((tick - view.start) / view.span) * 100}%`}
+                aria-hidden="true"
+              ></span>{/each}
+            {#if cursor >= 0 && cursor <= 100}<span
+                class="playhead"
+                class:live={running}
+                style:left={`${cursor}%`}
+                aria-hidden="true"
+              ></span>{/if}
+            {#if bar}
+              <button
+                class="bar"
+                class:running={node.status === "running"}
+                class:failed={node.status === "failed" ||
+                  node.status === "blocked"}
+                class:interrupted={node.status === "interrupted"}
+                class:selected={selected === node.id}
+                class:clipped-start={bar.clippedStart}
+                class:clipped-end={bar.clippedEnd}
+                data-kind={node.kind}
+                style:left={`${bar.left}%`}
+                style:width={`max(6px, ${bar.width}%)`}
+                aria-label={`${node.label}, ${node.status}, starts at ${duration(node.startedAt)}, duration ${duration(end - node.startedAt)}`}
+                aria-pressed={selected === node.id}
+                onclick={() => onselect(node.id)}
+                title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}`}
+              >
+                {#if bar.clippedStart}
+                  <span class="continuation start" aria-hidden="true">‹‹</span>
+                {/if}
+                <span class="bar-label"
+                  >{bar.clippedStart ? "" : node.label}</span
+                >
+                {#if !bar.clippedEnd}
+                  <span class="bar-duration"
+                    >{duration(end - node.startedAt)}</span
+                  >
+                {:else}
+                  <span class="continuation end" aria-hidden="true">››</span>
+                {/if}
+              </button>
+            {/if}
+          </div>
+        {/each}
+      </div>
     </div>
+    <TimelineMinimap
+      rows={miniRows}
+      vertical={{ start: scrollTop, span: visibleHeight, total: contentHeight }}
+      {view}
+      {elapsed}
+      {selected}
+      onchange={(next, top) => {
+        manual = next;
+        board.scrollTop = top;
+      }}
+      onfit={fit}
+    />
   </div>
   {#if expanded && inspected}
     <div class="expanded-detail">
@@ -472,7 +520,15 @@
   }
   .expanded .board {
     max-height: none;
+    height: 100%;
+  }
+  .chart {
+    position: relative;
+    min-height: 0;
+  }
+  .expanded .chart {
     flex: 1;
+    min-height: 0;
   }
   .grid {
     display: grid;
