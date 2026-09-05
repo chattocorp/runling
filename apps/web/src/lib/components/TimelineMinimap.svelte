@@ -3,6 +3,7 @@
   import { zoomWindow, type TimeWindow } from "$lib/timeline-layout.ts";
   import { overviewSpan, moveOverview } from "$lib/minimap.ts";
   import { duration } from "$lib/runs.ts";
+  import { middleDrag } from "$lib/middle-drag.ts";
   let {
     rows,
     view,
@@ -21,6 +22,40 @@
     onfit: () => void;
   } = $props();
   let collapsed = $state(false);
+  let middleDragging = $state(false);
+  function attachMiddleDrag(element: HTMLElement) {
+    return middleDrag(
+      element,
+      () => {
+        const rect = element.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const initial = { ...view };
+        const initialTop = top;
+        const horizontalTotal = total;
+        const verticalTotal = axis.total;
+        const height = visible;
+        middleDragging = true;
+        return (dx, dy) =>
+          onchange(
+            moveOverview(
+              initial,
+              horizontalTotal,
+              initial.start + (dx / rect.width) * horizontalTotal,
+              0,
+            ),
+            moveOverview(
+              { start: initialTop, span: height },
+              verticalTotal,
+              initialTop + (dy / rect.height) * verticalTotal,
+              0,
+            ).start,
+          );
+      },
+      () => {
+        middleDragging = false;
+      },
+    );
+  }
   let gesture = $state<{
     id: number;
     rect: DOMRect;
@@ -38,6 +73,7 @@
   );
 
   function down(event: PointerEvent) {
+    if (event.pointerType === "mouse" && event.button === 1) return;
     if ((event.button !== 0 && event.button !== 1) || gesture) return;
     event.preventDefault();
     const element = event.currentTarget as HTMLElement;
@@ -138,7 +174,8 @@
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (Two-dimensional overview supports pointer and keyboard navigation.) -->
     <div
       class="map"
-      class:dragging={!!gesture}
+      class:dragging={!!gesture || middleDragging}
+      {@attach attachMiddleDrag}
       role="region"
       tabindex="0"
       aria-label={`Timeline minimap, ${duration(view.start)} to ${duration(view.start + view.span)}. Arrow keys pan in both directions; plus and minus zoom; F fits time.`}

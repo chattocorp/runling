@@ -3,6 +3,7 @@
   import Usage from "./Usage.svelte";
   import AnsiText from "./AnsiText.svelte";
   import TimelineMinimap from "./TimelineMinimap.svelte";
+  import { middleDrag } from "$lib/middle-drag.ts";
   import { duration } from "$lib/runs.ts";
   import { findActivity, type Activity } from "$lib/timeline.ts";
   import {
@@ -173,6 +174,7 @@
       gesture = { ...center(), view: { ...view }, scroll: board.scrollTop };
     };
     const down = (event: PointerEvent) => {
+      if (event.pointerType === "mouse" && event.button === 1) return;
       if (
         (event.button !== 0 && event.button !== 1) ||
         !(event.target instanceof Element) ||
@@ -220,23 +222,34 @@
         event.stopPropagation();
       }
     };
-    const preventMiddleDefault = (event: MouseEvent) => {
-      if (event.button === 1) event.preventDefault();
-    };
+    const stopMiddleDrag = middleDrag(
+      board,
+      () => {
+        const initial = { ...view };
+        const scroll = board.scrollTop;
+        const width = plotWidth;
+        dragging = true;
+        return (dx, dy) => {
+          manual = panWindow(initial, (-dx / width) * initial.span);
+          board.scrollTop = scroll - dy;
+        };
+      },
+      () => {
+        dragging = false;
+        suppressUntil = performance.now() + 200;
+      },
+    );
     board.addEventListener("wheel", wheel, { passive: false });
     board.addEventListener("pointerdown", down);
-    board.addEventListener("mousedown", preventMiddleDefault);
-    board.addEventListener("auxclick", preventMiddleDefault);
     board.addEventListener("click", click, true);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
     return () => {
       observer.disconnect();
+      stopMiddleDrag();
       board.removeEventListener("wheel", wheel);
       board.removeEventListener("pointerdown", down);
-      board.removeEventListener("mousedown", preventMiddleDefault);
-      board.removeEventListener("auxclick", preventMiddleDefault);
       board.removeEventListener("click", click, true);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
