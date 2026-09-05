@@ -60,7 +60,7 @@ export function dragRowHeight(initial: number, dy: number): number {
     24,
     Math.min(
       100,
-      initial * Math.exp(-Math.max(-1000, Math.min(1000, dy)) * 0.006),
+      initial * Math.exp(Math.max(-1000, Math.min(1000, dy)) * 0.006),
     ),
   );
 }

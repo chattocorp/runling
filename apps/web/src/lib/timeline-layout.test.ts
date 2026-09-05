@@ -13,12 +13,12 @@ import {
 } from "./timeline-layout.ts";
 import type { Activity } from "./timeline.ts";
 
-test("middle zoom enlarges rows as time zooms in and respects row limits", () => {
-  expect(dragRowHeight(48, -80)).toBeGreaterThan(48);
-  expect(dragRowHeight(48, 80)).toBeLessThan(48);
+test("middle drag down enlarges rows, up shrinks them, and respects row limits", () => {
+  expect(dragRowHeight(48, 80)).toBeGreaterThan(48);
+  expect(dragRowHeight(48, -80)).toBeLessThan(48);
   expect(dragRowHeight(48, 0)).toBe(48);
-  expect(dragRowHeight(48, -1000)).toBe(100);
-  expect(dragRowHeight(48, 1000)).toBe(24);
+  expect(dragRowHeight(48, 1000)).toBe(100);
+  expect(dragRowHeight(48, -1000)).toBe(24);
 });
 
 test("signed drag delta zooms time around its anchor", () => {
