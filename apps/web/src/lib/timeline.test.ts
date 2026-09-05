@@ -2,6 +2,61 @@ import { expect, test } from "vitest";
 import { buildTimeline } from "./timeline.ts";
 import type { FactoryEvent } from "factory";
 
+test("uses formatted logs once without deduplicating genuine repeated messages", () => {
+  const events: FactoryEvent[] = [
+    {
+      type: "agent.started",
+      agentId: "a",
+      model: "model",
+      color: "blue",
+      timestamp: 0,
+    },
+  ];
+  const message = "\u001b[33m[a]\u001b[0m Reading file.ts";
+  for (let i = 0; i < 2; i++) {
+    events.push(
+      {
+        type: "agent.action",
+        agentId: "a",
+        action: "Reading file.ts",
+        timestamp: i * 2 + 1,
+      },
+      {
+        type: "log",
+        source: "agent",
+        sourceId: "a",
+        message,
+        level: "info",
+        depth: 0,
+        color: "blue",
+        timestamp: i * 2 + 2,
+      },
+    );
+  }
+  const node = buildTimeline(events, "running")[0]!;
+  expect(node.logs).toEqual([message, message]);
+  expect(node.preview).toBe("Reading file.ts");
+  // A later invocation of the same agent can still have action-only history.
+  events.push(
+    {
+      type: "agent.started",
+      agentId: "a",
+      model: "model",
+      color: "blue",
+      timestamp: 5,
+    },
+    {
+      type: "agent.action",
+      agentId: "a",
+      action: "Legacy message",
+      timestamp: 6,
+    },
+  );
+  expect(buildTimeline(events, "completed")[1]?.logs).toEqual([
+    "Legacy message",
+  ]);
+});
+
 test("shows legacy tool actions without letting debug or token summaries replace them", () => {
   const events: FactoryEvent[] = [
     {

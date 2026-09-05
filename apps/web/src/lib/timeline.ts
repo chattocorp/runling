@@ -23,6 +23,7 @@ export function buildTimeline(
   const nodes = new Map<string, Activity>();
   const agents = new Map<string, string>();
   const progressAgents = new Set<string>();
+  const actionLogs = new Map<string, string[]>();
   const roots: Activity[] = [];
   const add = (node: Activity) => {
     nodes.set(node.id, node);
@@ -86,7 +87,9 @@ export function buildTimeline(
     if (event.type === "agent.action") {
       const node = nodes.get(agents.get(event.agentId) ?? "");
       if (node) {
-        node.logs.push(event.action);
+        const actions = actionLogs.get(node.id) ?? [];
+        actions.push(event.action);
+        actionLogs.set(node.id, actions);
         // Old journals and already-running servers have no progress events.
         if (
           !progressAgents.has(node.id) &&
@@ -107,6 +110,11 @@ export function buildTimeline(
       );
       node?.logs.push(event.message);
     }
+  }
+  // Prefer formatted log events. Older activity instances may only have actions.
+  for (const [id, actions] of actionLogs) {
+    const node = nodes.get(id)!;
+    if (!node.logs.length) node.logs = actions;
   }
   if (runStatus !== "running") {
     for (const node of nodes.values()) {
