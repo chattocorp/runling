@@ -47,6 +47,10 @@ describe("GitHub Actions test workflow", () => {
     expect(steps?.[setupIndex]?.with?.["node-version"]).toBe(nodeVersion);
     expect(installIndex).toBeGreaterThan(setupIndex);
     expect(testIndex).toBeGreaterThan(installIndex);
-    expect(steps?.some((step) => step.run === "pnpm test:package")).toBe(true);
+    expect(Object.keys(workflow.jobs ?? {})).toEqual(["test"]);
+    expect(steps?.flatMap((step) => step.run ? [step.run] : [])).toEqual([
+      "pnpm install --frozen-lockfile",
+      "pnpm test",
+    ]);
   });
 });

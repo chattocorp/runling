@@ -29,8 +29,8 @@ repository's Node 22.18.0 baseline. See [npm's trusted-publishing documentation]
 ## Test the setup without publishing
 
 In GitHub Actions, select **Release → Run workflow** on `main`. This runs the
-Linux checks, Windows execution tests, and clean-install smoke test. The
-`runling-package` artifact contains the tested tarball. Manual runs never publish.
+build, `pnpm test`, and packaging on Linux. The
+`runling-package` artifact contains the release tarball. Manual runs never publish.
 This verifies packaging, not npm authentication; OIDC authentication happens
 only during publication.
 
@@ -61,10 +61,15 @@ See the [release-please configuration documentation](https://github.com/googleap
 
 The workflow checks that the release tag matches the package version. It checks
 the npm registry for both published versions and historical timestamps. Registry
-failures stop publication. It then builds the package, runs type checks and
-tests, and installs the tarball in a clean npm project. Publication waits for
-both Linux and Windows jobs. It publishes that exact tested tarball with
+failures stop publication. It then builds the package, runs `pnpm test`, and
+packs the release tarball. Publication waits for the package job.
+It publishes that exact tarball with
 provenance and no package scripts.
+
+Regular CI runs only `pnpm test` after dependency setup, on Linux.
+That command builds the framework needed by the CLI tests, then runs Vitest.
+Type checks and the clean-install smoke test remain available as local commands
+(`pnpm check` and `pnpm test:package`), but are not CI gates.
 
 The jobs use the `release_created` output, not a second tag-triggered workflow.
 Tags created with `GITHUB_TOKEN` do not trigger another workflow. For the same

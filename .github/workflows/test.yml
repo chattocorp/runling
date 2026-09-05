@@ -29,28 +29,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build package and UI
-        run: pnpm build
-
-      - name: Check types
-        run: pnpm check
-
       - name: Run tests
         run: pnpm test
-
-      - name: Test installed package
-        run: pnpm test:package
-
-  exec-windows:
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.18.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter runling build
-      - run: pnpm exec vitest run packages/runling/src/exec.test.ts

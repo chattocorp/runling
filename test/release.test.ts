@@ -27,7 +27,8 @@ test("publishes only tested tag artifacts with a dedicated OIDC permission", asy
   expect(workflow.on.push).toEqual({ branches: ["main"] });
   expect(workflow.on).toHaveProperty("workflow_dispatch");
   expect(workflow.permissions).toEqual({ contents: "read" });
-  expect(workflow.jobs.publish.needs).toEqual(["release", "package", "windows"]);
+  expect(workflow.jobs.publish.needs).toEqual(["release", "package"]);
+  expect(Object.keys(workflow.jobs)).toEqual(["release", "package", "publish"]);
   expect(workflow.jobs.publish.if).toContain("github.event_name == 'push'");
   expect(workflow.jobs.publish.if).toContain(
     "needs.release.outputs.created == 'true'",
@@ -43,7 +44,7 @@ test("publishes only tested tag artifacts with a dedicated OIDC permission", asy
   expect(workflow.jobs.release.outputs.tag).toBe(
     "${{ steps.release.outputs.tag_name }}",
   );
-  for (const name of ["package", "windows"]) {
+  for (const name of ["package"]) {
     const job = workflow.jobs[name];
     expect(job.needs).toBe("release");
     expect(job.if).toContain("always()");
@@ -62,8 +63,11 @@ test("publishes only tested tag artifacts with a dedicated OIDC permission", asy
     ),
   ).toBe(true);
   expect(
-    steps.some((s: { run?: string }) => s.run === "pnpm test:package"),
+    steps.some((s: { run?: string }) => s.run === "pnpm test"),
   ).toBe(true);
+  expect(steps.some((s: { run?: string }) => s.run === "pnpm check" || s.run === "pnpm test:package")).toBe(false);
+  expect(steps.some((s: { run?: string }) => s.run?.includes("npm pack --pack-destination"))).toBe(true);
+  expect(workflow.jobs.publish.steps.at(-1).run).toContain("packages=(./release/*.tgz)");
   expect(workflow.jobs.publish.steps.at(-1).run).toContain("--ignore-scripts");
   expect(workflow.jobs.publish.steps.at(-1).run).toContain(
     'npm publish "${packages[0]}"',

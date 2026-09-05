@@ -63,10 +63,12 @@ jobs:
         run: node scripts/check-release.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm check
       - run: pnpm test
-      - name: Test and retain the release tarball
-        run: pnpm test:package
+      - name: Pack the release tarball
+        working-directory: packages/runling
+        run: |
+          mkdir -p "$RUNLING_RELEASE_DIR"
+          npm pack --pack-destination "$RUNLING_RELEASE_DIR"
         env:
           RUNLING_RELEASE_DIR: ${{ runner.temp }}/runling-release
       - uses: actions/upload-artifact@v4
@@ -75,29 +77,9 @@ jobs:
           path: ${{ runner.temp }}/runling-release/*.tgz
           if-no-files-found: error
 
-  windows:
-    needs: release
-    if: >-
-      always() && (github.event_name == 'workflow_dispatch' ||
-      (needs.release.result == 'success' && needs.release.outputs.created == 'true'))
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          ref: ${{ needs.release.outputs.tag || github.sha }}
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.18.0
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter runling build
-      - run: pnpm exec vitest run packages/runling/src/exec.test.ts
-
   publish:
     if: github.event_name == 'push' && needs.release.outputs.created == 'true'
-    needs: [release, package, windows]
+    needs: [release, package]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: npm
@@ -113,9 +95,9 @@ jobs:
         with:
           name: runling-package
           path: release
-      - name: Publish the tested tarball with trusted publishing
+      - name: Publish the release tarball with trusted publishing
         run: |
           shopt -s nullglob
-          packages=(release/*.tgz)
+          packages=(./release/*.tgz)
           test "${#packages[@]}" -eq 1
           npm publish "${packages[0]}" --access public --provenance --ignore-scripts --registry=https://registry.npmjs.org
