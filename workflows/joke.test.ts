@@ -33,7 +33,14 @@ describe("joke workflow", () => {
       "# Joke\n\nTypeScript walked into a bar, but JavaScript let it in anyway.",
     );
     expect(questions).toEqual(["What should the joke be about?"]);
-    expect(steps).toEqual(["Tell a joke", "Write joke"]);
+    expect(steps).toEqual(["Tell a joke", "Write joke", "Review joke for funniness"]);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("TypeScript walked into a bar, but JavaScript let it in anyway.");
+    expect(options[1]).toMatchObject({
+      model: "openai-codex/gpt-5.6-sol",
+      thinkingLevel: "low",
+      tools: [],
+    });
     expect(prompts[0]).toContain('"TypeScript"');
     expect(options[0]).toMatchObject({
       model: "openai-codex/gpt-5.6-sol",
@@ -66,5 +73,7 @@ describe("joke workflow", () => {
 
     expect(askedForInput).toBe(false);
     expect(prompts[0]).toContain('"webhooks"');
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain('"A webhook joke"');
   });
 });

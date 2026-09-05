@@ -1,0 +1,125 @@
+import { expect, test } from "bun:test";
+import {
+  barPosition,
+  fitWindow,
+  flattenActivities,
+  panWindow,
+  tickLabel,
+  timelineTicks,
+  zoomWindow,
+} from "./timeline-layout.ts";
+import type { Activity } from "./timeline.ts";
+
+test("fit includes the full run and keeps its scale between growth boundaries", () => {
+  expect(fitWindow(0).span).toBeGreaterThan(0);
+  expect(fitWindow(1200)).toEqual(fitWindow(1500));
+  for (const elapsed of [0, 5, 90, 1000, 12345, 3600000]) {
+    expect(fitWindow(elapsed).span).toBeGreaterThan(elapsed);
+  }
+});
+
+test("zoom anchors to the pointer and pan preserves scale", () => {
+  const view = { start: 1000, span: 10000 };
+  const next = zoomWindow(view, 0.5, 0.3);
+  expect(next.start + next.span * 0.3).toBe(view.start + view.span * 0.3);
+  expect(next.span).toBe(5000);
+  expect(panWindow(next, 750)).toEqual({ start: next.start + 750, span: 5000 });
+  expect(panWindow(view, -10000).start).toBe(0);
+  expect(zoomWindow(view, 0.00000001).span).toBeGreaterThan(0);
+});
+
+test("manual windows and completed bar positions do not depend on the live clock", () => {
+  const manual = zoomWindow(fitWindow(1500), 0.5);
+  const before = barPosition(500, 750, manual);
+  fitWindow(30000);
+  expect(barPosition(500, 750, manual)).toEqual(before);
+});
+
+test("clips partially visible bars and excludes offscreen activities", () => {
+  const view = { start: 100, span: 100 };
+  expect(barPosition(50, 150, view)).toEqual({
+    left: 0,
+    width: 50,
+    clippedStart: true,
+    clippedEnd: false,
+  });
+  expect(barPosition(150, 250, view)).toEqual({
+    left: 50,
+    width: 50,
+    clippedStart: false,
+    clippedEnd: true,
+  });
+  expect(barPosition(0, 90, view)).toBeNull();
+  expect(barPosition(201, 250, view)).toBeNull();
+  expect(barPosition(150, 150, view)).toEqual({
+    left: 50,
+    width: 0,
+    clippedStart: false,
+    clippedEnd: false,
+  });
+});
+
+test("distinguishes viewport cuts from actual endpoints when zoomed in", () => {
+  const view = { start: 2500, span: 100 };
+  expect(barPosition(0, 4300, view)).toEqual({
+    left: 0,
+    width: 100,
+    clippedStart: true,
+    clippedEnd: true,
+  });
+  expect(barPosition(2500, 2600, view)).toEqual({
+    left: 0,
+    width: 100,
+    clippedStart: false,
+    clippedEnd: false,
+  });
+  expect(barPosition(0, 4300, fitWindow(4300))).toMatchObject({
+    clippedStart: false,
+    clippedEnd: false,
+  });
+});
+
+test("ticks remain readable and bounded at different zoom levels", () => {
+  for (const view of [
+    { start: 0, span: 1 },
+    { start: 2300, span: 10000 },
+    { start: 0, span: 1000000 },
+  ]) {
+    const ticks = timelineTicks(view, 600);
+    expect(ticks.length).toBeGreaterThan(1);
+    expect(ticks.length).toBeLessThan(12);
+    expect(
+      ticks.every(
+        (tick) => tick >= view.start && tick <= view.start + view.span,
+      ),
+    ).toBe(true);
+  }
+  expect(tickLabel(1200.2, 0.2)).toBe("1.2002 s");
+  expect(tickLabel(0.2, 0.2)).toBe("0.2 ms");
+});
+
+test("collapsing a parent hides descendants without changing sibling order", () => {
+  const node = (id: string, children: Activity[] = []): Activity => ({
+    id,
+    label: id,
+    kind: "step",
+    status: "completed",
+    startedAt: 0,
+    logs: [],
+    children,
+  });
+  const roots = [node("parent", [node("child")]), node("sibling")];
+  expect(
+    flattenActivities(roots, new Set()).map(({ node, depth }) => [
+      node.id,
+      depth,
+    ]),
+  ).toEqual([
+    ["parent", 0],
+    ["child", 1],
+    ["sibling", 0],
+  ]);
+  expect(
+    flattenActivities(roots, new Set(["parent"])).map(({ node }) => node.id),
+  ).toEqual(["parent", "sibling"]);
+});

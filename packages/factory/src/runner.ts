@@ -23,6 +23,7 @@ import {
   getRecordedTokenUsage,
   resetTokenUsage,
   totalTokens,
+  withTokenUsage,
 } from "./usage.ts";
 
 export function formatDuration(ms: number): string {
@@ -259,6 +260,12 @@ interface ExecutionHost {
 }
 
 async function captureExecution<Output>(
+  run: () => Promise<Output> | Output,
+): Promise<WorkflowExecution<Awaited<Output>>> {
+  return withTokenUsage(() => captureExecutionInContext(run));
+}
+
+async function captureExecutionInContext<Output>(
   run: () => Promise<Output> | Output,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
   resetTokenUsage();

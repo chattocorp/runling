@@ -259,6 +259,44 @@ schemas:
 curl http://localhost:5173/api/webhooks/joke
 ```
 
+### Use the run console
+
+Open the web app to see the configured webhooks and their workflows. Use
+**Copy URL** to copy an endpoint with the current browser origin. Use **Run**
+to edit a sample JSON request, inspect the schemas, and start a workflow.
+The editor provides a starting point; the server validates each request.
+
+The console lists the latest 100 runs. Select a run to see its nested timeline,
+input, output, and logs. The horizontal timeline places activity bars on a
+shared time axis, with nested labels on the left. It fits the full run by
+default. Scroll or pinch to zoom, drag to pan, or use Shift+scroll to pan.
+The zoom buttons use the center of the view; wheel zoom uses the pointer.
+Use **Fit timeline** to return to the full run, or expand the chart for more
+space. Once you zoom or pan, live updates preserve your chosen time window.
+With the chart focused, use arrow keys to pan, plus/minus to zoom, and F to fit.
+Expand or collapse steps, then select a bar to inspect its logs and command output. Updates
+arrive through Server-Sent Events. The connection restores a snapshot after
+a disconnect. Browser-started runs continue if you close the page.
+
+The web server records runs in `.factory/runs/<run-id>.jsonl`, relative to
+the workflow working directory. Each file contains the validated workflow
+input, events, and final result. The directory is excluded from Git. History
+includes runs started by both the console and webhook requests. Runs started
+with the `factory` CLI are not recorded here.
+
+On restart, the server restores history and marks unfinished runs as
+interrupted. It does not resume them. Use one server process per history
+directory. History has no automatic retention limit; files can contain
+request values, agent logs, and command output. Keep this console local to
+your development environment; it does not provide authentication.
+
+The console uses `POST /api/runs/start/:name` to start a run and receive
+`202 { "id": "..." }`. `GET /api/runs/:id` returns its stored state.
+`GET /api/runs/events` streams the recent run list, and
+`GET /api/runs/:id/events` streams a snapshot followed by new records.
+The existing `POST /api/webhooks/:name` endpoint still waits for completion
+and returns the workflow output.
+
 Build and start the production server with Bun:
 
 ```bash

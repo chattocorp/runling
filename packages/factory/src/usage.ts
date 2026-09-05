@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { emitFactoryEvent } from "./events.ts";
 
 export interface TokenUsage {
@@ -87,10 +88,15 @@ const readCost = (cost: TokenUsageInput["cost"]): number | undefined => {
 };
 
 let recordedUsage = emptyTokenUsage();
+const executionUsage = new AsyncLocalStorage<TokenUsage>();
+
+/** Keep token totals local to one execution, including its parallel agents. */
+export const withTokenUsage = <T>(work: () => T): T =>
+  executionUsage.run(emptyTokenUsage(), work);
 
 /** Add one agent interaction's usage to the workflow-wide totals. */
 export function recordTokenUsage(usage: TokenUsageInput): void {
-  accumulateTokenUsage(recordedUsage, usage);
+  accumulateTokenUsage(executionUsage.getStore() ?? recordedUsage, usage);
   emitFactoryEvent({
     type: "usage.updated",
     usage: getRecordedTokenUsage(),
@@ -99,10 +105,16 @@ export function recordTokenUsage(usage: TokenUsageInput): void {
 
 /** Workflow-wide token usage accumulated via `recordTokenUsage`. */
 export function getRecordedTokenUsage(): TokenUsage {
-  return { ...recordedUsage };
+  return { ...(executionUsage.getStore() ?? recordedUsage) };
 }
 
 /** Reset workflow-wide totals, e.g. at the start of a workflow execution. */
 export function resetTokenUsage(): void {
-  recordedUsage = emptyTokenUsage();
+  const current = executionUsage.getStore();
+  if (current) {
+    Object.assign(current, emptyTokenUsage());
+    delete current.cost;
+  } else {
+    recordedUsage = emptyTokenUsage();
+  }
 }

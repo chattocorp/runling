@@ -19,8 +19,7 @@ const runConfiguredWorkflow: WebhookRunner = (workflow, input) =>
     input,
   });
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, { status });
+const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 export function describeWebhook(
   name: string,
@@ -47,6 +46,21 @@ export async function handleWebhook(
     run = runConfiguredWorkflow,
   }: WebhookDependencies,
 ): Promise<Response> {
+  const prepared = await prepareWebhook(name, request, config);
+  if (prepared instanceof Response) return prepared;
+  const execution = await run(prepared.workflow, prepared.input);
+  if (!execution.ok) {
+    return json({ error: execution.error ?? "The workflow failed." }, 500);
+  }
+  log(execution.output);
+  return json({ output: execution.output });
+}
+
+export async function prepareWebhook(
+  name: string,
+  request: Request,
+  config: WebConfig,
+): Promise<Response | { workflow: Workflow; input: unknown }> {
   if (!Object.hasOwn(config.webhooks, name)) {
     return json({ error: `Unknown webhook ${JSON.stringify(name)}.` }, 404);
   }
@@ -63,10 +77,12 @@ export async function handleWebhook(
     return json(
       {
         error: "The request body does not match the webhook schema.",
-        issues: Errors(definition.body, body).map(({ instancePath, message }) => ({
-          path: instancePath === "" ? "/" : instancePath,
-          message,
-        })),
+        issues: Errors(definition.body, body).map(
+          ({ instancePath, message }) => ({
+            path: instancePath === "" ? "/" : instancePath,
+            message,
+          }),
+        ),
       },
       400,
     );
@@ -82,11 +98,11 @@ export async function handleWebhook(
     );
   }
 
-  const execution = await run(definition.workflow, input);
-  if (!execution.ok) {
-    return json({ error: execution.error ?? "The workflow failed." }, 500);
+  if (!Check(definition.workflow.input, input)) {
+    return json(
+      { error: "The mapped input does not match the workflow schema." },
+      400,
+    );
   }
-
-  log(execution.output);
-  return json({ output: execution.output });
+  return { workflow: definition.workflow, input };
 }
