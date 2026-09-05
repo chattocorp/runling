@@ -484,6 +484,7 @@ async function createFactoryAgent(
 
         accumulateTokenUsage(usage, event.message.usage);
         recordTokenUsage(event.message.usage);
+        emitFactoryEvent({ type: "agent.usage", agentId, usage: { ...usage } });
         agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
       }
     });

@@ -68,6 +68,11 @@ export type FactoryEventPayload =
       action: string;
     }
   | {
+      type: "agent.usage";
+      agentId: string;
+      usage: TokenUsage;
+    }
+  | {
       type: "agent.finished";
       agentId: string;
       outcome: "completed" | "blocked" | "failed";

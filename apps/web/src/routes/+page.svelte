@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Usage from "$lib/components/Usage.svelte";
   import { onMount } from "svelte";
   import type { PageData } from "./$types";
   import {
@@ -237,6 +238,7 @@
                   : "In progress"}</span
               ></span
             >
+            <Usage usage={run.usage} />
             <span class="run-bottom"
               ><span>{run.id.slice(0, 8)}</span><time
                 datetime={new Date(run.startedAt).toISOString()}

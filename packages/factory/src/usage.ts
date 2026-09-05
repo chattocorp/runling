@@ -12,6 +12,8 @@ export interface TokenUsage {
   cacheWrite: number;
   /** Provider/model-aware cost in US dollars, when reported by Pi. */
   cost?: number;
+  /** Some recorded tokens have no reported price. */
+  costIncomplete?: boolean;
 }
 
 type TokenUsageInput = Omit<TokenUsage, "cost"> & {
@@ -37,6 +39,12 @@ export function accumulateTokenUsage(
   total.cacheWrite += usage.cacheWrite;
   const cost = readCost(usage.cost);
   if (cost !== undefined) total.cost = (total.cost ?? 0) + cost;
+  if (
+    usage.costIncomplete ||
+    (cost === undefined &&
+      usage.input + usage.output + usage.cacheRead + usage.cacheWrite > 0)
+  )
+    total.costIncomplete = true;
   return total;
 }
 
@@ -66,8 +74,10 @@ export function isTokenUsage(value: unknown): value is TokenUsage {
 
   const usage = value as TokenUsage;
   return (
-    usage.cost === undefined ||
-    (Number.isFinite(usage.cost) && usage.cost >= 0)
+    (usage.costIncomplete === undefined ||
+      typeof usage.costIncomplete === "boolean") &&
+    (usage.cost === undefined ||
+      (Number.isFinite(usage.cost) && usage.cost >= 0))
   );
 }
 
@@ -114,6 +124,7 @@ export function resetTokenUsage(): void {
   if (current) {
     Object.assign(current, emptyTokenUsage());
     delete current.cost;
+    delete current.costIncomplete;
   } else {
     recordedUsage = emptyTokenUsage();
   }

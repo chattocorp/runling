@@ -1,5 +1,6 @@
 import { ansiColor } from "./ansi.ts";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { observeFactoryEvents, type FactoryEvent } from "./events.ts";
 
 const fakeModel = {
   id: "claude-opus-4-5",
@@ -93,12 +94,8 @@ vi.doMock("@earendil-works/pi-coding-agent", () => {
   };
 });
 
-const {
-  agent,
-  AgentOutcomeError,
-  describeTool,
-  runAgent,
-} = await import("./agent.ts");
+const { agent, AgentOutcomeError, describeTool, runAgent } =
+  await import("./agent.ts");
 const { getRecordedTokenUsage, resetTokenUsage } = await import("./usage.ts");
 const { log } = await import("./log.ts");
 
@@ -229,9 +226,9 @@ describe("runAgent", () => {
 
     const started = logs.find((line) => line.includes("Agent started"));
 
-    expect(
-      logs.some((line) => /Agent [a-z]+-[a-z]+-\d{4}$/.test(line)),
-    ).toBe(false);
+    expect(logs.some((line) => /Agent [a-z]+-[a-z]+-\d{4}$/.test(line))).toBe(
+      false,
+    );
     expect(started).toBeDefined();
     expect(started).not.toMatch(/^\s/);
   });
@@ -286,9 +283,9 @@ describe("runAgent", () => {
     expect(reading).toBeDefined();
     expect(reading).toContain("\x1b[1m");
     expect(reading).toContain(ansiColor("#40c057") ?? "");
-    expect(reading!.indexOf("\x1b[0m", reading!.indexOf("Reading"))).toBeLessThan(
-      reading!.indexOf("src/foo.ts"),
-    );
+    expect(
+      reading!.indexOf("\x1b[0m", reading!.indexOf("Reading")),
+    ).toBeLessThan(reading!.indexOf("src/foo.ts"));
     expect(
       plainErrors.some((line) => line.includes(`[${id}] bash failed`)),
     ).toBe(true);
@@ -393,9 +390,7 @@ describe("runAgent", () => {
     expect(logs.some((line) => line.includes("Turn 1 started"))).toBe(true);
     expect(logs.some((line) => line.includes("read finished in"))).toBe(true);
     expect(
-      logs.some((line) =>
-        line.includes("Turn 1 finished (1 tool result)"),
-      ),
+      logs.some((line) => line.includes("Turn 1 finished (1 tool result)")),
     ).toBe(true);
     expect(
       logs.some((line) => line.includes("Agent finished (1 message)")),
@@ -486,7 +481,9 @@ describe("runAgent", () => {
     expect(settingsOverrides).toEqual({
       retry: { enabled: true, maxRetries: 5, baseDelayMs: 2000 },
     });
-    expect(resourceOptions.settingsManager).toBe(sessionOptions.settingsManager);
+    expect(resourceOptions.settingsManager).toBe(
+      sessionOptions.settingsManager,
+    );
   });
 
   test("returns the structured outcome reported by the agent", async () => {
@@ -546,8 +543,18 @@ describe("runAgent", () => {
     const originalLog = console.log;
     console.log = (message: string) => logs.push(message);
     promptImplementation = async () => {
-      emitAssistantUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 });
-      emitAssistantUsage({ input: 50, output: 25, cacheRead: 550, cacheWrite: 15 });
+      emitAssistantUsage({
+        input: 100,
+        output: 20,
+        cacheRead: 500,
+        cacheWrite: 10,
+      });
+      emitAssistantUsage({
+        input: 50,
+        output: 25,
+        cacheRead: 550,
+        cacheWrite: 15,
+      });
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
@@ -559,6 +566,7 @@ describe("runAgent", () => {
         summary: "Done",
         usage: {
           input: 150,
+          costIncomplete: true,
           output: 45,
           cacheRead: 1050,
           cacheWrite: 25,
@@ -590,7 +598,42 @@ describe("runAgent", () => {
       output: 5,
       cacheRead: 0,
       cacheWrite: 0,
+      costIncomplete: true,
     });
+  });
+
+  test("emits immutable live usage snapshots before an agent finishes", async () => {
+    const events: FactoryEvent[] = [];
+    promptImplementation = async () => {
+      emitAssistantUsage({
+        input: 10,
+        output: 2,
+        cacheRead: 5,
+        cacheWrite: 0,
+        cost: { total: 0.01 },
+      });
+      expect(events.filter((e) => e.type === "agent.usage")).toHaveLength(1);
+      expect(events.some((e) => e.type === "agent.finished")).toBe(false);
+      emitAssistantUsage({
+        input: 20,
+        output: 3,
+        cacheRead: 7,
+        cacheWrite: 1,
+        cost: { total: 0.02 },
+      });
+      throw new Error("Provider unavailable");
+    };
+    await expect(
+      observeFactoryEvents(
+        (e) => events.push(e),
+        () => runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      ),
+    ).rejects.toThrow("Provider unavailable");
+    const snapshots = events.filter((e) => e.type === "agent.usage");
+    expect(snapshots.map((e) => e.usage.input)).toEqual([10, 30]);
+    expect(snapshots[1]?.usage.cost).toBeCloseTo(0.03);
+    const finished = events.find((e) => e.type === "agent.finished");
+    expect(finished?.usage).toEqual(snapshots[1]?.usage);
   });
 
   test("records tokens and cost as each model turn completes", async () => {
@@ -620,7 +663,12 @@ describe("runAgent", () => {
   test("returns token usage even when no outcome is reported", async () => {
     promptImplementation = async () => {
       if (promptCalls === 1) {
-        emitAssistantUsage({ input: 7, output: 3, cacheRead: 0, cacheWrite: 0 });
+        emitAssistantUsage({
+          input: 7,
+          output: 3,
+          cacheRead: 0,
+          cacheWrite: 0,
+        });
         emitAssistantText("I could not finish");
       }
     };
@@ -630,7 +678,13 @@ describe("runAgent", () => {
     ).resolves.toEqual({
       outcome: "failed",
       summary: "Agent finished without a valid outcome report",
-      usage: { input: 7, output: 3, cacheRead: 0, cacheWrite: 0 },
+      usage: {
+        input: 7,
+        output: 3,
+        cacheRead: 0,
+        cacheWrite: 0,
+        costIncomplete: true,
+      },
     });
   });
 
@@ -647,7 +701,12 @@ describe("runAgent", () => {
 
   test("records usage when prompting fails", async () => {
     promptImplementation = async () => {
-      emitAssistantUsage({ input: 10, output: 5, cacheRead: 20, cacheWrite: 1 });
+      emitAssistantUsage({
+        input: 10,
+        output: 5,
+        cacheRead: 20,
+        cacheWrite: 1,
+      });
       throw new Error("Provider unavailable");
     };
 
@@ -659,6 +718,7 @@ describe("runAgent", () => {
       output: 5,
       cacheRead: 20,
       cacheWrite: 1,
+      costIncomplete: true,
     });
   });
 
@@ -770,10 +830,12 @@ describe("runAgent", () => {
       noContextFiles: true,
       extensionFactories: [],
     });
-    expect(resourceOptions.appendSystemPromptOverride(["Base prompt"])).toEqual([
-      "Base prompt",
-      expect.stringContaining("non-interactive software factory"),
-    ]);
+    expect(resourceOptions.appendSystemPromptOverride(["Base prompt"])).toEqual(
+      [
+        "Base prompt",
+        expect.stringContaining("non-interactive software factory"),
+      ],
+    );
   });
 
   test("aborts and disposes an active session", async () => {

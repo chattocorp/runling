@@ -1,4 +1,5 @@
-import type { FactoryEvent } from "factory";
+import type { FactoryEvent, TokenUsage } from "factory";
+import { mergeUsage } from "./usage.ts";
 import type { RunStatus } from "./runs.ts";
 
 export interface Activity {
@@ -11,6 +12,7 @@ export interface Activity {
   durationMs?: number;
   logs: string[];
   children: Activity[];
+  usage?: TokenUsage;
 }
 
 export function buildTimeline(
@@ -68,6 +70,10 @@ export function buildTimeline(
         node.durationMs = event.timestamp - node.startedAt;
       }
     }
+    if (event.type === "agent.usage" || event.type === "agent.finished") {
+      const node = nodes.get(agents.get(event.agentId) ?? "");
+      if (node) node.usage = { ...event.usage };
+    }
     if (event.type === "agent.action")
       nodes.get(agents.get(event.agentId) ?? "")?.logs.push(event.action);
     if (event.type === "log") {
@@ -84,6 +90,14 @@ export function buildTimeline(
       if (node.status === "running") node.status = "interrupted";
     }
   }
+  const aggregate = (node: Activity): void => {
+    node.children.forEach(aggregate);
+    if (node.kind === "step")
+      node.usage = mergeUsage(
+        node.children.flatMap((child) => (child.usage ? [child.usage] : [])),
+      );
+  };
+  roots.forEach(aggregate);
   return roots;
 }
 

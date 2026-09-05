@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import Usage from "./Usage.svelte";
   import { duration } from "$lib/runs.ts";
   import { findActivity, type Activity } from "$lib/timeline.ts";
   import {
@@ -317,7 +318,8 @@
             onclick={() => onselect(node.id)}
             aria-pressed={selected === node.id}
             title={`${node.label} (${node.kind}, ${node.status})`}
-            ><strong>{node.label}</strong><small>{node.kind}</small></button
+            ><strong>{node.label}</strong><small>{node.kind}</small>
+            {#if node.usage}<Usage usage={node.usage} />{/if}</button
           >
         </div>
         <div class="lane plot" class:chosen={selected === node.id}>
@@ -371,6 +373,7 @@
   {#if expanded && inspected}
     <div class="expanded-detail">
       <strong>{inspected.label}</strong><small>{inspected.status}</small>
+      {#if inspected.usage}<Usage usage={inspected.usage} detail />{/if}
       <pre>{inspected.logs.length
           ? inspected.logs.join("\n\n")
           : "No logs for this activity."}</pre>
@@ -471,7 +474,7 @@
   .grid {
     display: grid;
     grid-template-columns: clamp(125px, 29%, 235px) minmax(0, 1fr);
-    grid-template-rows: 35px repeat(var(--row-count), 50px);
+    grid-template-rows: 35px repeat(var(--row-count), minmax(76px, auto));
     min-width: 0;
   }
   .label-heading,

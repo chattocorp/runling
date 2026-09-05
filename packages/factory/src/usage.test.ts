@@ -11,6 +11,18 @@ import {
 } from "./usage.ts";
 
 describe("token usage", () => {
+  test("retains unknown pricing when later calls have known costs", () => {
+    const total = emptyTokenUsage();
+    accumulateTokenUsage(total, { ...emptyTokenUsage(), input: 10 });
+    accumulateTokenUsage(total, {
+      ...emptyTokenUsage(),
+      input: 20,
+      cost: 0.02,
+    });
+    expect(total.cost).toBe(0.02);
+    expect(total.costIncomplete).toBe(true);
+    expect(isTokenUsage({ ...total, costIncomplete: "yes" })).toBe(false);
+  });
   test("emptyTokenUsage returns zeroed counters", () => {
     expect(emptyTokenUsage()).toEqual({
       input: 0,
@@ -37,6 +49,7 @@ describe("token usage", () => {
     });
 
     expect(total).toEqual({
+      costIncomplete: true,
       input: 150,
       output: 45,
       cacheRead: 1050,
@@ -76,41 +89,74 @@ describe("token usage", () => {
   });
 
   test("totalTokens sums all counters", () => {
-    expect(totalTokens({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(
-      10,
-    );
+    expect(
+      totalTokens({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }),
+    ).toBe(10);
     expect(totalTokens(emptyTokenUsage())).toBe(0);
   });
 
   test("formatTokenUsage reports input and output tokens", () => {
-    expect(formatTokenUsage({ input: 1200, output: 340, cacheRead: 0, cacheWrite: 0 })).toBe(
-      "in 1,200, out 340",
-    );
+    expect(
+      formatTokenUsage({
+        input: 1200,
+        output: 340,
+        cacheRead: 0,
+        cacheWrite: 0,
+      }),
+    ).toBe("in 1,200, out 340");
   });
 
   test("formatTokenUsage includes cached token counts when present", () => {
     expect(
-      formatTokenUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 }),
+      formatTokenUsage({
+        input: 100,
+        output: 20,
+        cacheRead: 500,
+        cacheWrite: 10,
+      }),
     ).toBe("in 100, out 20, cache read 500, cache write 10");
   });
 
   test("isTokenUsage validates usage objects", () => {
     expect(isTokenUsage(emptyTokenUsage())).toBe(true);
-    expect(isTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(
-      true,
-    );
-    expect(isTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4, cost: 0.01 })).toBe(
-      true,
-    );
-    expect(isTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4, cost: -1 })).toBe(
-      false,
-    );
+    expect(
+      isTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }),
+    ).toBe(true);
+    expect(
+      isTokenUsage({
+        input: 1,
+        output: 2,
+        cacheRead: 3,
+        cacheWrite: 4,
+        cost: 0.01,
+      }),
+    ).toBe(true);
+    expect(
+      isTokenUsage({
+        input: 1,
+        output: 2,
+        cacheRead: 3,
+        cacheWrite: 4,
+        cost: -1,
+      }),
+    ).toBe(false);
     expect(isTokenUsage(undefined)).toBe(false);
     expect(isTokenUsage({})).toBe(false);
     expect(isTokenUsage({ input: 1 })).toBe(false);
-    expect(isTokenUsage({ input: -1, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(false);
-    expect(isTokenUsage({ input: Number.NaN, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(false);
-    expect(isTokenUsage({ input: 1.5, output: 2, cacheRead: 3, cacheWrite: 4 })).toBe(false);
+    expect(
+      isTokenUsage({ input: -1, output: 2, cacheRead: 3, cacheWrite: 4 }),
+    ).toBe(false);
+    expect(
+      isTokenUsage({
+        input: Number.NaN,
+        output: 2,
+        cacheRead: 3,
+        cacheWrite: 4,
+      }),
+    ).toBe(false);
+    expect(
+      isTokenUsage({ input: 1.5, output: 2, cacheRead: 3, cacheWrite: 4 }),
+    ).toBe(false);
   });
 });
 
@@ -122,6 +168,7 @@ describe("recorded token usage", () => {
     recordTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4 });
 
     expect(getRecordedTokenUsage()).toEqual({
+      costIncomplete: true,
       input: 11,
       output: 7,
       cacheRead: 3,

@@ -5,6 +5,7 @@
   import { buildTimeline, findActivity } from "$lib/timeline.ts";
   import StatusBadge from "./StatusBadge.svelte";
   import Timeline from "./Timeline.svelte";
+  import Usage from "./Usage.svelte";
   let { run, connection }: { run: RunDetail; connection: string } = $props();
   let now = $state(Date.now());
   let selected = $state("");
@@ -12,12 +13,6 @@
   let nodes = $derived(buildTimeline(run.events, run.status));
   let activity = $derived(findActivity(nodes, selected));
   let elapsed = $derived(run.durationMs ?? Math.max(0, now - run.startedAt));
-  let tokenCount = $derived(
-    run.usage.input +
-      run.usage.output +
-      run.usage.cacheRead +
-      run.usage.cacheWrite,
-  );
   let logs = $derived(
     run.events.filter((e) => e.type === "log").map((e) => e.message),
   );
@@ -44,11 +39,9 @@
     <div class="facts">
       <span>{new Date(run.startedAt).toLocaleString()}</span><span
         >{duration(elapsed)}</span
-      ><span>{tokenCount.toLocaleString()} tokens</span
-      >{#if run.usage.cost !== undefined}<span
-          >${run.usage.cost.toFixed(4)}</span
-        >{/if}
+      >
     </div>
+    <Usage usage={run.usage} detail />
     <p class="run-id">Run {run.id.slice(0, 8)} <span>{connection}</span></p>
   </header>
   {#if run.error}<div class="error" role="alert">{run.error}</div>{/if}
@@ -103,6 +96,7 @@
           <p class="hint">
             {activity.kind} started at {duration(activity.startedAt)}
           </p>
+          {#if activity.usage}<Usage usage={activity.usage} detail />{/if}
           <pre>{activity.logs.length
               ? activity.logs.join("\n\n")
               : "No logs for this activity."}</pre>
