@@ -28,11 +28,20 @@ test("curl example preserves the URL and sample JSON as literal shell arguments"
   ]);
 });
 
-test("curl example uses the webhook body schema", () => {
+test("curl example uses the workflow input schema", () => {
   expect(
     webhookCurl("http://localhost/hook", {
       type: "object",
       properties: { value: { type: "string", default: "monorepos" } },
     }),
   ).toContain('"value": "monorepos"');
+});
+
+test("string workflow inputs produce a JSON string payload, not an object", () => {
+  expect(
+    webhookCurl("http://localhost/hook", {
+      type: "string",
+      default: "monorepos",
+    }),
+  ).toContain(`--data-raw '"monorepos"'`);
 });

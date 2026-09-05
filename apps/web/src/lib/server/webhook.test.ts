@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, expectTypeOf, test } from "bun:test";
 import { Type, workflow, type WorkflowExecution } from "factory";
-import { defineWebConfig, isWebConfig, webhook } from "factory-web";
-import { describeWebhook, handleWebhook } from "./webhook.ts";
+import { defineWebConfig, isWebConfig } from "factory-web";
+import { describeWebhook, handleWebhook, prepareWebhook } from "./webhook.ts";
 
 const joke = workflow(
   {
@@ -14,11 +14,9 @@ const joke = workflow(
 
 const config = defineWebConfig({
   webhooks: {
-    joke: webhook({
-      body: Type.Object({ value: Type.String({ minLength: 1 }) }),
+    joke: {
       workflow: joke,
-      input: ({ value }) => value,
-    }),
+    },
   },
 });
 
@@ -39,9 +37,78 @@ const execution = (output: string): WorkflowExecution<string> => ({
 });
 
 describe("configured webhooks", () => {
+  test("preserves workflow types and hook names without a wrapper", () => {
+    expectTypeOf(config.webhooks.joke.workflow).toEqualTypeOf<typeof joke>();
+    expectTypeOf<keyof typeof config.webhooks>().toEqualTypeOf<"joke">();
+  });
   test("recognizes schemaful web configurations", () => {
     expect(isWebConfig(config)).toBe(true);
-    expect(isWebConfig({ webhooks: { joke: { workflow: joke } } })).toBe(false);
+    expect(isWebConfig({ webhooks: { joke: { workflow: joke } } })).toBe(true);
+    expect(isWebConfig({ webhooks: { joke: {} } })).toBe(false);
+  });
+
+  test("rejects removed input mappings instead of silently ignoring them", () => {
+    expect(
+      isWebConfig({
+        webhooks: { joke: { workflow: joke, input: () => "mapped" } },
+      }),
+    ).toBe(false);
+  });
+
+  test.each([
+    {
+      schema: Type.Object({
+        topic: Type.String({ minLength: 1 }),
+        count: Type.Integer({ minimum: 1 }),
+      }),
+      value: { topic: "schemas", count: 2 },
+      invalid: { topic: "", count: 0 },
+    },
+    { schema: Type.Array(Type.String()), value: ["one", "two"], invalid: [1] },
+    { schema: Type.Boolean(), value: false, invalid: "false" },
+    { schema: Type.Number(), value: 0, invalid: "0" },
+    { schema: Type.Null(), value: null, invalid: {} },
+  ])(
+    "uses the workflow schema directly for $schema.type inputs",
+    async ({ schema, value, invalid }) => {
+      const echo = workflow(
+        { name: "Echo", input: schema, output: schema },
+        (_f, input) => input,
+      );
+      const direct = defineWebConfig({
+        webhooks: { echo: { workflow: echo } },
+      });
+      const response = await handleWebhook(
+        "echo",
+        request(JSON.stringify(value)),
+        { config: direct, log: () => {} },
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ output: value });
+      const rejected = await prepareWebhook(
+        "echo",
+        request(JSON.stringify(invalid)),
+        direct,
+      );
+      expect(rejected).toBeInstanceOf(Response);
+      expect((rejected as Response).status).toBe(400);
+    },
+  );
+
+  test("rejects malformed JSON before starting a workflow", async () => {
+    const result = await prepareWebhook("joke", request("not JSON"), config);
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(400);
+  });
+
+  test("rejects the old wrapped string payload", async () => {
+    const result = await prepareWebhook(
+      "joke",
+      request('{"value":"monorepos"}'),
+      config,
+    );
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(400);
   });
 
   test.each([
@@ -50,50 +117,64 @@ describe("configured webhooks", () => {
     [{ type: "not-a-schema-type" }],
     [{ type: "object", properties: { value: { type: "invalid" } } }],
     [{ type: "string", minLength: -1 }],
-  ])("rejects malformed body schemas at configuration validation: %j", (body) => {
-    expect(isWebConfig({
-      webhooks: { joke: { ...config.webhooks.joke, body } },
-    })).toBe(false);
+  ])("rejects removed body schema configuration: %j", (body) => {
+    expect(
+      isWebConfig({
+        webhooks: { joke: { ...config.webhooks.joke, body } },
+      }),
+    ).toBe(false);
   });
 
-  test.each(["input", "output"] as const)("rejects malformed workflow %s schemas", (boundary) => {
-    const invalid = Object.assign(() => "unused", {
-      input: joke.input,
-      output: joke.output,
-      [boundary]: { type: "invalid" },
-    });
-    expect(isWebConfig({
-      webhooks: { joke: { ...config.webhooks.joke, workflow: invalid } },
-    })).toBe(false);
-  });
+  test.each(["input", "output"] as const)(
+    "rejects malformed workflow %s schemas",
+    (boundary) => {
+      const invalid = Object.assign(() => "unused", {
+        input: joke.input,
+        output: joke.output,
+        [boundary]: { type: "invalid" },
+      });
+      expect(
+        isWebConfig({
+          webhooks: { joke: { ...config.webhooks.joke, workflow: invalid } },
+        }),
+      ).toBe(false);
+    },
+  );
 
   test("runs and serializes an output with undefined optional properties", async () => {
-    const optional = workflow({
-      name: "Optional output",
-      input: Type.String(),
-      output: Type.Object({
-        answer: Type.Optional(Type.String()),
-        nested: Type.Object({ detail: Type.Optional(Type.String()) }),
-      }),
-    }, () => ({ answer: undefined, nested: { detail: undefined } }));
+    const optional = workflow(
+      {
+        name: "Optional output",
+        input: Type.String(),
+        output: Type.Object({
+          answer: Type.Optional(Type.String()),
+          nested: Type.Object({ detail: Type.Optional(Type.String()) }),
+        }),
+      },
+      () => ({ answer: undefined, nested: { detail: undefined } }),
+    );
     const logs: unknown[] = [];
     const response = await handleWebhook("optional", request('"hello"'), {
-      config: defineWebConfig({ webhooks: {
-        optional: webhook({ body: Type.String(), workflow: optional, input: (body) => body }),
-      } }),
+      config: defineWebConfig({
+        webhooks: {
+          optional: { workflow: optional },
+        },
+      }),
       log: (output) => logs.push(output),
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ output: { nested: {} } });
-    expect(logs).toEqual([{ answer: undefined, nested: { detail: undefined } }]);
+    expect(logs).toEqual([
+      { answer: undefined, nested: { detail: undefined } },
+    ]);
   });
 
-  test("maps a schemaful body to workflow input and logs the output", async () => {
+  test("passes the body directly to the workflow and logs the output", async () => {
     const inputs: unknown[] = [];
     const logs: unknown[] = [];
     const response = await handleWebhook(
       "joke",
-      request(JSON.stringify({ value: "schemas" })),
+      request(JSON.stringify("schemas")),
       {
         config,
         run: async (_workflow, input) => {
@@ -124,7 +205,7 @@ describe("configured webhooks", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
-      error: "The request body does not match the webhook schema.",
+      error: "The request body does not match the workflow input schema.",
       issues: [{ path: "/" }],
     });
     expect(runs).toBe(0);
@@ -135,7 +216,6 @@ describe("configured webhooks", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      body: config.webhooks.joke.body,
       input: joke.input,
       output: joke.output,
     });
@@ -146,21 +226,26 @@ describe("configured webhooks", () => {
     expect(response.status).toBe(404);
   });
 
-  test.each(["toString", "constructor", "__proto__"])("returns 404 for inherited name %s", async (name) => {
-    expect(describeWebhook(name, { config }).status).toBe(404);
-    const response = await handleWebhook(name, request("{}"), { config });
-    expect(response.status).toBe(404);
-  });
+  test.each(["toString", "constructor", "__proto__"])(
+    "returns 404 for inherited name %s",
+    async (name) => {
+      expect(describeWebhook(name, { config }).status).toBe(404);
+      const response = await handleWebhook(name, request("{}"), { config });
+      expect(response.status).toBe(404);
+    },
+  );
 
   test("permits an explicitly configured name that matches a prototype property", () => {
     const explicit = { webhooks: { constructor: config.webhooks.joke } };
-    expect(describeWebhook("constructor", { config: explicit }).status).toBe(200);
+    expect(describeWebhook("constructor", { config: explicit }).status).toBe(
+      200,
+    );
   });
 
   test("returns a server error when the workflow fails", async () => {
     const response = await handleWebhook(
       "joke",
-      request(JSON.stringify({ value: "failure" })),
+      request(JSON.stringify("failure")),
       {
         config,
         run: async () => ({

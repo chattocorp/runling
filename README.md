@@ -219,40 +219,37 @@ Use `--config` to select another file. Use `--host`, `--port`, or `--open` to
 configure the server. The `bun run dev:web` command remains available as a
 repository-local alias.
 
-The configuration defines named webhooks. Each webhook has a request body
-schema, a workflow, and a function that maps the request body to the workflow
-input.
+The configuration defines named webhooks. Each webhook selects a workflow.
+The request body uses that workflow's input schema and is passed directly to
+the workflow. Do not define a separate body schema or input mapping.
 
 ```ts
-import { Type } from "factory";
-import { defineWebConfig, webhook } from "factory-web";
+import { defineWebConfig } from "factory-web";
 import joke from "./workflows/joke.ts";
 
 export default defineWebConfig({
   webhooks: {
-    joke: webhook({
-      body: Type.Object({ value: Type.String({ minLength: 1 }) }),
+    joke: {
       workflow: joke,
-      input: ({ value }) => value,
-    }),
+    },
   },
 });
 ```
 
-Send a JSON object with a non-empty `value` string:
+The joke workflow accepts a string. Send a JSON string, not a `value` object:
 
 ```bash
 curl -X POST http://localhost:5173/api/webhooks/joke \
   -H 'content-type: application/json' \
-  -d '{"value":"monorepos"}'
+  -d '"monorepos"'
 ```
 
-The app checks the request body, passes `value` to the joke workflow, checks
+The app checks the request body, passes it to the joke workflow, checks
 the workflow output, and writes the output to the server log. The response has
 the output in its `output` field. Configure the model credentials before you
 send a webhook.
 
-Use `GET` to inspect the request body, workflow input, and workflow output
+Use `GET` to inspect the workflow input and output
 schemas:
 
 ```bash

@@ -55,7 +55,6 @@ export interface WebhookInfo {
   name: string;
   workflow: string;
   path: string;
-  body: Record<string, unknown>;
   input: Record<string, unknown>;
   output: Record<string, unknown>;
 }

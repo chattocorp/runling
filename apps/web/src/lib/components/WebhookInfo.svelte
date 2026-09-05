@@ -9,7 +9,7 @@
   let origin = $state("");
   let message = $state("");
   let url = $derived(`${origin}${webhook.path}`);
-  let curl = $derived(webhookCurl(url, webhook.body));
+  let curl = $derived(webhookCurl(url, webhook.input));
   onMount(() => {
     origin = location.origin;
     dialog.showModal();
@@ -47,8 +47,9 @@
       <dd><code>application/json</code></dd>
     </dl>
     <p class="hint">
-      The request body is validated, then mapped to the workflow input. The
-      response returns the workflow result when the run finishes.
+      The request body must match the workflow input schema and is passed
+      directly to the workflow. The response returns the workflow result when
+      the run finishes.
     </p>
     <section aria-labelledby="hook-url-title">
       <div class="section-head">
@@ -65,18 +66,14 @@
         >
       </div>
       <p class="hint">
-        For bash or zsh. This sample comes from the request schema. Check its
-        values and add any required authentication headers before use.
+        For bash or zsh. This sample comes from the workflow input schema. Check
+        its values and add any required authentication headers before use.
       </p>
       <pre>{curl}</pre>
     </section>
     <p class="copy-status" role="status">{message}</p>
     <section aria-labelledby="hook-schemas-title">
       <h3 id="hook-schemas-title">Schemas</h3>
-      <details>
-        <summary>Request body</summary>
-        <pre>{JSON.stringify(webhook.body, null, 2)}</pre>
-      </details>
       <details>
         <summary>Workflow input</summary>
         <pre>{JSON.stringify(webhook.input, null, 2)}</pre>

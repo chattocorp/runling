@@ -15,11 +15,11 @@
   let body = $state("");
   let pending = $state(false);
   let error = $state("");
-  let schemaTab = $state<"body" | "input" | "output">("body");
+  let schemaTab = $state<"input" | "output">("input");
   let origin = $state("");
   let copied = $state(false);
   onMount(() => {
-    body = JSON.stringify(sample(webhook.body), null, 2);
+    body = JSON.stringify(sample(webhook.input), null, 2);
     origin = location.origin;
     dialog.showModal();
   });
@@ -104,10 +104,6 @@
       <summary>Inspect schemas</summary>
       <div class="schema-tabs">
         <button
-          type="button"
-          class:active={schemaTab === "body"}
-          onclick={() => (schemaTab = "body")}>Request body</button
-        ><button
           type="button"
           class:active={schemaTab === "input"}
           onclick={() => (schemaTab = "input")}>Workflow input</button

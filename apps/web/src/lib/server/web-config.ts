@@ -14,7 +14,9 @@ export function loadWebConfig(): Promise<WebConfig> {
   ).then((module: { default?: unknown }) => {
     const config = module.default;
     if (!isWebConfig(config)) {
-      throw new Error(`${configPath} must export a Factory web configuration`);
+      throw new Error(
+        `${configPath} must export a Factory web configuration. Each webhook must select a workflow without a separate body schema or input mapping.`,
+      );
     }
     return config as WebConfig;
   });

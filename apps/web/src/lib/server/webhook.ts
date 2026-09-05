@@ -31,7 +31,6 @@ export function describeWebhook(
   const definition = config.webhooks[name]!;
 
   return json({
-    body: definition.body,
     input: definition.workflow.input,
     output: definition.workflow.output,
   });
@@ -73,11 +72,11 @@ export async function prepareWebhook(
     return json({ error: "The request body must be valid JSON." }, 400);
   }
 
-  if (!Check(definition.body, body)) {
+  if (!Check(definition.workflow.input, body)) {
     return json(
       {
-        error: "The request body does not match the webhook schema.",
-        issues: Errors(definition.body, body).map(
+        error: "The request body does not match the workflow input schema.",
+        issues: Errors(definition.workflow.input, body).map(
           ({ instancePath, message }) => ({
             path: instancePath === "" ? "/" : instancePath,
             message,
@@ -88,21 +87,5 @@ export async function prepareWebhook(
     );
   }
 
-  let input: unknown;
-  try {
-    input = await definition.input(body, request);
-  } catch (cause) {
-    return json(
-      { error: cause instanceof Error ? cause.message : String(cause) },
-      400,
-    );
-  }
-
-  if (!Check(definition.workflow.input, input)) {
-    return json(
-      { error: "The mapped input does not match the workflow schema." },
-      400,
-    );
-  }
-  return { workflow: definition.workflow, input };
+  return { workflow: definition.workflow, input: body };
 }

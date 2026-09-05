@@ -10,7 +10,6 @@ export const load: PageServerLoad = async () => {
       name,
       workflow: definition.workflow.name,
       path: `/api/webhooks/${encodeURIComponent(name)}`,
-      body: definition.body,
       input: definition.workflow.input,
       output: definition.workflow.output,
     }),

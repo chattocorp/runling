@@ -1,19 +1,16 @@
-import { isWorkflow, isWorkflowSchema, type Static, type TSchema, type Workflow } from "factory";
+import { isWorkflow, type TSchema, type Workflow } from "factory";
 
 export interface WebhookDefinition<
-  BodySchema extends TSchema,
   WorkflowInputSchema extends TSchema,
   WorkflowOutputSchema extends TSchema,
 > {
-  body: BodySchema;
   workflow: Workflow<WorkflowInputSchema, WorkflowOutputSchema>;
-  input: (
-    body: Static<BodySchema>,
-    request: Request,
-  ) => Promise<Static<WorkflowInputSchema>> | Static<WorkflowInputSchema>;
 }
 
-type AnyWebhookDefinition = WebhookDefinition<TSchema, TSchema, TSchema>;
+// Accept heterogeneous workflow signatures; defineWebConfig preserves each concrete type.
+type AnyWebhookDefinition = {
+  workflow: ((...args: any[]) => unknown) & Pick<Workflow, "name" | "input" | "output">;
+};
 
 export interface WebConfig<
   Webhooks extends Record<string, AnyWebhookDefinition> = Record<
@@ -22,21 +19,6 @@ export interface WebConfig<
   >,
 > {
   webhooks: Webhooks;
-}
-
-/** Preserve schema inference when defining one HTTP webhook. */
-export function webhook<
-  const BodySchema extends TSchema,
-  const WorkflowInputSchema extends TSchema,
-  const WorkflowOutputSchema extends TSchema,
->(
-  definition: WebhookDefinition<
-    BodySchema,
-    WorkflowInputSchema,
-    WorkflowOutputSchema
-  >,
-): WebhookDefinition<BodySchema, WorkflowInputSchema, WorkflowOutputSchema> {
-  return definition;
 }
 
 /** Preserve webhook names and schema types in a Factory web configuration. */
@@ -63,11 +45,9 @@ export function isWebConfig(value: unknown): value is WebConfig {
     (definition) =>
       typeof definition === "object" &&
       definition !== null &&
-      "body" in definition &&
-      isWorkflowSchema(definition.body) &&
       "workflow" in definition &&
       isWorkflow(definition.workflow) &&
-      "input" in definition &&
-      typeof definition.input === "function",
+      !("body" in definition) &&
+      !("input" in definition),
   );
 }
