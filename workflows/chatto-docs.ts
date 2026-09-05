@@ -1,4 +1,4 @@
-import { workflow, type WorkflowResult } from "../src/index.ts";
+import { workflow, type WorkflowResult } from "factory";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
 const documentationRoot =

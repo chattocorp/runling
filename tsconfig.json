@@ -26,5 +26,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": ["workflows/**/*.ts", "test/**/*.ts"],
+  "exclude": ["apps", "packages"]
 }

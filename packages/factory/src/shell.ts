@@ -1,11 +1,12 @@
-import { $ } from "bun";
 import { emitFactoryEvent } from "./events.ts";
 import { log, logCommand } from "./log.ts";
 
 const COMMAND_COLOR = "#ae3ec9";
 const COMMAND_PREVIEW_LENGTH = 200;
 
-export const ShellError = $.ShellError;
+const bun = (globalThis as typeof globalThis & { Bun?: typeof Bun }).Bun;
+
+export const ShellError = bun?.$.ShellError ?? Error;
 
 export interface CreateShellOptions {
   verbose?: boolean;
@@ -15,7 +16,7 @@ export interface CreateShellOptions {
 export function createShell(options: CreateShellOptions = {}) {
   return function (
     this: { cwd?: string } | void,
-    ...args: Parameters<typeof $>
+    ...args: Parameters<typeof Bun.$>
   ) {
     const id = crypto.randomUUID();
     const startedAt = performance.now();
@@ -29,7 +30,11 @@ export function createShell(options: CreateShellOptions = {}) {
       id,
       `${log.highlight("Running", COMMAND_COLOR)} ${formattedCommand}`,
     );
-    const command = $(...args).quiet(!(options.verbose ?? false));
+    if (bun === undefined) {
+      throw new Error("Factory shell commands require Bun");
+    }
+
+    const command = bun.$(...args).quiet(!(options.verbose ?? false));
     const cwd = options.cwd ?? this?.cwd;
     const configured = cwd === undefined ? command : command.cwd(cwd);
 
@@ -75,7 +80,9 @@ const shellOutput = (value: unknown): { stdout: string; stderr: string } => {
 const bufferText = (value: unknown): string =>
   value instanceof Uint8Array ? new TextDecoder().decode(value) : "";
 
-function formatCommand(...[strings, ...expressions]: Parameters<typeof $>) {
+function formatCommand(
+  ...[strings, ...expressions]: Parameters<typeof Bun.$>
+) {
   const command = strings
     .map((part, index) => {
       const expression = expressions[index];
@@ -92,7 +99,9 @@ function formatCommand(...[strings, ...expressions]: Parameters<typeof $>) {
   return `${command.slice(0, COMMAND_PREVIEW_LENGTH)}… (${(command.length - COMMAND_PREVIEW_LENGTH).toLocaleString()} characters omitted)`;
 }
 
-function formatExpression(expression: Parameters<typeof $>[number]): string {
+function formatExpression(
+  expression: Parameters<typeof Bun.$>[number],
+): string {
   if (Array.isArray(expression)) {
     return expression.map(formatExpression).join(" ");
   }
@@ -104,5 +113,7 @@ function formatExpression(expression: Parameters<typeof $>[number]): string {
     return String(expression.raw);
   }
 
-  return $.escape(String(expression));
+  if (bun === undefined) return String(expression);
+
+  return bun.$.escape(String(expression));
 }

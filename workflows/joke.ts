@@ -1,9 +1,10 @@
-import { workflow } from "../src/index.ts";
+import { workflow } from "factory";
 
 const model = "openai-codex/gpt-5.6-sol";
 
 export const joke = workflow("Tell a joke", async (f): Promise<string> => {
-  const topic = await f.input("What should the joke be about?");
+  const topic =
+    f.prompt || (await f.input("What should the joke be about?"));
 
   const result = await f.step("Write joke", () =>
     f.runAgent(`Write one genuinely funny joke about ${JSON.stringify(topic)}.`, {

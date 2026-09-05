@@ -273,7 +273,7 @@ async function captureExecution(
 
 export async function loadWorkflow(path: string): Promise<FactoryWorkflow> {
   const resolvedPath = resolve(path);
-  const module = await import(pathToFileURL(resolvedPath).href);
+  const module = await import(/* @vite-ignore */ pathToFileURL(resolvedPath).href);
   if (typeof module.default !== "function") {
     throw new Error(
       `Workflow ${resolvedPath} must have a default function export`,

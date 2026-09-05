@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Factory, Shell, WorkflowResult } from "../src/index.ts";
+import type { Factory, Shell, WorkflowResult } from "factory";
 import {
   createWorktree,
   describePullRequest,

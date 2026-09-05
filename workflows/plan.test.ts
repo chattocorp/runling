@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentResult, Factory } from "../src/index.ts";
+import type { AgentResult, Factory } from "factory";
 import { plan } from "./plan.ts";
 
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };

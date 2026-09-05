@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Factory, FactoryAgent, Shell } from "../src/index.ts";
+import type { Factory, FactoryAgent, Shell } from "factory";
 import { review } from "./review.ts";
 
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };

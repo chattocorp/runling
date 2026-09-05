@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Factory } from "../src/index.ts";
+import type { Factory } from "factory";
 import { joke } from "./joke.ts";
 
 describe("joke workflow", () => {
@@ -40,5 +40,31 @@ describe("joke workflow", () => {
       thinkingLevel: "low",
       tools: [],
     });
+  });
+
+  test("uses the invocation prompt without asking for input", async () => {
+    let askedForInput = false;
+    const prompts: string[] = [];
+    const f = {
+      prompt: "webhooks",
+      input: async () => {
+        askedForInput = true;
+        return "unused";
+      },
+      runAgent: async (prompt: string) => {
+        prompts.push(prompt);
+        return {
+          outcome: "completed" as const,
+          summary: "A webhook joke",
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        };
+      },
+      step: <T>(_name: string, work: () => T) => work(),
+    } as unknown as Factory;
+
+    await joke(f);
+
+    expect(askedForInput).toBe(false);
+    expect(prompts[0]).toContain('"webhooks"');
   });
 });

@@ -1,4 +1,4 @@
-import { workflow } from "../src/index.ts";
+import { workflow } from "factory";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";

@@ -1,4 +1,4 @@
-import { workflow, type WorkflowResult } from "../src/index.ts";
+import { workflow, type WorkflowResult } from "factory";
 
 const model = "openai-codex/gpt-5.6-sol";
 

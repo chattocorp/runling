@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Factory, type Shell } from "../src/index.ts";
+import { type Factory, type Shell } from "factory";
 import { implement } from "./implement.ts";
 
 const contextValues = {

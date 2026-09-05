@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Factory } from "../src/index.ts";
+import type { Factory } from "factory";
 import { chattoDocs } from "./chatto-docs.ts";
 
 const completedReport = {

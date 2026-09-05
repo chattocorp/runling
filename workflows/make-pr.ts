@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { workflow, type WorkflowResult } from "../src/index.ts";
+import { workflow, type WorkflowResult } from "factory";
 import { implement } from "./implement.ts";
 import { review } from "./review.ts";
 
