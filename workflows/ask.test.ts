@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { Factory } from "factory";
 import { ask } from "./ask.ts";
 

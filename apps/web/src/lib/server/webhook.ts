@@ -1,5 +1,5 @@
 import { runWorkflow, type Workflow, type WorkflowExecution } from "factory";
-import type { WebConfig } from "factory-web";
+import type { WebConfig } from "factory/web";
 import { Check, Errors } from "typebox/value";
 
 type WebhookRunner = (

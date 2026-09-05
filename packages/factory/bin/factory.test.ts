@@ -1,15 +1,16 @@
-import { describe, expect, test } from "bun:test";
+import { spawnProcess } from "../../../test/process.ts";
+import { describe, expect, test } from "vitest";
 import { resolve } from "node:path";
 
-const executable = resolve(import.meta.dir, "factory.ts");
-const fixture = resolve(import.meta.dir, "../test/fixtures/echo-workflow.ts");
+const executable = resolve(import.meta.dirname, "factory.js");
+const fixture = resolve(import.meta.dirname, "../test/fixtures/echo-workflow.ts");
 
 describe("factory executable", () => {
   test("loads a workflow file and injects the factory runtime", async () => {
-    const child = Bun.spawn(
+    const child = spawnProcess(
       [process.execPath, executable, fixture, "A workflow result"],
       {
-        cwd: import.meta.dir,
+        cwd: import.meta.dirname,
         stdout: "pipe",
         stderr: "pipe",
       },
@@ -28,7 +29,7 @@ describe("factory executable", () => {
   });
 
   test("runs a workflow without a prompt", async () => {
-    const child = Bun.spawn(
+    const child = spawnProcess(
       [process.execPath, executable, fixture, "--json"],
       {
         stdout: "pipe",
@@ -46,7 +47,7 @@ describe("factory executable", () => {
   });
 
   test("reports invalid invocations without a stack trace", async () => {
-    const child = Bun.spawn([process.execPath, executable], {
+    const child = spawnProcess([process.execPath, executable, "--config", "missing-factory-config.ts"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -57,14 +58,12 @@ describe("factory executable", () => {
     ]);
 
     expect(exitCode).toBe(1);
-    expect(stderr).toContain(
-      "Usage: factory [-v|--verbose] [--log|--json] <workflow.ts> [prompt]",
-    );
+    expect(stderr).toContain("Factory web configuration not found:");
     expect(stderr).not.toContain("at ");
   });
 
   test("prints one structured document to stdout in JSON mode", async () => {
-    const child = Bun.spawn(
+    const child = spawnProcess(
       [process.execPath, executable, fixture, "--json", "A JSON result"],
       {
         stdout: "pipe",
@@ -84,7 +83,7 @@ describe("factory executable", () => {
     expect(execution.error).toBeNull();
     expect(execution.result.summary).toBe("A JSON result");
     expect(execution.result.outputs.id).toMatch(/^[a-z]+-[a-z]+-\d{4}$/);
-    expect(execution.durationMs).toBeNumber();
+    expect(execution.durationMs).toBeTypeOf("number");
     expect(execution.usage).toEqual({
       input: 0,
       output: 0,
@@ -96,7 +95,7 @@ describe("factory executable", () => {
   });
 
   test("reports failures as JSON with a nonzero exit status", async () => {
-    const child = Bun.spawn([process.execPath, executable, "--json"], {
+    const child = spawnProcess([process.execPath, executable, "--json"], {
       stdout: "pipe",
       stderr: "pipe",
     });

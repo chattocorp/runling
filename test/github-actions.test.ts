@@ -1,4 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
+import { readFile } from "node:fs/promises";
+import { parse } from "yaml";
 
 const workflowPath = new URL("../.github/workflows/test.yml", import.meta.url);
 const misePath = new URL("../mise.toml", import.meta.url);
@@ -14,14 +16,10 @@ interface Workflow {
   jobs?: Record<string, { steps?: WorkflowStep[] }>;
 }
 
-interface MiseConfig {
-  tools?: Record<string, unknown>;
-}
-
-const workflow = Bun.YAML.parse(
-  await Bun.file(workflowPath).text(),
-) as Workflow;
-const mise = Bun.TOML.parse(await Bun.file(misePath).text()) as MiseConfig;
+const workflow = parse(await readFile(workflowPath, "utf8")) as Workflow;
+const nodeVersion = (await readFile(misePath, "utf8")).match(
+  /node = "([^"]+)"/,
+)?.[1];
 
 describe("GitHub Actions test workflow", () => {
   test("runs for pushes and pull requests", () => {
@@ -30,25 +28,25 @@ describe("GitHub Actions test workflow", () => {
     );
   });
 
-  test("installs locked dependencies and runs the test suite with the project Bun version", () => {
-    const bunVersion = mise.tools?.bun;
+  test("installs locked dependencies and tests the package with the project Node version", () => {
     const steps = workflow.jobs?.test?.steps;
 
-    expect(typeof bunVersion).toBe("string");
+    expect(typeof nodeVersion).toBe("string");
     expect(Array.isArray(steps)).toBe(true);
 
     const setupIndex =
-      steps?.findIndex((step) => step.uses === "oven-sh/setup-bun@v2") ?? -1;
+      steps?.findIndex((step) => step.uses === "actions/setup-node@v4") ?? -1;
     const installIndex =
       steps?.findIndex(
-        (step) => step.run === "bun install --frozen-lockfile",
+        (step) => step.run === "pnpm install --frozen-lockfile",
       ) ?? -1;
     const testIndex =
-      steps?.findIndex((step) => step.run === "bun test") ?? -1;
+      steps?.findIndex((step) => step.run === "pnpm test") ?? -1;
 
     expect(setupIndex).toBeGreaterThanOrEqual(0);
-    expect(steps?.[setupIndex]?.with?.["bun-version"]).toBe(bunVersion);
+    expect(steps?.[setupIndex]?.with?.["node-version"]).toBe(nodeVersion);
     expect(installIndex).toBeGreaterThan(setupIndex);
     expect(testIndex).toBeGreaterThan(installIndex);
+    expect(steps?.some((step) => step.run === "pnpm test:package")).toBe(true);
   });
 });

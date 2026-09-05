@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { stripVTControlCharacters } from "node:util";
+import { afterEach, describe, expect, test } from "vitest";
 import {
   executeWorkflow,
   formatDuration,
@@ -31,10 +32,10 @@ describe("executeWorkflow", () => {
   test("passes one factory containing primitives and invocation values", async () => {
     await executeWorkflow(async (receivedFactory) => {
       expect(receivedFactory).toBe(f);
-      expect(receivedFactory.agent).toBeFunction();
-      expect(receivedFactory.shell).toBeFunction();
-      expect(receivedFactory.createShell).toBeFunction();
-      expect(receivedFactory.step).toBeFunction();
+      expect(receivedFactory.agent).toBeTypeOf("function");
+      expect(receivedFactory.shell).toBeTypeOf("function");
+      expect(receivedFactory.createShell).toBeTypeOf("function");
+      expect(receivedFactory.step).toBeTypeOf("function");
       expect(receivedFactory.cwd).toBe("/project");
       expect(receivedFactory.prompt).toBe("Make the change");
     }, f);
@@ -114,7 +115,7 @@ describe("executeWorkflow", () => {
     const details = logs.find((line) => line.includes("Findings"));
     expect(details).toBeDefined();
     expect(details).toContain("\x1b[");
-    expect(Bun.stripANSI(details ?? "")).not.toContain("##");
+    expect(stripVTControlCharacters(details ?? "")).not.toContain("##");
   });
 
   test("emits only the execution document to stdout in JSON mode", async () => {
@@ -375,8 +376,8 @@ describe("formatWorkflowDetails", () => {
     });
 
     expect(formatted).toContain("\x1b[");
-    expect(Bun.stripANSI(formatted)).not.toContain("##");
-    expect(Bun.stripANSI(formatted)).not.toContain("**");
+    expect(stripVTControlCharacters(formatted)).not.toContain("##");
+    expect(stripVTControlCharacters(formatted)).not.toContain("**");
   });
 
   test("preserves Markdown for redirected output", () => {

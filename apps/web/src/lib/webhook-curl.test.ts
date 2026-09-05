@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import { spawnProcess } from "../../../../test/process.ts";
+import { expect, test } from "vitest";
 import { shellQuote, webhookCurl } from "./webhook-curl.ts";
 
 test("shell quoting protects apostrophes and shell expressions", () => {
@@ -10,7 +11,7 @@ test("curl example preserves the URL and sample JSON as literal shell arguments"
   const body = { value: "it's $(whoami) `pwd` $HOME\nnext line" };
   const command = webhookCurl(url, { examples: [body] });
   // Substitute a local function for curl. No HTTP request is sent.
-  const process = Bun.spawn(
+  const process = spawnProcess(
     ["/bin/sh", "-c", `curl() { printf '%s\\0' "$@"; }; ${command}`],
     { stdout: "pipe", stderr: "pipe" },
   );

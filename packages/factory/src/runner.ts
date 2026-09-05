@@ -302,7 +302,7 @@ export async function loadWorkflow(path: string): Promise<Workflow> {
   return module.default;
 }
 
-export async function runFactory(argv: readonly string[] = Bun.argv.slice(2)) {
+export async function runFactory(argv: readonly string[] = process.argv.slice(2)) {
   const json = argv.includes("--json");
   const presentation = shouldUseTui(argv) ? "tui" : "log";
   const title =

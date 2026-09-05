@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, test } from "bun:test";
+import { describe, expect, expectTypeOf, test } from "vitest";
 import { Type } from "typebox";
 import type { Factory } from "./runtime.ts";
 import { workflow } from "./workflow.ts";

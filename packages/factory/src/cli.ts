@@ -34,8 +34,8 @@ function parseCliArguments(argv: readonly string[]) {
 }
 
 export function cli(
-  argv: readonly string[] = Bun.argv.slice(2),
-  command = displayPath(Bun.main),
+  argv: readonly string[] = process.argv.slice(2),
+  command = displayPath((process.argv[1] ?? "factory")),
 ): CliArguments {
   let parsed: ReturnType<typeof parseCliArguments>;
 

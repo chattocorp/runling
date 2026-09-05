@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -219,7 +220,7 @@ async function createFactoryAgent(
       emitFactoryEvent({
         type: "agent.action",
         agentId,
-        action: Bun.stripANSI(message),
+        action: stripVTControlCharacters(message),
       });
     }
     withLogSource({ type: "agent", id: agentId }, () =>

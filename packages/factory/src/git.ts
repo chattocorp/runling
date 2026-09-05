@@ -1,50 +1,38 @@
 import { createReadStream } from "node:fs";
 import { lstat, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createHash, type Hash } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const exec = promisify(execFile);
 
 async function git(cwd: string, args: string[]) {
-  const process = Bun.spawn(["git", ...args], {
+  const { stdout } = await exec("git", args, {
     cwd,
-    stdout: "pipe",
-    stderr: "pipe",
+    encoding: "buffer",
+    maxBuffer: 128 * 1024 * 1024,
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).arrayBuffer(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    throw new Error(stderr);
-  }
-
   return stdout;
 }
 
 async function hasHead(cwd: string) {
-  const process = Bun.spawn(["git", "rev-parse", "--verify", "HEAD"], {
-    cwd,
-    stdout: "ignore",
-    stderr: "ignore",
-  });
-  return (await process.exited) === 0;
+  try {
+    await git(cwd, ["rev-parse", "--verify", "HEAD"]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-function updateField(
-  hasher: Bun.CryptoHasher,
-  value: string | ArrayBuffer | Uint8Array,
-) {
+function updateField(hasher: Hash, value: string | ArrayBuffer | Uint8Array) {
   const bytes =
     typeof value === "string" ? new TextEncoder().encode(value) : value;
   hasher.update(`${bytes.byteLength}:`);
-  hasher.update(bytes);
+  hasher.update(bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes);
 }
 
-async function updateUntrackedFile(
-  hasher: Bun.CryptoHasher,
-  cwd: string,
-  path: string,
-) {
+async function updateUntrackedFile(hasher: Hash, cwd: string, path: string) {
   const absolutePath = resolve(cwd, path);
   const stat = await lstat(absolutePath);
 
@@ -67,7 +55,7 @@ async function updateUntrackedFile(
 }
 
 export async function workingTreeHash(cwd = process.cwd()) {
-  const hasher = new Bun.CryptoHasher("sha256");
+  const hasher = createHash("sha256");
   if (await hasHead(cwd)) {
     updateField(hasher, await git(cwd, ["diff", "--binary", "HEAD"]));
   } else {

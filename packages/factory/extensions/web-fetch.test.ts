@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test, vi } from "vitest";
 import { createWebFetchExtension } from "./web-fetch.ts";
 
 function loadWebFetchTool(
@@ -17,7 +17,7 @@ function loadWebFetchTool(
 
 describe("web_fetch extension", () => {
   test("fetches textual HTTP content with response metadata", async () => {
-    const fetch = mock(async () =>
+    const fetch = vi.fn(async () =>
       new Response("Hello from the web", {
         status: 200,
         statusText: "OK",
@@ -77,7 +77,7 @@ describe("web_fetch extension", () => {
     "::1",
     "fd00::1",
   ])("blocks private destination %s", async (address) => {
-    const fetch = mock(async () => new Response("should not be fetched"));
+    const fetch = vi.fn(async () => new Response("should not be fetched"));
     const webFetchTool = loadWebFetchTool(fetch, async () => [address]);
 
     await expect(
@@ -91,7 +91,7 @@ describe("web_fetch extension", () => {
   });
 
   test("blocks a redirect to a private destination before following it", async () => {
-    const fetch = mock(async () =>
+    const fetch = vi.fn(async () =>
       new Response(null, {
         status: 302,
         headers: { location: "http://169.254.169.254/latest/meta-data" },

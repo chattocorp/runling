@@ -1,15 +1,16 @@
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { ansiColor } from "./ansi.ts";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { log } from "./log.ts";
 import { step } from "./step.ts";
 
 describe("log", () => {
   afterEach(() => {
-    mock.restore();
+    vi.restoreAllMocks();
     log.level = "info";
   });
 
   test("debug does not print at the default info level", () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
     log.level = "info";
 
     log.debug("hidden detail");
@@ -18,7 +19,7 @@ describe("log", () => {
   });
 
   test("debug prints at the debug level", () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
     log.level = "debug";
 
     log.debug("visible detail");
@@ -28,8 +29,8 @@ describe("log", () => {
   });
 
   test("info, success, and error print at the info level", () => {
-    const print = spyOn(console, "log");
-    const printError = spyOn(console, "error");
+    const print = vi.spyOn(console, "log");
+    const printError = vi.spyOn(console, "error");
     log.level = "info";
 
     log.info("an info message");
@@ -44,7 +45,7 @@ describe("log", () => {
   });
 
   test("info, success, and error print at the debug level too", () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
     log.level = "debug";
 
     log.info("an info message");
@@ -56,15 +57,15 @@ describe("log", () => {
   test("highlights text in a bold, bright color", () => {
     const highlighted = log.highlight("Reading", "#40c057");
 
-    expect(highlighted).toStartWith("\x1b[1m");
-    expect(highlighted).toContain(Bun.color("#40c057", "ansi") ?? "");
+    expect(highlighted.startsWith("\x1b[1m")).toBe(true);
+    expect(highlighted).toContain(ansiColor("#40c057") ?? "");
     expect(highlighted).toContain("Reading");
-    expect(highlighted).toEndWith("\x1b[0m");
+    expect(highlighted.endsWith("\x1b[0m")).toBe(true);
   });
 
   test("can route informational output to stderr", async () => {
-    const print = spyOn(console, "log");
-    const printError = spyOn(console, "error");
+    const print = vi.spyOn(console, "log");
+    const printError = vi.spyOn(console, "error");
 
     await log.withDestination("stderr", async () => {
       log.info("machine-readable companion log");
@@ -76,7 +77,7 @@ describe("log", () => {
   });
 
   test("indents output one level deeper inside a step", () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
     const result = step("Running a step", () => {
       log.info("inside the step");
       return 42;
@@ -91,7 +92,7 @@ describe("log", () => {
   });
 
   test("restores the indentation level after a step finishes", async () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
 
     await step("outer", async () => {
       log.info("inside outer");
@@ -116,7 +117,7 @@ describe("log", () => {
   });
 
   test("restores the indentation level when a step throws", async () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
 
     await expect(
       step("failing step", async () => {
@@ -129,7 +130,7 @@ describe("log", () => {
   });
 
   test("keeps concurrent steps at their own indentation level", async () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
     let releaseA: () => void = () => {};
     const gate = new Promise<void>((resolveGate) => {
       releaseA = resolveGate;
@@ -156,7 +157,7 @@ describe("log", () => {
   });
 
   test("supports sync and async work without a label", async () => {
-    const print = spyOn(console, "log");
+    const print = vi.spyOn(console, "log");
 
     const sync = log.indented(() => {
       log.info("sync work");

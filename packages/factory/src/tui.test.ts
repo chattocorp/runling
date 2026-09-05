@@ -1,4 +1,7 @@
-import { expect, test } from "bun:test";
+import { setTimeout as sleep } from "node:timers/promises";
+import { visibleWidth } from "@earendil-works/pi-tui";
+import { stripVTControlCharacters } from "node:util";
+import { expect, test } from "vitest";
 import type { Terminal } from "@earendil-works/pi-tui";
 import type { FactoryEvent, FactoryEventPayload } from "./events.ts";
 import { observeFactoryEvents } from "./events.ts";
@@ -116,7 +119,7 @@ test("renders activity as one semantic execution tree", () => {
     }),
   );
 
-  const output = Bun.stripANSI(dashboard.render(100).join("\n"));
+  const output = stripVTControlCharacters(dashboard.render(100).join("\n"));
   const lines = output.split("\n");
   expect(output).toContain("Factory  workflows/review.ts");
   expect(lines).toContain("  ● Review");
@@ -150,7 +153,7 @@ test("renders activity as one semantic execution tree", () => {
       "investigate",
     ),
   );
-  const completed = Bun.stripANSI(dashboard.render(100).join("\n"));
+  const completed = stripVTControlCharacters(dashboard.render(100).join("\n"));
   expect(completed).toContain("      ✓ [bright-otters-1234]");
   expect(completed).not.toContain("↳ Using grep");
 
@@ -162,7 +165,7 @@ test("renders activity as one semantic execution tree", () => {
       durationMs: 1_500,
     }),
   );
-  const collapsedStep = Bun.stripANSI(dashboard.render(100).join("\n"));
+  const collapsedStep = stripVTControlCharacters(dashboard.render(100).join("\n"));
   expect(collapsedStep).toContain("    ✓ Investigate change · 1.5s");
   expect(collapsedStep).not.toContain("git status --short");
   expect(collapsedStep).not.toContain("bright-otters-1234");
@@ -176,7 +179,7 @@ test("renders activity as one semantic execution tree", () => {
       durationMs: 2_000,
     }),
   );
-  const collapsedWorkflow = Bun.stripANSI(dashboard.render(100).join("\n"));
+  const collapsedWorkflow = stripVTControlCharacters(dashboard.render(100).join("\n"));
   expect(collapsedWorkflow).toContain("  ✓ Review · 2.0s");
   expect(collapsedWorkflow).not.toContain("Investigate change");
 
@@ -188,7 +191,7 @@ test("renders activity as one semantic execution tree", () => {
       durationMs: 2_100,
     }),
   );
-  const failedWorkflow = Bun.stripANSI(dashboard.render(100).join("\n"));
+  const failedWorkflow = stripVTControlCharacters(dashboard.render(100).join("\n"));
   expect(failedWorkflow).toContain("  ✗ Review · 2.1s");
   expect(failedWorkflow).toContain("    ✓ Investigate change · 1.5s");
   expect(failedWorkflow).not.toContain("git status --short");
@@ -212,7 +215,7 @@ test("renders the final Markdown report and completion state", () => {
   };
 
   dashboard.finish(execution);
-  const output = Bun.stripANSI(dashboard.render(80).join("\n"));
+  const output = stripVTControlCharacters(dashboard.render(80).join("\n"));
 
   expect(output).toContain("Completed  ·  1s  ·  0 tokens  ·  $0.00");
   expect(output).toContain("\nReview complete\n");
@@ -242,7 +245,7 @@ test("wraps and Markdown-renders the final summary when details are present", ()
     },
   });
 
-  const output = Bun.stripANSI(dashboard.render(40).join("\n"));
+  const output = stripVTControlCharacters(dashboard.render(40).join("\n"));
   expect(output).toContain(
     "\nChatto deliberately keeps servers\nindependent, according to the\ndocumentation.\n",
   );
@@ -265,7 +268,7 @@ test("renders a Markdown result supplied as the workflow summary", () => {
     },
   });
 
-  const output = Bun.stripANSI(dashboard.render(80).join("\n"));
+  const output = stripVTControlCharacters(dashboard.render(80).join("\n"));
   expect(output).toContain("Joke");
   expect(output).toContain("A factory walks into a bar.");
   expect(output).not.toContain("# Joke");
@@ -279,7 +282,7 @@ test("shows a bounded, ANSI-free tail for failed commands", () => {
   );
   dashboard.handle(
     event(
-      { type: "command.started", id: "bun-test", command: "bun test" },
+      { type: "command.started", id: "bun-test", command: "pnpm test" },
       "test",
     ),
   );
@@ -299,8 +302,8 @@ test("shows a bounded, ANSI-free tail for failed commands", () => {
     ),
   );
 
-  const output = Bun.stripANSI(dashboard.render(80).join("\n"));
-  expect(output).toContain("✗ Ran bun test · 1.8s");
+  const output = stripVTControlCharacters(dashboard.render(80).join("\n"));
+  expect(output).toContain("✗ Ran pnpm test · 1.8s");
   expect(output).toContain("… 3 earlier lines omitted");
   expect(output).not.toContain("Preparing tests");
   expect(output).not.toContain("failure 2");
@@ -322,7 +325,7 @@ test("never renders beyond the available width", () => {
   );
 
   expect(
-    dashboard.render(20).every((line) => Bun.stringWidth(line) <= 20),
+    dashboard.render(20).every((line) => visibleWidth(line) <= 20),
   ).toBe(true);
 });
 
@@ -356,8 +359,8 @@ test("drives pi-tui through the main-screen reporter lifecycle", () => {
   expect(terminal.output).not.toContain("\x1b[?1049l");
   expect(terminal.output).not.toContain("\x1b[2J");
   expect(terminal.output).not.toContain("\x1b[3J");
-  expect(Bun.stripANSI(terminal.output)).toContain("Doing useful work");
-  expect(Bun.stripANSI(terminal.output)).toContain("Done");
+  expect(stripVTControlCharacters(terminal.output)).toContain("Doing useful work");
+  expect(stripVTControlCharacters(terminal.output)).toContain("Done");
 });
 
 test("collects workflow input inline in the execution tree", async () => {
@@ -369,13 +372,13 @@ test("collects workflow input inline in the execution tree", async () => {
   const answer = observeFactoryEvents(reporter.handle, () =>
     input("What should we call this release?", { defaultValue: "Factory " }),
   );
-  await Bun.sleep(10);
+  await sleep(10);
 
-  expect(Bun.stripANSI(terminal.output)).toContain(
+  expect(stripVTControlCharacters(terminal.output)).toContain(
     "What should we call this release?",
   );
-  expect(Bun.stripANSI(terminal.output)).toContain("> Factory ");
-  expect(Bun.stripANSI(terminal.output)).not.toContain("Interview");
+  expect(stripVTControlCharacters(terminal.output)).toContain("> Factory ");
+  expect(stripVTControlCharacters(terminal.output)).not.toContain("Interview");
   expect(terminal.output).not.toContain("\x1b[2J");
   expect(terminal.output).not.toContain("\x1b[3J");
 
@@ -383,8 +386,8 @@ test("collects workflow input inline in the execution tree", async () => {
   terminal.send("\r");
 
   await expect(answer).resolves.toBe("Factory Manbot");
-  await Bun.sleep(10);
-  expect(Bun.stripANSI(terminal.output)).toContain(
+  await sleep(10);
+  expect(stripVTControlCharacters(terminal.output)).toContain(
     "✓ What should we call this release? → Factory Manbot",
   );
   expect(terminal.output).not.toContain("\x1b[2J");

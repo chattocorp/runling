@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { ansiColor } from "./ansi.ts";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const fakeModel = {
   id: "claude-opus-4-5",
@@ -21,7 +22,7 @@ let abortCalls = 0;
 let disposed = false;
 let modelAvailable = true;
 
-mock.module("@earendil-works/pi-coding-agent", () => {
+vi.doMock("@earendil-works/pi-coding-agent", () => {
   return {
     ModelRuntime: {
       create: async () => ({
@@ -164,8 +165,8 @@ describe("describeTool", () => {
     expect(describeTool("write", { path: "src/foo.ts" })).toBe(
       "Writing src/foo.ts",
     );
-    expect(describeTool("bash", { command: "bun test" })).toBe(
-      "Running bun test",
+    expect(describeTool("bash", { command: "pnpm test" })).toBe(
+      "Running pnpm test",
     );
     expect(describeTool("report_outcome", {})).toBe("Using report_outcome");
   });
@@ -177,8 +178,8 @@ describe("describeTool", () => {
 
 describe("runAgent", () => {
   test("uses a distinct, consistent color for each agent", async () => {
-    const withColor = spyOn(log, "withColor");
-    const colorize = spyOn(log, "colorize");
+    const withColor = vi.spyOn(log, "withColor");
+    const colorize = vi.spyOn(log, "colorize");
     promptImplementation = async () => {
       eventHandler?.({ type: "agent_start" });
       await reportOutcome({ outcome: "completed", summary: "Done" });
@@ -284,7 +285,7 @@ describe("runAgent", () => {
     );
     expect(reading).toBeDefined();
     expect(reading).toContain("\x1b[1m");
-    expect(reading).toContain(Bun.color("#40c057", "ansi") ?? "");
+    expect(reading).toContain(ansiColor("#40c057") ?? "");
     expect(reading!.indexOf("\x1b[0m", reading!.indexOf("Reading"))).toBeLessThan(
       reading!.indexOf("src/foo.ts"),
     );
@@ -950,7 +951,7 @@ describe("agent", () => {
         model: "anthropic/claude-opus-4-5",
       });
       expect(disposed).toBe(false);
-      expect(instance.id).toBeString();
+      expect(instance.id).toBeTypeOf("string");
     }
 
     expect(disposed).toBe(true);

@@ -1,17 +1,19 @@
-import { expect, test } from "bun:test";
+import { visibleWidth } from "@earendil-works/pi-tui";
+import { stripVTControlCharacters } from "node:util";
+import { expect, test } from "vitest";
 import { renderMarkdown } from "./markdown.ts";
 
 test("renders Markdown as styled terminal text", () => {
   const rendered = renderMarkdown(
-    "## Findings\n\n- Read **carefully**\n- Run `bun test`",
+    "## Findings\n\n- Read **carefully**\n- Run `pnpm test`",
     80,
   );
-  const plain = Bun.stripANSI(rendered);
+  const plain = stripVTControlCharacters(rendered);
 
   expect(rendered).toContain("\x1b[");
   expect(plain).toContain("Findings");
   expect(plain).toContain("Read carefully");
-  expect(plain).toContain("Run bun test");
+  expect(plain).toContain("Run pnpm test");
   expect(plain).not.toContain("##");
   expect(plain).not.toContain("**");
 });
@@ -26,7 +28,7 @@ test.each([12, 19, 20, 24])(
 
     expect(rendered.split("\n").length).toBeGreaterThan(1);
     expect(
-      rendered.split("\n").every((line) => Bun.stringWidth(line) <= width),
+      rendered.split("\n").every((line) => visibleWidth(line) <= width),
     ).toBe(true);
   },
 );

@@ -4,6 +4,6 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [sveltekit()],
   ssr: { external: ["factory"] },
-  // Config files import Factory through Bun. Keep one runtime instance.
-  build: { rollupOptions: { external: ["factory"] } },
+  // Config files and the server must share one Factory event runtime.
+  build: { rollupOptions: { external: ["factory", "factory/web"] } },
 });

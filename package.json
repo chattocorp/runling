@@ -1,23 +1,32 @@
 {
   "name": "factory-monorepo",
   "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "dev:web": "factory-web",
-    "link": "bun link --cwd packages/factory && bun link --cwd apps/web",
-    "test": "bun test",
-    "check": "bun run check:root && bun run --filter '*' check",
-    "check:root": "tsc --noEmit"
+    "factory": "node packages/factory/bin/factory.js",
+    "dev:web": "node --import tsx apps/web/src/bin/factory-web.ts",
+    "build": "pnpm --filter factory build && pnpm --filter @factory/web build && node scripts/bundle-web.mjs",
+    "test": "vitest run",
+    "check": "pnpm run check:root && pnpm -r check",
+    "check:root": "tsc --noEmit",
+    "test:package": "node scripts/test-package.mjs"
   },
   "dependencies": {
-    "factory": "workspace:*",
-    "factory-web": "workspace:*"
+    "factory": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "1.4.0",
-    "typescript": "^7"
+    "@types/node": "^22",
+    "tsx": "^4.20.0",
+    "vitest": "^3.2.0",
+    "yaml": "^2.8.0",
+    "typescript": "~5.9.3"
   }
 }

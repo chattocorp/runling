@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { formatAgentInstructions } from "./system-prompt.ts";
 
 describe("formatAgentInstructions", () => {

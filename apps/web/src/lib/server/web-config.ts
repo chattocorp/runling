@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { isWebConfig, type WebConfig } from "../../config.ts";
+import { isWebConfig, type WebConfig } from "factory/web";
 
 let loadedConfig: Promise<WebConfig> | undefined;
 

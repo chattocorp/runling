@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 import { eventStream } from "./stream.ts";
 
 test("sends snapshots and removes listeners when the browser disconnects", async () => {

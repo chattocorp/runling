@@ -1,7 +1,8 @@
+import { ansiColor } from "./ansi.ts";
 import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
 
 const foreground = (color: string) => (text: string) => {
-  const open = Bun.color(color, "ansi");
+  const open = ansiColor(color);
   return open ? `${open}${text}\x1b[39m` : text;
 };
 

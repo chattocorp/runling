@@ -1,6 +1,6 @@
-import { describe, expect, expectTypeOf, test } from "bun:test";
+import { describe, expect, expectTypeOf, test } from "vitest";
 import { Type, workflow, type WorkflowExecution } from "factory";
-import { defineWebConfig, isWebConfig } from "factory-web";
+import { defineWebConfig, isWebConfig } from "factory/web";
 import { describeWebhook, handleWebhook, prepareWebhook } from "./webhook.ts";
 
 const joke = workflow(

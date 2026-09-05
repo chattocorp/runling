@@ -1,32 +1,53 @@
 {
   "name": "factory",
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "keywords": [
     "pi-package"
   ],
   "pi": {
     "extensions": [
-      "./extensions/web-fetch.ts"
+      "./dist/extensions/web-fetch.js"
     ]
   },
-  "module": "src/index.ts",
-  "exports": "./src/index.ts",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./web": {
+      "types": "./dist/src/web-config.d.ts",
+      "default": "./dist/src/web-config.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin/factory.js"
+  ],
   "bin": {
-    "factory": "./bin/factory.ts"
+    "factory": "./bin/factory.js"
   },
   "type": "module",
-  "private": true,
   "scripts": {
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "node -e \"for (const file of ['dist/src/index.js', 'dist/src/index.d.ts', 'dist/web/handler.js']) { if (!require('node:fs').existsSync(file)) throw new Error('Run pnpm build from the repository root before packing Factory'); }\""
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.84.4",
     "@earendil-works/pi-tui": "0.84.4",
     "ajv": "^8.20.0",
     "human-id": "4.2.1",
-    "typebox": "1.3.7"
+    "typebox": "1.3.7",
+    "tsx": "^4.20.0",
+    "color-name": "^2.0.0"
   },
   "devDependencies": {
-    "@types/bun": "1.4.0",
-    "typescript": "^7"
+    "@types/node": "^22",
+    "@types/color-name": "^2.0.0",
+    "typescript": "~5.9.3"
   }
 }

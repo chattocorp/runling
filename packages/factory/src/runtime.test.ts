@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { createFactory } from "./runtime.ts";
 
 describe("factory", () => {
@@ -9,10 +9,10 @@ describe("factory", () => {
       verbose: false,
     });
 
-    expect(f.agent).toBeFunction();
-    expect(f.input).toBeFunction();
-    expect(f.shell).toBeFunction();
-    expect(f.createShell).toBeFunction();
+    expect(f.agent).toBeTypeOf("function");
+    expect(f.input).toBeTypeOf("function");
+    expect(f.shell).toBeTypeOf("function");
+    expect(f.createShell).toBeTypeOf("function");
     expect(f.cwd).toBe("/project");
     expect(f.prompt).toBe("Make the change");
   });

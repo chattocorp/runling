@@ -12,10 +12,10 @@ const maxValidationFeedbackLength = 18_000;
 const validate = (f: Factory) =>
   f.step("Validate", async () => {
     const check = await f.step("Run checks", () =>
-      f.shell`bun run check`.nothrow(),
+      f.shell`pnpm run check`.nothrow(),
     );
     return check.exitCode === 0
-      ? f.step("Run tests", () => f.shell`bun test`.nothrow())
+      ? f.step("Run tests", () => f.shell`pnpm test`.nothrow())
       : check;
   });
 
@@ -70,7 +70,7 @@ export const implement = workflow(
         () =>
           implementationAgent.run(
             f.concat(
-              "Project validation failed. Fix the implementation and tests so that both `bun run check` and `bun test` pass.",
+              "Project validation failed. Fix the implementation and tests so that both `pnpm run check` and `pnpm test` pass.",
               "In your report, summarize the complete implementation, including this repair.",
               "",
               "Failure output:",

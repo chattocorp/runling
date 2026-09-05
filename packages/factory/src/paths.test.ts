@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { displayPath, displayText } from "./paths.ts";
 
 describe("displayPath", () => {
@@ -31,14 +31,14 @@ describe("displayText", () => {
   const cwd = "/tmp/project";
 
   test("removes embedded absolute cwd paths", () => {
-    expect(displayText("bun test /tmp/project/src/agent.ts", cwd)).toBe(
-      "bun test src/agent.ts",
+    expect(displayText("pnpm test /tmp/project/src/agent.ts", cwd)).toBe(
+      "pnpm test src/agent.ts",
     );
   });
 
   test("leaves text without cwd references untouched", () => {
-    expect(displayText("bun test src/agent.ts", cwd)).toBe(
-      "bun test src/agent.ts",
+    expect(displayText("pnpm test src/agent.ts", cwd)).toBe(
+      "pnpm test src/agent.ts",
     );
   });
 

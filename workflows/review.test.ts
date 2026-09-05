@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { Factory, FactoryAgent, Shell } from "factory";
 import { review } from "./review.ts";
 

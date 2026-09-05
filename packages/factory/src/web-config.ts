@@ -1,4 +1,5 @@
-import { isWorkflow, type TSchema, type Workflow } from "factory";
+import { isWorkflow, type Workflow } from "./workflow.ts";
+import type { TSchema } from "typebox";
 
 export interface WebhookDefinition<
   WorkflowInputSchema extends TSchema,
@@ -9,7 +10,8 @@ export interface WebhookDefinition<
 
 // Accept heterogeneous workflow signatures; defineWebConfig preserves each concrete type.
 type AnyWebhookDefinition = {
-  workflow: ((...args: any[]) => unknown) & Pick<Workflow, "name" | "input" | "output">;
+  workflow: ((...args: any[]) => unknown) &
+    Pick<Workflow, "name" | "input" | "output">;
 };
 
 export interface WebConfig<

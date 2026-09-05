@@ -1,4 +1,4 @@
-import { defineWebConfig } from "factory-web";
+import { defineWebConfig } from "factory/web";
 import joke from "./workflows/joke.ts";
 
 export default defineWebConfig({

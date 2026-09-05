@@ -1,11 +1,13 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { writeFile } from "node:fs/promises";
+import { spawnProcess } from "../../../test/process.ts";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { chmod, mkdtemp, rm, symlink, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getPwd, workingTreeHash } from "./git.ts";
 
 async function git(cwd: string, ...args: string[]) {
-  const process = Bun.spawn(["git", ...args], {
+  const process = spawnProcess(["git", ...args], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
@@ -26,7 +28,7 @@ describe("workingTreeHash", () => {
   beforeEach(async () => {
     cwd = await mkdtemp(join(tmpdir(), "factory-git-test-"));
     await git(cwd, "init", "--quiet");
-    await Bun.write(join(cwd, "tracked.txt"), "initial\n");
+    await writeFile(join(cwd, "tracked.txt"), "initial\n");
     await git(cwd, "add", "tracked.txt");
     await git(
       cwd,
@@ -51,7 +53,7 @@ describe("workingTreeHash", () => {
 
   test("changes when a tracked file changes", async () => {
     const before = await workingTreeHash(cwd);
-    await Bun.write(join(cwd, "tracked.txt"), "changed\n");
+    await writeFile(join(cwd, "tracked.txt"), "changed\n");
     expect(await workingTreeHash(cwd)).not.toBe(before);
   });
 
@@ -59,10 +61,10 @@ describe("workingTreeHash", () => {
     const clean = await workingTreeHash(cwd);
     const path = join(cwd, "untracked.txt");
 
-    await Bun.write(path, "first\n");
+    await writeFile(path, "first\n");
     const first = await workingTreeHash(cwd);
 
-    await Bun.write(path, "second\n");
+    await writeFile(path, "second\n");
     const second = await workingTreeHash(cwd);
 
     expect(first).not.toBe(clean);
@@ -74,7 +76,7 @@ describe("workingTreeHash", () => {
 
   test("includes untracked file modes", async () => {
     const path = join(cwd, "script.sh");
-    await Bun.write(path, "#!/bin/sh\n");
+    await writeFile(path, "#!/bin/sh\n");
     const before = await workingTreeHash(cwd);
 
     await chmod(path, 0o755);
@@ -83,8 +85,8 @@ describe("workingTreeHash", () => {
   });
 
   test("includes untracked symlink targets", async () => {
-    await Bun.write(join(cwd, "first.txt"), "same contents\n");
-    await Bun.write(join(cwd, "second.txt"), "same contents\n");
+    await writeFile(join(cwd, "first.txt"), "same contents\n");
+    await writeFile(join(cwd, "second.txt"), "same contents\n");
     const path = join(cwd, "link.txt");
     await symlink("first.txt", path);
     const before = await workingTreeHash(cwd);
@@ -100,11 +102,11 @@ describe("workingTreeHash", () => {
 
     try {
       await git(freshCwd, "init", "--quiet");
-      await Bun.write(join(freshCwd, "new.txt"), "staged\n");
+      await writeFile(join(freshCwd, "new.txt"), "staged\n");
       await git(freshCwd, "add", "new.txt");
       const pwd = await getPwd(freshCwd);
 
-      await Bun.write(join(freshCwd, "new.txt"), "changed\n");
+      await writeFile(join(freshCwd, "new.txt"), "changed\n");
 
       expect(await pwd.hasChanges).toBe(true);
     } finally {
@@ -119,7 +121,7 @@ describe("workingTreeHash", () => {
 
   test("working directory snapshots report later changes", async () => {
     const pwd = await getPwd(cwd);
-    await Bun.write(join(cwd, "tracked.txt"), "changed\n");
+    await writeFile(join(cwd, "tracked.txt"), "changed\n");
     expect(await pwd.hasChanges).toBe(true);
   });
 });

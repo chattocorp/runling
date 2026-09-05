@@ -1,24 +1,27 @@
-import { describe, expect, test } from "bun:test";
+import { spawnProcess } from "../../../test/process.ts";
+import { describe, expect, test } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 
 describe("web_fetch package integration", () => {
   test("the manifest loads only the selectable web_fetch extension", async () => {
-    const packageJson = await Bun.file(
-      resolve(import.meta.dir, "../package.json"),
-    ).json();
-    expect(packageJson.pi.extensions).toEqual(["./extensions/web-fetch.ts"]);
+    const packageJson = JSON.parse(await readFile(
+      resolve(import.meta.dirname, "../package.json"),
+      "utf8",
+    ));
+    expect(packageJson.pi.extensions).toEqual(["./dist/extensions/web-fetch.js"]);
 
     const temporaryDirectory = await mkdtemp(
       resolve(tmpdir(), "factory-web-fetch-"),
     );
     try {
-      const child = Bun.spawn(
+      const child = spawnProcess(
         [
           process.execPath,
-          resolve(import.meta.dir, "fixtures/web-fetch-loader.ts"),
-          resolve(import.meta.dir, "../extensions/web-fetch.ts"),
+          resolve(import.meta.dirname, "fixtures/web-fetch-loader.ts"),
+          resolve(import.meta.dirname, "../dist/extensions/web-fetch.js"),
           temporaryDirectory,
         ],
         { stdout: "pipe", stderr: "pipe" },

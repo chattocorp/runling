@@ -1,3 +1,5 @@
+import { ansiColor } from "./ansi.ts";
+import { stripVTControlCharacters } from "node:util";
 import {
   type Focusable,
   Input as TextInput,
@@ -20,7 +22,7 @@ import { totalTokens, type TokenUsage } from "./usage.ts";
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 const paint = (color: string, text: string): string => {
-  const ansi = Bun.color(color, "ansi");
+  const ansi = ansiColor(color);
   return ansi ? `${ansi}${text}\x1b[39m` : text;
 };
 
@@ -647,7 +649,7 @@ const failureOutput = ({
   stdout: string;
   stderr: string;
 }): string[] => {
-  const lines = Bun.stripANSI(
+  const lines = stripVTControlCharacters(
     [stdout.trimEnd(), stderr.trimEnd()].filter(Boolean).join("\n"),
   )
     .split("\n")

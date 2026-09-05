@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { type Factory, type Shell } from "factory";
 import { implement } from "./implement.ts";
 
@@ -37,7 +37,7 @@ function runtimeWith({
   }
   const shell = ((strings: TemplateStringsArray) => {
     const command = strings.join("");
-    const run = command === "bun run check" ? runCheck : runTests;
+    const run = command === "pnpm run check" ? runCheck : runTests;
     const shellPromise = {
       cwd: () => shellPromise,
       async nothrow() {

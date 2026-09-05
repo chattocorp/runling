@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { containsMalformedToolCall, toSingleLine } from "./text.ts";
 
 describe("toSingleLine", () => {
@@ -17,11 +17,11 @@ describe("toSingleLine", () => {
 describe("containsMalformedToolCall", () => {
   test("recognizes a tool call emitted as text", () => {
     expect(
-      containsMalformedToolCall('functions.bash:0{"command":"bun test"}'),
-    ).toBeTrue();
+      containsMalformedToolCall('functions.bash:0{"command":"pnpm test"}'),
+    ).toBe(true);
   });
 
   test("ignores regular assistant text", () => {
-    expect(containsMalformedToolCall("Changed the requested files.")).toBeFalse();
+    expect(containsMalformedToolCall("Changed the requested files.")).toBe(false);
   });
 });

@@ -26,7 +26,7 @@ export const describePullRequest = (
         "Write the title and Markdown description for a pull request containing the current commit.",
         "Use the supplied commit and diff, inspecting repository files when useful.",
         "Use your report summary as the concise pull request title and report details as the complete Markdown body.",
-        "Mention that `bun run check` and `bun test` passed.",
+        "Mention that `pnpm run check` and `pnpm test` passed.",
         "",
         "Implementation summary:",
         implementationSummary,
@@ -95,7 +95,7 @@ const makePullRequest = workflow(
     f.log.info(`Working in ${worktreePath}`);
 
     const worktree = { ...f, cwd: worktreePath, prompt: input };
-    await worktree.shell`bun install --frozen-lockfile`;
+    await worktree.shell`pnpm install --frozen-lockfile`;
     const implementationSummary = await implement(worktree, input);
 
     // Review the complete staged change before capturing it in a commit.

@@ -1,12 +1,12 @@
 # Factory
 
-This Bun monorepo contains a TypeScript framework for agent workflows and the
+This pnpm monorepo contains a TypeScript/Node.js framework for agent workflows and the
 applications that use it.
 
 - `packages/factory` contains the `factory` package and command.
 - `workflows` contains workflow scripts.
-- `apps/web` contains the `factory-web` executable and a small SvelteKit
-  app that runs the joke workflow.
+- `apps/web` contains the SvelteKit run console. Its production build is
+  included in the `factory` package.
 
 A workflow is a TypeScript function with JSON Schema input and output. The
 `factory` command loads the function and passes a `Factory` object and an
@@ -26,29 +26,104 @@ The framework can:
 The workflow controls all decisions. Put loops, validation, retries, model
 selection, and outcome handling in the workflow.
 
-## Setup
+## Use Factory in a project
+
+Use Node.js 22.18 or later. Factory includes the TypeScript loader and the
+built web UI. You do not need Bun, Vite, or SvelteKit in your project.
+Shell commands use a POSIX `sh` executable, as supplied by macOS and Linux.
+
+The package name is temporary. Until publication, build and pack this repo:
+
+```bash
+pnpm install
+pnpm build
+pnpm --filter factory pack --pack-destination ../..
+```
+
+In your own npm project, install that tarball:
+
+```bash
+npm install /path/to/factory/factory-0.0.0.tgz
+```
+
+Add a script to your project's `package.json`:
+
+```json
+{ "scripts": { "factory": "factory" } }
+```
+
+Create `workflows/echo.ts`:
+
+```ts
+import { Type, workflow } from "factory";
+
+export default workflow(
+  { name: "Echo", input: Type.String(), output: Type.String() },
+  async (f, input) => f.step("Echo input", () => {
+    f.log.info(input);
+    return input;
+  }),
+);
+```
+
+Create `factory.web.ts` in your project root:
+
+```ts
+import { defineWebConfig } from "factory/web";
+import echo from "./workflows/echo.ts";
+
+export default defineWebConfig({
+  webhooks: { echo: { workflow: echo } },
+});
+```
+
+Start the UI:
+
+```bash
+npm run factory
+```
+
+Open `http://localhost:5173`. Use **Run** to send a JSON string to the workflow,
+or send it directly:
+
+```bash
+curl http://localhost:5173/api/webhooks/echo \
+  -H 'content-type: application/json' -d '"hello"'
+```
+
+The config and workflow files can use TypeScript imports. Both ESM projects
+and projects without `"type": "module"` are supported. The server reads files,
+runs commands, and stores history relative to your project, not the installed
+package. Restart the server after config or workflow changes.
+The command loads `.env` from the project directory without replacing existing
+environment variables. Keep credentials out of version control.
+
+## Work on this repository
 
 Install the tools and dependencies:
 
 ```bash
 mise install
-bun install
+pnpm install
+pnpm build
 ```
 
-Link the local executables during development:
+Start the packaged UI from the repository root:
 
 ```bash
-bun run link
+pnpm factory
 ```
 
 Configure credentials for each model that a workflow uses.
+Use `pnpm dev:web` for the Vite development server when changing the UI.
+Rebuild the framework after changing its source. No global package link is required.
 
 ## Run a workflow
 
 Pass the workflow file and one optional request:
 
 ```bash
-factory path/to/workflow.ts "Implement the requested change"
+npm run factory -- path/to/workflow.ts "Implement the requested change"
 ```
 
 Use `--log` for append-only output. Use `--verbose` for detailed output. Use
@@ -68,11 +143,20 @@ For headless execution, use `runWorkflow(review, { input: "Check error handling"
 The `input` option is required; the old `prompt` option is not supported.
 Each workflow call still runs as a named step, including nested calls.
 
+The workflow CLI accepts a string. Use a configured webhook or `runWorkflow`
+for object, array, or other JSON inputs.
+
 ## Run a shell command
 
 Use `workflow` to give the workflow a name and TypeBox schemas. Factory checks
 the input before the workflow starts and checks the output before it finishes.
 Use `f.shell` to run a command in the current working directory.
+Interpolated values are quoted as shell arguments. Commands return buffered
+`stdout`, `stderr`, and an `exitCode`. Use `.text()` or `.json()` to read stdout,
+`.nothrow()` to inspect a failed command, `.cwd(path)` to set its directory,
+and `.quiet(false)` to stream output. Shell syntax uses POSIX `sh`; Bash-only
+syntax must be run through Bash explicitly. Bun-specific shell objects and
+file-redirection helpers are not supported.
 
 ```ts
 import { Type, workflow } from "factory";
@@ -85,7 +169,7 @@ export default workflow(
   },
   async (f, input) => {
     f.log.info(input);
-    await f.shell`bun test`;
+    await f.shell`npm test`;
     return "Tests passed";
   },
 );
@@ -145,7 +229,7 @@ export default workflow(
     });
 
     const firstReport = await agent.run(input);
-    const tests = await f.shell`bun test`.nothrow();
+    const tests = await f.shell`npm test`.nothrow();
 
     if (tests.exitCode === 0) return firstReport.summary;
 
@@ -182,7 +266,7 @@ export default workflow(
           if (event.isError) return;
           if (event.toolName !== "edit" && event.toolName !== "write") return;
 
-          const check = await f.shell`bun run check`.nothrow();
+          const check = await f.shell`npm run check`.nothrow();
           if (check.exitCode === 0) return;
 
           return {
@@ -216,29 +300,32 @@ option to restrict its tools.
 Run the static checks and tests:
 
 ```bash
-bun run check
-bun test
+pnpm build
+pnpm check
+pnpm test
+pnpm test:package
 ```
 
 ## Run the web app
 
-Start the SvelteKit development server:
+Start the bundled production UI in your project:
 
 ```bash
-factory-web
+npm run factory
 ```
 
 By default, the executable loads `factory.web.ts` from the current directory.
 Use `--config` to select another file. Use `--host`, `--port`, or `--open` to
-configure the server. The `bun run dev:web` command remains available as a
-repository-local alias.
+configure the server, for example `npm run factory -- --port 3000`.
+`factory web` also starts the UI. The Vite development server is only for
+work on this repository; consumers run the bundled Node.js server.
 
 The configuration defines named webhooks. Each webhook selects a workflow.
 The request body uses that workflow's input schema and is passed directly to
 the workflow. Do not define a separate body schema or input mapping.
 
 ```ts
-import { defineWebConfig } from "factory-web";
+import { defineWebConfig } from "factory/web";
 import joke from "./workflows/joke.ts";
 
 export default defineWebConfig({
@@ -308,11 +395,6 @@ The console uses `POST /api/runs/start/:name` to start a run and receive
 The existing `POST /api/webhooks/:name` endpoint still waits for completion
 and returns the workflow output.
 
-Build and start the production server with Bun:
-
-```bash
-bun run --cwd apps/web build
-FACTORY_WEB_CONFIG="$PWD/factory.web.ts" \
-  FACTORY_WEB_WORKFLOW_CWD="$PWD" \
-  bun run --cwd apps/web start
-```
+`pnpm test:package` creates a temporary npm project, installs the packed
+package, and checks the CLI, UI assets, TypeScript config loading, webhooks,
+live events, and history. It does not call an AI model.

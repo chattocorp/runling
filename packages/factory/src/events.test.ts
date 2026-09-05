@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 import {
   emitFactoryEvent,
   observeFactoryEvents,
@@ -17,7 +17,7 @@ test("delivers events with their current activity", () => {
         emitFactoryEvent({
           type: "command.started",
           id: "command-1",
-          command: "bun test",
+          command: "pnpm test",
         }),
       ),
   );
@@ -27,7 +27,7 @@ test("delivers events with their current activity", () => {
     type: "command.started",
     id: "command-1",
     activityId: "step-1",
-    command: "bun test",
+    command: "pnpm test",
   });
 });
 
@@ -40,7 +40,7 @@ test("composes nested event observers", () => {
       emitFactoryEvent({
         type: "command.started",
         id: "command-1",
-        command: "bun test",
+        command: "pnpm test",
       });
     });
   });

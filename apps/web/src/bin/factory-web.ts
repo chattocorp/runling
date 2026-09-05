@@ -1,11 +1,12 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parseArgs } from "node:util";
 import { createServer } from "vite";
-import { isWebConfig } from "../config.ts";
+import { isWebConfig } from "factory/web";
+import { parseFactoryWebArguments } from "../../../../packages/factory/src/web-server.ts";
+export { parseFactoryWebArguments } from "../../../../packages/factory/src/web-server.ts";
 
 const usage = `Usage: factory-web [options]
 
@@ -16,46 +17,8 @@ Options:
   --open         Open the app in a browser
   -h, --help     Show this help`;
 
-export interface FactoryWebArguments {
-  config: string;
-  help: boolean;
-  host: string;
-  open: boolean;
-  port: number;
-}
-
-export function parseFactoryWebArguments(
-  argv: readonly string[],
-): FactoryWebArguments {
-  const parsed = parseArgs({
-    args: [...argv],
-    options: {
-      config: { type: "string", default: "factory.web.ts" },
-      help: { type: "boolean", short: "h", default: false },
-      host: { type: "string", default: "localhost" },
-      open: { type: "boolean", default: false },
-      port: { type: "string", default: "5173" },
-    },
-    allowPositionals: false,
-    strict: true,
-  });
-  const port = Number(parsed.values.port);
-
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error("Port must be an integer from 1 through 65535");
-  }
-
-  return {
-    config: parsed.values.config ?? "factory.web.ts",
-    help: parsed.values.help ?? false,
-    host: parsed.values.host ?? "localhost",
-    open: parsed.values.open ?? false,
-    port,
-  };
-}
-
 export async function runFactoryWeb(
-  argv: readonly string[] = Bun.argv.slice(2),
+  argv: readonly string[] = process.argv.slice(2),
 ): Promise<void> {
   const options = parseFactoryWebArguments(argv);
   if (options.help) {
@@ -63,7 +26,7 @@ export async function runFactoryWeb(
     return;
   }
 
-  const appRoot = resolve(import.meta.dir, "../..");
+  const appRoot = resolve(import.meta.dirname, "../..");
   const workflowCwd = process.cwd();
   const configPath = resolve(workflowCwd, options.config);
   if (!existsSync(configPath)) {
@@ -96,7 +59,10 @@ export async function runFactoryWeb(
   server.printUrls();
 }
 
-if (import.meta.main) {
+if (
+  process.argv[1] &&
+  pathToFileURL(resolve(process.argv[1])).href === import.meta.url
+) {
   try {
     await runFactoryWeb();
   } catch (cause) {

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { cli } from "./cli.ts";
 import { log } from "./log.ts";
 

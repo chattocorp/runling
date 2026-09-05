@@ -1,4 +1,4 @@
-This repository is an experiment in building the core primitive of an agentic software factory: a little TypeScript/Bun framework that you can use to script workflow scripts for agentic coding.
+This repository is an experiment in building the core primitive of an agentic software factory: a TypeScript/Node.js framework for agentic coding workflows. Use pnpm for repository commands.
 
 ## Repository structure
 

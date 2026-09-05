@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import { stripVTControlCharacters } from "node:util";
+import { expect, test } from "vitest";
 import {
   observeFactoryEvents,
   withFactoryActivity,
@@ -39,7 +40,7 @@ test("delegates input to the host and reports its lifecycle", async () => {
     status: "answered",
     value: "production",
   });
-  expect(logs.map(({ message }) => Bun.stripANSI(message))).toEqual([
+  expect(logs.map(({ message }) => stripVTControlCharacters(message))).toEqual([
     "Asking Which environment?",
     "Answered production",
   ]);

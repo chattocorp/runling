@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 import { buildTimeline } from "./timeline.ts";
 
 test("keeps repeated turns of one agent distinct and interrupts unfinished blocks", () => {

@@ -1,13 +1,14 @@
+import { ansiColor } from "./ansi.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { emitFactoryEvent } from "./events.ts";
 
 function paint(color: string, text: string) {
-  const ansi = Bun.color(color, "ansi");
+  const ansi = ansiColor(color);
   return ansi ? `${ansi}${text}\x1b[0m` : text;
 }
 
 function highlight(text: string, color = "white") {
-  const ansi = Bun.color(color, "ansi") ?? "";
+  const ansi = ansiColor(color) ?? "";
   return `\x1b[1m${ansi}${text}\x1b[0m`;
 }
 
