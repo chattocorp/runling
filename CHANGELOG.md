@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/chattocorp/runling/compare/v0.4.0...v0.4.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **ci:** simplify tests and publish an explicit local tarball ([d12780a](https://github.com/chattocorp/runling/commit/d12780a8d80029e4aeddf40fc701e19e1bc381f5))
+
 ## [0.4.0](https://github.com/chattocorp/runling/compare/v0.3.0...v0.4.0) (2026-09-05)
 
 
