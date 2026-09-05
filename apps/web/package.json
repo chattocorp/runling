@@ -2,6 +2,7 @@
   "name": "@factory/web",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",

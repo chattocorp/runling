@@ -36,6 +36,7 @@
     "factory": "./bin/factory.js"
   },
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "check": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
