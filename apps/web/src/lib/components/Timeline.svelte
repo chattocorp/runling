@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import Usage from "./Usage.svelte";
+  import AnsiText from "./AnsiText.svelte";
   import { duration } from "$lib/runs.ts";
   import { findActivity, type Activity } from "$lib/timeline.ts";
   import {
@@ -374,9 +375,11 @@
     <div class="expanded-detail">
       <strong>{inspected.label}</strong><small>{inspected.status}</small>
       {#if inspected.usage}<Usage usage={inspected.usage} detail />{/if}
-      <pre>{inspected.logs.length
-          ? inspected.logs.join("\n\n")
-          : "No logs for this activity."}</pre>
+      <pre><AnsiText
+          text={inspected.logs.length
+            ? inspected.logs.join("\n\n")
+            : "No logs for this activity."}
+        /></pre>
     </div>
   {/if}
   <footer>

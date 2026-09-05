@@ -5,6 +5,7 @@
   import { buildTimeline, findActivity } from "$lib/timeline.ts";
   import StatusBadge from "./StatusBadge.svelte";
   import Timeline from "./Timeline.svelte";
+  import AnsiText from "./AnsiText.svelte";
   import Usage from "./Usage.svelte";
   let { run, connection }: { run: RunDetail; connection: string } = $props();
   let now = $state(Date.now());
@@ -97,9 +98,11 @@
             {activity.kind} started at {duration(activity.startedAt)}
           </p>
           {#if activity.usage}<Usage usage={activity.usage} detail />{/if}
-          <pre>{activity.logs.length
-              ? activity.logs.join("\n\n")
-              : "No logs for this activity."}</pre>
+          <pre><AnsiText
+              text={activity.logs.length
+                ? activity.logs.join("\n\n")
+                : "No logs for this activity."}
+            /></pre>
         </section>
       {/if}
       {#if run.status === "completed" && run.output !== null}
@@ -112,9 +115,9 @@
     {:else if tab === "output"}<pre class="document">{run.status === "running"
           ? "Output will appear when the workflow finishes."
           : pretty(run.output)}</pre>
-    {:else}<pre class="document">{logs.length
-          ? logs.join("\n\n")
-          : "No logs yet."}</pre>{/if}
+    {:else}<pre class="document"><AnsiText
+          text={logs.length ? logs.join("\n\n") : "No logs yet."}
+        /></pre>{/if}
   </div>
 </section>
 
