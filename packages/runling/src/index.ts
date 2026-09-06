@@ -67,10 +67,7 @@ export {
   accumulateTokenUsage,
   emptyTokenUsage,
   formatTokenUsage,
-  getRecordedTokenUsage,
   isTokenUsage,
-  recordTokenUsage,
-  resetTokenUsage,
   totalTokens,
   type TokenUsage,
 } from "./usage.ts";

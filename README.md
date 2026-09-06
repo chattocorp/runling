@@ -133,6 +133,12 @@ Replace `f.concat` and `f.randomId` with the named imports `concat` and `randomI
 The factories `createExec` and `createShell`, and the error classes `CommandError`,
 `ShellError`, and `AgentOutcomeError`, are also named imports, not runtime properties.
 
+Runling tracks token usage and cost automatically. Read `.usage` on agent results
+and `runWorkflow()` results. Usage events provide updates during a run.
+The accounting controls `recordTokenUsage`, `resetTokenUsage`, and
+`getRecordedTokenUsage` are internal and are no longer exported from `runling`.
+The `TokenUsage` type and usage calculation and formatting helpers remain public.
+
 Pass the workflow file and one optional request:
 
 ```bash

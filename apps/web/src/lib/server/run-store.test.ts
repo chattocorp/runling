@@ -9,7 +9,8 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { Type, workflow, recordTokenUsage } from "runling";
+import { Type, workflow } from "runling";
+import { recordTokenUsage } from "../../../../../packages/runling/src/usage.ts";
 import { historyDirectory, RunStore } from "./run-store.ts";
 import { buildTimeline } from "../timeline.ts";
 import type { RunRecord } from "../runs.ts";
