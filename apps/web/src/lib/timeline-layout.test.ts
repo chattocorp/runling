@@ -5,6 +5,7 @@ import {
   dragZoomWindow,
   dragRowHeight,
   fitWindow,
+  timelineEnd,
   flattenActivities,
   panWindow,
   tickLabel,
@@ -12,6 +13,19 @@ import {
   zoomWindow,
 } from "./timeline-layout.ts";
 import type { Activity } from "./timeline.ts";
+
+test("full range includes bar endpoints on a different duration clock", () => {
+  const child: Activity = {
+    id: "child", label: "Child", kind: "step", status: "completed",
+    startedAt: 6400, durationMs: 4701, children: [], logs: [],
+  };
+  const parent: Activity = { ...child, id: "parent", startedAt: 0, durationMs: 11100, children: [child] };
+  const end = timelineEnd([parent], 11099);
+  expect(end).toBe(11101);
+  expect(barPosition(6400, 11101, fitWindow(end))?.clippedEnd).toBe(false);
+  expect(timelineEnd([parent], 12000)).toBe(12000);
+  expect(timelineEnd([], 0)).toBe(0);
+});
 
 test("middle drag down enlarges rows, up shrinks them, and respects row limits", () => {
   expect(dragRowHeight(48, 80)).toBeGreaterThan(48);
@@ -58,12 +72,20 @@ test("clamps zoom-out and panning to the full timeline", () => {
   }
 });
 
-test("fit includes the full run and keeps its scale between growth boundaries", () => {
-  expect(fitWindow(0).span).toBeGreaterThan(0);
-  expect(fitWindow(1200)).toEqual(fitWindow(1500));
-  for (const elapsed of [0, 5, 90, 1000, 12345, 3600000]) {
-    expect(fitWindow(elapsed).span).toBeGreaterThan(elapsed);
+test("fit ends at the actual run duration without padding or rounding", () => {
+  expect(fitWindow(0)).toEqual({ start: 0, span: 1 });
+  for (const elapsed of [5, 90, 1000, 9700, 12345, 3600000]) {
+    expect(fitWindow(elapsed)).toEqual({ start: 0, span: elapsed });
   }
+});
+
+test("all navigation clamps to the actual end, including a stale rounded view", () => {
+  const full = fitWindow(9700);
+  expect(clampWindow({ start: 0, span: 20000 }, full.span)).toEqual(full);
+  expect(clampWindow(zoomWindow(full, 2), full.span)).toEqual(full);
+  expect(clampWindow(dragZoomWindow(full, 1000), full.span)).toEqual(full);
+  expect(clampWindow(panWindow({ start: 0, span: 2000 }, 20000), full.span))
+    .toEqual({ start: 7700, span: 2000 });
 });
 
 test("zoom anchors to the pointer and pan preserves scale", () => {

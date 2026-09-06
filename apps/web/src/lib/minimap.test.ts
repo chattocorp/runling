@@ -9,8 +9,9 @@ test("vertical navigation preserves the grab position and clamps the last visibl
 });
 
 test("overview uses only the full timeline range", () => {
-  expect(overviewSpan(0)).toBe(100);
-  expect(overviewSpan(1000)).toBe(2000);
+  expect(overviewSpan(0)).toBe(1);
+  expect(overviewSpan(1000)).toBe(1000);
+  expect(overviewSpan(9700)).toBe(9700);
 });
 test("click centers the view and clamps it to the overview", () => {
   const view = { start: 0, span: 200 };

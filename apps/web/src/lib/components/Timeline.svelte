@@ -10,6 +10,7 @@
   import {
     barPosition,
     fitWindow,
+    timelineEnd,
     clampWindow,
     flattenActivities,
     panWindow,
@@ -60,8 +61,9 @@
   let plotWidth = $state(500);
   let expanded = $state(false);
   let dragging = $state(false);
+  let extent = $derived(timelineEnd(nodes, elapsed));
   let view = $derived(
-    clampWindow(manual ?? fitWindow(elapsed), fitWindow(elapsed).span),
+    clampWindow(!manual || manual.span >= elapsed ? fitWindow(extent) : manual, fitWindow(extent).span),
   );
   let rows = $derived(flattenActivities(nodes, collapsed));
   let contentHeight = $derived(Math.max(1, rows.length * rowHeight));
@@ -73,8 +75,8 @@
     })),
   );
   let ticks = $derived(timelineTicks(view, plotWidth));
-  let cursor = $derived(((elapsed - view.start) / view.span) * 100);
-  let zoom = $derived(fitWindow(elapsed).span / view.span);
+  let cursor = $derived(((extent - view.start) / view.span) * 100);
+  let zoom = $derived(fitWindow(extent).span / view.span);
   let inspected = $derived(findActivity(nodes, selected));
 
   function toggle(id: string) {
@@ -385,7 +387,8 @@
           {#if cursor >= 0 && cursor <= 100}
             <span
               class={[
-                "absolute bottom-0 -translate-x-1/2 text-xs px-1 rounded-t-sm pointer-events-none",
+                "absolute bottom-0 text-xs px-1 rounded-t-sm pointer-events-none",
+                cursor > 95 ? "-translate-x-full" : cursor < 5 ? "translate-x-0" : "-translate-x-1/2",
                 running
                   ? "bg-error text-error-content"
                   : "bg-neutral text-neutral-content",
@@ -568,7 +571,7 @@
       rows={miniRows}
       vertical={{ start: scrollTop, span: visibleHeight, total: contentHeight }}
       {view}
-      {elapsed}
+      elapsed={extent}
       {selected}
       onzoomstart={(anchor) => beginMiddleZoom(anchor)}
       onchange={(next, top) => {

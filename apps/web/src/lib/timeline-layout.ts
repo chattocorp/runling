@@ -5,6 +5,15 @@ export interface TimeWindow {
   span: number;
 }
 
+/** Event timestamps can include setup time outside the runner's duration clock. */
+export function timelineEnd(nodes: Activity[], elapsed: number): number {
+  return nodes.reduce((end, node) => Math.max(
+    end,
+    node.startedAt + (node.durationMs ?? Math.max(0, elapsed - node.startedAt)),
+    timelineEnd(node.children, elapsed),
+  ), elapsed);
+}
+
 function niceCeiling(value: number): number {
   const power = 10 ** Math.floor(Math.log10(Math.max(value, 0.001)));
   const fraction = value / power;
@@ -13,9 +22,9 @@ function niceCeiling(value: number): number {
   );
 }
 
-/** Grow the live fit range in steps instead of changing scale on every tick. */
+/** Fit the actual run duration; only empty runs need a nonzero minimum. */
 export function fitWindow(elapsed: number): TimeWindow {
-  return { start: 0, span: niceCeiling(Math.max(100, elapsed * 1.05)) };
+  return { start: 0, span: Math.max(1, elapsed) };
 }
 
 /** Keep every navigation path within the full timeline's fit range. */
