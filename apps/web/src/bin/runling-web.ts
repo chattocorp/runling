@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
-import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createServer } from "vite";
-import { isWebConfig } from "runling/web";
 import { parseRunlingWebArguments } from "../../../../packages/runling/src/web-server.ts";
 export { parseRunlingWebArguments } from "../../../../packages/runling/src/web-server.ts";
 
@@ -29,15 +27,6 @@ export async function runRunlingWeb(
   const appRoot = resolve(import.meta.dirname, "../..");
   const workflowCwd = process.cwd();
   const configPath = resolve(workflowCwd, options.config);
-  if (existsSync(configPath)) {
-    const configModule = await import(pathToFileURL(configPath).href);
-    if (!isWebConfig(configModule.default)) {
-      throw new Error(
-        `${configPath} must export a valid Runling web configuration`,
-      );
-    }
-  }
-
   process.env.RUNLING_WEB_CONFIG = configPath;
   process.env.RUNLING_WEB_WORKFLOW_CWD = workflowCwd;
   process.chdir(appRoot);

@@ -1,8 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { isWebConfig } from "./web-config.ts";
 import { createServer, type RequestListener } from "node:http";
 
 export function parseRunlingWebArguments(argv: readonly string[]) {
@@ -35,13 +33,6 @@ With no arguments, start the web UI in the current project.`);
   }
   const cwd = process.cwd();
   const configPath = resolve(cwd, options.config);
-  if (existsSync(configPath)) {
-    const config = await import(pathToFileURL(configPath).href);
-    if (!isWebConfig(config.default))
-      throw new Error(
-        `${configPath} must export a valid Runling web configuration`,
-      );
-  }
   process.env.RUNLING_WEB_CONFIG = configPath;
   process.env.RUNLING_WEB_WORKFLOW_CWD = cwd;
   process.env.HOST = options.host;

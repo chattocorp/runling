@@ -44,6 +44,33 @@ test("retains a previously loaded config if the file is removed", async () => {
   }
 });
 
+test("shares the initial load and caches it until reload", async () => {
+  await fixture(async (loader, path) => {
+    await writeFile(path, "export default { webhooks: {} };\n");
+    const [first, second] = await Promise.all([loader.load(), loader.load()]);
+    expect(second).toBe(first);
+    expect(await loader.load()).toBe(first);
+    const next = await loader.reload();
+    expect(next).not.toBe(first);
+    expect(await loader.load()).toBe(next);
+  });
+});
+
+test("recovers when an initially invalid config is corrected", async () => {
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await fixture(async (loader, path) => {
+      await writeFile(path, "export default { invalid: true };\n");
+      await expect(loader.load()).rejects.toThrow("valid Runling configuration");
+      await writeFile(path, "export default { webhooks: {} };\n");
+      await vi.waitFor(() => expect(loader.error).toBeUndefined(), { timeout: 5000 });
+      expect(await loader.load()).toEqual({ webhooks: {} });
+    });
+  } finally {
+    log.mockRestore();
+  }
+});
+
 test("rejects an existing invalid config and missing imports", async () => {
   const log = vi.spyOn(console, "error").mockImplementation(() => {});
   try {
