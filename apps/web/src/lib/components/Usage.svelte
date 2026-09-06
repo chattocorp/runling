@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { TokenUsage } from "runling";
   import { estimatedCost, tokenCount } from "$lib/usage.ts";
-  let { usage, detail = false }: { usage: TokenUsage; detail?: boolean } =
+  let { usage, detail = false, compact = false }: { usage: TokenUsage; detail?: boolean; compact?: boolean } =
     $props();
 </script>
 
 <span
   class="usage"
-  title="Estimated model cost in USD, not an invoice. Totals include child activities."
+  class:compact
+  title={`${tokenCount(usage).toLocaleString()} tokens · ${estimatedCost(usage)}. Estimated model cost in USD, not an invoice. Totals include child activities.`}
 >
   <span>{tokenCount(usage).toLocaleString()} tokens</span>
   <span>{estimatedCost(usage)}</span>
@@ -45,6 +46,18 @@
     font-size: 11px;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
+  }
+  .usage.compact {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .compact > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
   dl {
     display: flex;

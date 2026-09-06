@@ -398,10 +398,10 @@
               onclick={() => onselect(node.id)}
               aria-pressed={selected === node.id}
               title={`${node.label} (${node.kind}, ${node.status})`}
-              ><strong>{node.label}</strong><small>{node.kind}</small>
+              ><strong>{node.label}</strong>
               {#if node.usage}<span class="row-usage"
-                  ><Usage usage={node.usage} /></span
-                >{/if}</button
+                  ><Usage usage={node.usage} compact /></span
+                >{:else}<small>{node.kind}</small>{/if}</button
             >
           </div>
           <div class="lane plot" class:chosen={selected === node.id}>
@@ -702,7 +702,7 @@
   }
   .label-select {
     display: grid;
-    gap: 2px;
+    gap: 4px;
     min-width: 0;
     flex: 1;
     background: none;
