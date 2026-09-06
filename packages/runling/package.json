@@ -1,6 +1,6 @@
 {
   "name": "runling",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "TypeScript workflows for coding agents, with a CLI and live web console.",
   "repository": {
     "type": "git",
