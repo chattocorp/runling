@@ -21,7 +21,6 @@ import { isWorkflow, type Workflow } from "./workflow.ts";
 import {
   formatTokenUsage,
   getRecordedTokenUsage,
-  resetTokenUsage,
   totalTokens,
   withTokenUsage,
 } from "./usage.ts";
@@ -264,7 +263,6 @@ async function captureExecution<Output>(
 async function captureExecutionInContext<Output>(
   run: () => Promise<Output> | Output,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
-  resetTokenUsage();
   const start = performance.now();
   let result: WorkflowResult | null = null;
   let output: Awaited<Output> | null = null;

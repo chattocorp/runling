@@ -11,7 +11,7 @@ import {
 import type { RunlingEvent } from "./events.ts";
 import type { InputRequest } from "./input.ts";
 import { createRunling } from "./runtime.ts";
-import { recordTokenUsage, resetTokenUsage } from "./usage.ts";
+import { recordTokenUsage } from "./usage.ts";
 import { Type } from "typebox";
 import { workflow } from "./workflow.ts";
 
@@ -19,7 +19,6 @@ const initialExitCode = process.exitCode;
 
 afterEach(() => {
   process.exitCode = initialExitCode ?? 0;
-  resetTokenUsage();
 });
 
 describe("executeWorkflow", () => {
@@ -34,7 +33,7 @@ describe("executeWorkflow", () => {
       expect(receivedRunling).toBe(f);
       expect(receivedRunling.agent).toBeTypeOf("function");
       expect(receivedRunling.shell).toBeTypeOf("function");
-      expect(receivedRunling.createShell).toBeTypeOf("function");
+      expect(receivedRunling.exec).toBeTypeOf("function");
       expect(receivedRunling.step).toBeTypeOf("function");
       expect(receivedRunling.cwd).toBe("/project");
       expect(receivedRunling.prompt).toBe("Make the change");

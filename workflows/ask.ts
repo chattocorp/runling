@@ -1,4 +1,4 @@
-import { Type, workflow } from "runling";
+import { concat, Type, workflow } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 
@@ -20,7 +20,7 @@ export const ask = workflow(
 
     const report = await f.step("Investigating repository", () =>
       f.runAgent(
-        f.concat(
+        concat(
           "Answer this question about the repository:",
           question,
           "",

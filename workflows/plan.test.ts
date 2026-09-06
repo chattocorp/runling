@@ -17,7 +17,6 @@ const runtimeWith = (
     prompt,
     cwd: "/project",
     verbose: false,
-    concat: (...parts: string[]) => parts.join("\n"),
     input: async (question: string) => {
       questions.push(question);
       return answers.shift() ?? "";

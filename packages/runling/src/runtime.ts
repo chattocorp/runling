@@ -1,6 +1,5 @@
 import {
   agent as createAgent,
-  AgentOutcomeError,
   type AgentOptions,
   runAgent as runAgentOnce,
   type RunAgentOptions,
@@ -9,19 +8,15 @@ import {
   getPwd as captureWorkingDirectory,
   workingTreeHash as hashWorkingTree,
 } from "./git.ts";
-import { randomId } from "./id.ts";
 import { createInput, type Input, type InputHandler } from "./input.ts";
 import { log } from "./log.ts";
 import {
   createShell,
   createExec,
-  CommandError,
-  ShellError,
   type Shell,
   type Exec,
 } from "./shell.ts";
 import { step } from "./step.ts";
-import { concat } from "./utils.ts";
 
 interface RunlingValues {
   cwd: string;
@@ -67,18 +62,11 @@ function workingTreeHash(this: RunlingValues, cwd = this.cwd) {
 
 const runlingPrimitives = Object.freeze({
   agent,
-  AgentOutcomeError,
   runAgent,
   getPwd,
   workingTreeHash,
-  randomId,
   log,
   step,
-  createShell,
-  createExec,
-  CommandError,
-  ShellError,
-  concat,
 });
 
 type RunlingPrimitives = typeof runlingPrimitives;

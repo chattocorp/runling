@@ -1,4 +1,4 @@
-import { Type, workflow } from "runling";
+import { concat, Type, workflow } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -49,7 +49,7 @@ export const review = workflow(
 
     await f.step("Investigate change", () =>
       orchestrator.run(
-        f.concat(
+        concat(
           "Build a factual understanding of the current working-tree change for several focused reviewers.",
           "Do not modify the repository.",
           input === "" ? [] : ["", "Requested focus:", input],
@@ -87,13 +87,13 @@ export const review = workflow(
 
     const report = await f.step("Synthesize review", () =>
       orchestrator.run(
-        f.concat(
+        concat(
           "Synthesize the focused reports below into one concise code review.",
           "Report only concrete, actionable findings, ordered by severity. Say clearly when no issues were found.",
           "Use report details for the complete Markdown review.",
           "",
           reviews.map((review, index) =>
-            f.concat(
+            concat(
               `## ${perspectives[index]!.name}`,
               review.summary,
               review.details ?? "",

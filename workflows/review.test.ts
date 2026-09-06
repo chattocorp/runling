@@ -95,7 +95,6 @@ describe("review workflow", () => {
       cwd: "/project",
       prompt: "Review the current change",
       exec,
-      concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       agent: async (options: Record<string, unknown>) => {
         agentOptions = options;
         return orchestrator;
@@ -187,7 +186,6 @@ describe("review workflow", () => {
     const f = {
       exec,
       prompt: "Review the current change",
-      concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       agent: async () => orchestrator,
       step: <T>(_name: string, run: () => T) => run(),
     } as unknown as Runling;

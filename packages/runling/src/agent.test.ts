@@ -97,7 +97,7 @@ vi.doMock("@earendil-works/pi-coding-agent", () => {
 
 const { agent, AgentOutcomeError, describeTool, runAgent } =
   await import("./agent.ts");
-const { getRecordedTokenUsage, resetTokenUsage } = await import("./usage.ts");
+const { getRecordedTokenUsage, withTokenUsage } = await import("./usage.ts");
 const { log } = await import("./log.ts");
 
 beforeEach(() => {
@@ -113,7 +113,6 @@ beforeEach(() => {
   abortCalls = 0;
   disposed = false;
   modelAvailable = true;
-  resetTokenUsage();
 });
 
 async function reportOutcome(report: {
@@ -638,7 +637,7 @@ describe("runAgent", () => {
     ).toBe(true);
   });
 
-  test("records usage into the workflow-wide totals", async () => {
+  test("records usage into the workflow-wide totals", () => withTokenUsage(async () => {
     promptImplementation = async () => {
       emitAssistantUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
       await reportOutcome({ outcome: "completed", summary: "Done" });
@@ -653,7 +652,7 @@ describe("runAgent", () => {
       cacheWrite: 0,
       costIncomplete: true,
     });
-  });
+  }));
 
   test("emits immutable live usage snapshots before an agent finishes", async () => {
     const events: RunlingEvent[] = [];
@@ -689,7 +688,7 @@ describe("runAgent", () => {
     expect(finished?.usage).toEqual(snapshots[1]?.usage);
   });
 
-  test("records tokens and cost as each model turn completes", async () => {
+  test("records tokens and cost as each model turn completes", () => withTokenUsage(async () => {
     promptImplementation = async () => {
       emitAssistantUsage({
         input: 10,
@@ -711,7 +710,7 @@ describe("runAgent", () => {
     await runAgent("Do the thing", {
       model: "anthropic/claude-opus-4-5",
     });
-  });
+  }));
 
   test("returns token usage even when no outcome is reported", async () => {
     promptImplementation = async () => {
@@ -752,7 +751,7 @@ describe("runAgent", () => {
     expect(disposed).toBe(true);
   });
 
-  test("records usage when prompting fails", async () => {
+  test("records usage when prompting fails", () => withTokenUsage(async () => {
     promptImplementation = async () => {
       emitAssistantUsage({
         input: 10,
@@ -773,7 +772,7 @@ describe("runAgent", () => {
       cacheWrite: 1,
       costIncomplete: true,
     });
-  });
+  }));
 
   test("rejects unavailable models before creating a session", async () => {
     modelAvailable = false;

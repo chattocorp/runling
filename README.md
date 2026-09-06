@@ -127,6 +127,12 @@ Rebuild the framework after changing its source. No global package link is requi
 
 ## Run a workflow
 
+The workflow runtime provides invocation state and operations such as `agent`,
+`exec`, `shell`, `input`, `step`, and `log`. Import general helpers from `runling`.
+Replace `f.concat` and `f.randomId` with the named imports `concat` and `randomId`.
+The factories `createExec` and `createShell`, and the error classes `CommandError`,
+`ShellError`, and `AgentOutcomeError`, are also named imports, not runtime properties.
+
 Pass the workflow file and one optional request:
 
 ```bash

@@ -1,4 +1,4 @@
-import { Type, workflow, type Runling } from "runling";
+import { concat, Type, workflow, type Runling } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -69,7 +69,7 @@ export const implement = workflow(
         `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
         () =>
           implementationAgent.run(
-            f.concat(
+            concat(
               "Project validation failed. Fix the implementation and tests so that both `pnpm run check` and `pnpm test` pass.",
               "In your report, summarize the complete implementation, including this repair.",
               "",

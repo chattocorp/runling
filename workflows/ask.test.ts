@@ -20,7 +20,6 @@ describe("ask workflow", () => {
       input: () => {
         throw new Error("input should not be requested");
       },
-      concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       runAgent: async (prompt: string, agentOptions: Record<string, unknown>) => {
         prompts.push(prompt);
         options.push(agentOptions);
@@ -60,7 +59,6 @@ describe("ask workflow", () => {
         questions.push(question);
         return "Where are agent tools configured?";
       },
-      concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       runAgent: async (prompt: string) => {
         prompts.push(prompt);
         return completedReport;

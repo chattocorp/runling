@@ -20,7 +20,6 @@ describe("chatto-docs workflow", () => {
       input: () => {
         throw new Error("input should not be requested");
       },
-      concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       runAgent: async (prompt: string, agentOptions: Record<string, unknown>) => {
         prompts.push(prompt);
         options.push(agentOptions);
@@ -64,7 +63,6 @@ describe("chatto-docs workflow", () => {
         questions.push(question);
         return "How do I get started?";
       },
-      concat: (...parts: Array<string | string[]>) => parts.flat().join("\n"),
       runAgent: async (prompt: string) => {
         prompts.push(prompt);
         return completedReport;

@@ -85,11 +85,8 @@ function runtimeWith({
         },
       };
     },
-    concat: (...parts: string[]) => parts.join("\n"),
-    createExec: () => exec,
     getPwd: async () => ({ hasChanges: Promise.resolve(true) }),
     log: { info: (message: string) => messages.push(message) },
-    ShellError: TestShellError,
     step: <T>(label: string, work: () => T) => {
       messages.push(label);
       return work();

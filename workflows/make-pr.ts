@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { Type, workflow, type Runling, type WorkflowResult } from "runling";
+import { concat, randomId, Type, workflow, type Runling, type WorkflowResult } from "runling";
 import { implement } from "./implement.ts";
 import { review } from "./review.ts";
 
@@ -22,7 +22,7 @@ export const describePullRequest = (
     });
 
     const report = await writer.run(
-      f.concat(
+      concat(
         "Write the title and Markdown description for a pull request containing the current commit.",
         "Use the supplied commit and diff, inspecting repository files when useful.",
         "Use your report summary as the concise pull request title and report details as the complete Markdown body.",
@@ -84,7 +84,7 @@ const makePullRequest = workflow(
     const { cwd } = f;
     await f.exec`gh auth status`;
 
-    const worktreeId = f.randomId();
+    const worktreeId = randomId();
     const branchName = `runling/${worktreeId}`;
     const worktreesPath = resolve(cwd, worktreesDirectory);
     const worktreePath = resolve(worktreesPath, worktreeId);

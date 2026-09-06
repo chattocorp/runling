@@ -13,8 +13,13 @@ describe("runling", () => {
     expect(f.input).toBeTypeOf("function");
     expect(f.shell).toBeTypeOf("function");
     expect(f.exec).toBeTypeOf("function");
-    expect(f.createExec).toBeTypeOf("function");
-    expect(f.createShell).toBeTypeOf("function");
+    expect(f).not.toHaveProperty("createExec");
+    expect(f).not.toHaveProperty("createShell");
+    expect(f).not.toHaveProperty("concat");
+    expect(f).not.toHaveProperty("randomId");
+    expect(f).not.toHaveProperty("CommandError");
+    expect(f).not.toHaveProperty("ShellError");
+    expect(f).not.toHaveProperty("AgentOutcomeError");
     expect(f.cwd).toBe("/project");
     expect(f.prompt).toBe("Make the change");
   });

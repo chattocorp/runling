@@ -1,4 +1,4 @@
-import { Type, workflow } from "../../src/index.ts";
+import { randomId, Type, workflow } from "../../src/index.ts";
 
 export default workflow(
   {
@@ -9,9 +9,9 @@ export default workflow(
       outputs: Type.Object({ id: Type.String() }),
     }),
   },
-  function echo({ randomId }, input) {
+  function echo(f, input) {
     const id = randomId();
-    if (!/^[a-z]+-[a-z]+-\d{4}$/.test(id)) {
+    if (typeof f.step !== "function") {
       throw new Error("The runling runtime was not injected");
     }
     return {

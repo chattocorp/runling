@@ -1,4 +1,4 @@
-import { Type, workflow } from "runling";
+import { concat, Type, workflow } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -34,7 +34,7 @@ export const plan = workflow(
       ],
     });
 
-    let message = f.concat(
+    let message = concat(
       "Investigate this request, then begin the planning interview.",
       "Ask a question rather than making an arbitrary choice whenever the answer would materially affect the result.",
       "",
@@ -59,7 +59,7 @@ export const plan = workflow(
       }
 
       const answer = await f.input(report.summary);
-      message = f.concat(
+      message = concat(
         "The human answered your question:",
         answer,
         "",

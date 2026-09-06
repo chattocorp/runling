@@ -55,7 +55,6 @@ describe("make-pr workflow", () => {
     let agentOptions: Record<string, unknown> | undefined;
     const f = {
       cwd: "/worktree",
-      concat: (...parts: string[]) => parts.join("\n"),
       agent: async function (
         this: Runling,
         options: Record<string, unknown>,

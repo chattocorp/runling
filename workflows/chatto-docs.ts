@@ -1,4 +1,4 @@
-import { Type, workflow } from "runling";
+import { concat, Type, workflow } from "runling";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
 const documentationRoot =
@@ -22,7 +22,7 @@ export const chattoDocs = workflow(
 
     const report = await f.step("Consulting Chatto documentation", () =>
       f.runAgent(
-        f.concat(
+        concat(
           "Answer this question using the official Chatto documentation:",
           question,
           "",
