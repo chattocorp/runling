@@ -7,6 +7,7 @@
   import Timeline from "./Timeline.svelte";
   import AnsiText from "./AnsiText.svelte";
   import Usage from "./Usage.svelte";
+  import RunOutput from "./RunOutput.svelte";
   let { run, connection }: { run: RunDetail; connection: string } = $props();
   let now = $state(Date.now());
   let selected = $state("");
@@ -137,24 +138,12 @@
             /></pre>
         </section>
       {/if}
-      {#if run.status === "completed" && run.output !== null}
-        <section class="mt-6 space-y-3 border-t border-base-300 pt-5">
-          <h2 class="text-sm font-semibold m-0 wrap-anywhere">Output</h2>
-          <pre
-            class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere max-h-110 overflow-auto">{pretty(
-              run.output,
-            )}</pre>
-        </section>
-      {/if}
     {:else if tab === "input"}<pre
         class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0">{pretty(
           run.input,
         )}</pre>
-    {:else if tab === "output"}<pre
-        class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0">{run.status ===
-        "running"
-          ? "Output will appear when the workflow finishes."
-          : pretty(run.output)}</pre>
+    {:else if tab === "output"}
+      {#key run.id}<RunOutput {run} />{/key}
     {:else}<pre
         class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0"><AnsiText
           text={logs.length ? logs.join("\n\n") : "No logs yet."}
