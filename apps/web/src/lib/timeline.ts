@@ -16,6 +16,13 @@ export interface Activity {
   preview?: string;
 }
 
+/** Running leaf work is our best signal; parent/child work can still overlap. */
+export function isActivityActive(activity: Activity): boolean {
+  const hasRunningDescendant = (node: Activity): boolean =>
+    node.children.some((child) => child.status === "running" || hasRunningDescendant(child));
+  return activity.status === "running" && activity.kind !== "input" && !hasRunningDescendant(activity);
+}
+
 export function buildTimeline(
   events: RunlingEvent[],
   runStatus: RunStatus,

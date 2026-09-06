@@ -1,6 +1,37 @@
 import { expect, test } from "vitest";
-import { buildTimeline } from "./timeline.ts";
+import { buildTimeline, isActivityActive, type Activity } from "./timeline.ts";
 import type { RunlingEvent } from "runling";
+
+const task = (overrides: Partial<Activity> = {}): Activity => ({
+  id: "task", label: "Task", kind: "step", status: "running", startedAt: 0,
+  logs: [], children: [], ...overrides,
+});
+
+test("indicates running leaf work but not input waits or finished tasks", () => {
+  for (const kind of ["step", "agent", "command"] as const)
+    expect(isActivityActive(task({ kind }))).toBe(true);
+  expect(isActivityActive(task({ kind: "input" }))).toBe(false);
+  for (const status of ["completed", "failed", "blocked", "interrupted"])
+    expect(isActivityActive(task({ status }))).toBe(false);
+});
+
+test("keeps waiting ancestors quiet and marks parallel children active", () => {
+  const first = task({ id: "first", kind: "agent" });
+  const second = task({ id: "second", kind: "command" });
+  const parent = task({ children: [first, second] });
+  expect(isActivityActive(parent)).toBe(false);
+  expect(isActivityActive(task({ children: [parent] }))).toBe(false);
+  expect(isActivityActive(first)).toBe(true);
+  expect(isActivityActive(second)).toBe(true);
+  first.status = "completed";
+  expect(isActivityActive(parent)).toBe(false);
+  second.status = "completed";
+  expect(isActivityActive(parent)).toBe(true);
+});
+
+test("does not animate a step waiting for user input", () => {
+  expect(isActivityActive(task({ children: [task({ kind: "input" })] }))).toBe(false);
+});
 
 test("uses formatted logs once without deduplicating genuine repeated messages", () => {
   const events: RunlingEvent[] = [

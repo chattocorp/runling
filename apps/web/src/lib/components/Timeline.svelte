@@ -5,7 +5,8 @@
   import TimelineMinimap from "./TimelineMinimap.svelte";
   import { middleDrag } from "$lib/middle-drag.ts";
   import { duration } from "$lib/runs.ts";
-  import { findActivity, type Activity } from "$lib/timeline.ts";
+  import { findActivity, isActivityActive, type Activity } from "$lib/timeline.ts";
+  import ActivityIndicator from "./ActivityIndicator.svelte";
   import {
     barPosition,
     fitWindow,
@@ -503,11 +504,10 @@
                   onclick={() => onselect(node.id)}
                   title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}${node.preview ? `\n${node.preview}` : ""}`}
                 >
-                  {#if node.status === "running"}
-                    <span
-                      aria-hidden="true"
-                      class="pointer-events-none absolute inset-0 animate-shimmer bg-linear-to-r from-transparent via-white/25 to-transparent motion-reduce:animate-none"
-                    ></span>
+                  {#if isActivityActive(node)}
+                    <span class="relative ml-2 flex shrink-0 items-center" title="Active task">
+                      <ActivityIndicator />
+                    </span>
                   {/if}
                   {#if bar.clippedStart}
                     <span
@@ -516,7 +516,8 @@
                     >
                   {/if}
                   <span
-                    class="relative z-1 text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis min-w-0 pl-2 flex-1"
+                    class="relative z-1 text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis min-w-0 flex-1"
+                    class:pl-2={!isActivityActive(node)}
                     >{node.kind === "agent" && node.preview
                       ? node.preview
                       : bar.clippedStart

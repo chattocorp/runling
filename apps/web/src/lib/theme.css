@@ -43,14 +43,11 @@
 @theme {
   --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, monospace;
-  --animate-shimmer: shimmer 2.4s ease-in-out infinite;
+  --animate-braille-spinner: braille-spinner 0.8s steps(10) infinite;
 
-  @keyframes shimmer {
-    from {
-      translate: -100% 0;
-    }
+  @keyframes braille-spinner {
     to {
-      translate: 100% 0;
+      transform: translateY(-100%);
     }
   }
 }
