@@ -27,44 +27,71 @@
   });
 </script>
 
-<section class="inspector" aria-label="Run details">
-  <header>
-    <div class="run-top">
-      <span class="source"
+<section class="min-w-0" aria-label="Run details">
+  <header class="px-8 pt-8 pb-4 max-sm:p-5">
+    <div class="flex justify-between gap-2.5">
+      <span class="text-base-content/60 text-xs"
         >{run.source === "web"
           ? "Started from web"
           : `Webhook /${run.webhook}`}</span
       ><StatusBadge status={run.status} />
     </div>
-    <h1>{run.workflow}</h1>
-    <div class="facts">
+    <h1 class="text-3xl tracking-tight font-medium my-3.5 mx-0 wrap-anywhere">
+      {run.workflow}
+    </h1>
+    <div
+      class="flex flex-wrap gap-y-2.5 gap-x-5.5 text-base-content/60 text-xs tabular-nums"
+    >
       <span>{new Date(run.startedAt).toLocaleString()}</span><span
         >{duration(elapsed)}</span
       >
     </div>
     <Usage usage={run.usage} detail />
-    <p class="run-id">Run {run.id.slice(0, 8)} <span>{connection}</span></p>
+    <p
+      class="text-base-content/60 text-xs flex justify-between mt-5 mr-0 mb-0 ml-0"
+    >
+      Run {run.id.slice(0, 8)} <span>{connection}</span>
+    </p>
   </header>
-  {#if run.error}<div class="error" role="alert">{run.error}</div>{/if}
-  <nav class="tabs" aria-label="Run views">
-    <button class:active={tab === "timeline"} onclick={() => (tab = "timeline")}
-      >Timeline <span
+  {#if run.error}<div
+      class="alert alert-error mt-0 mr-8 mb-2.5 ml-8 max-sm:mx-5"
+      role="alert"
+    >
+      {run.error}
+    </div>{/if}
+  <nav
+    class="tabs tabs-border px-8 border-b border-base-300 max-sm:px-5"
+    aria-label="Run views"
+  >
+    <button
+      class="tab gap-2 text-sm"
+      class:tab-active={tab === "timeline"}
+      onclick={() => (tab = "timeline")}
+      >Timeline <span class="badge badge-sm badge-ghost text-xs"
         >{run.events.filter((e) => e.type === "step.started").length}</span
       ></button
     >
-    <button class:active={tab === "input"} onclick={() => (tab = "input")}
-      >Input</button
+    <button
+      class="tab gap-2 text-sm"
+      class:tab-active={tab === "input"}
+      onclick={() => (tab = "input")}>Input</button
     >
-    <button class:active={tab === "output"} onclick={() => (tab = "output")}
-      >Output</button
+    <button
+      class="tab gap-2 text-sm"
+      class:tab-active={tab === "output"}
+      onclick={() => (tab = "output")}>Output</button
     >
-    <button class:active={tab === "logs"} onclick={() => (tab = "logs")}
-      >Logs <span>{logs.length}</span></button
+    <button
+      class="tab gap-2 text-sm"
+      class:tab-active={tab === "logs"}
+      onclick={() => (tab = "logs")}
+      >Logs <span class="badge badge-sm badge-ghost text-xs">{logs.length}</span
+      ></button
     >
   </nav>
-  <div class="content">
+  <div class="py-6 px-8 max-sm:p-5">
     {#if tab === "timeline"}
-      <div class="scale">
+      <div class="flex justify-between text-base-content/60 text-xs mb-3.5">
         <span>Execution timeline</span><span>0 → {duration(elapsed)}</span>
       </div>
       {#if nodes.length}
@@ -75,30 +102,35 @@
           {elapsed}
           running={run.status === "running"}
         />
-        <p class="hint">
+        <p class="mt-3 text-base-content/60 text-xs leading-relaxed">
           Select a block to inspect its activity. Collapse a step to focus the
           timeline.
         </p>
-      {:else}<div class="empty">
+      {:else}<div
+          class="border border-base-300 border-dashed py-9 px-5 text-base-content/60 rounded-lg text-sm text-center"
+        >
           {run.status === "running"
             ? "Waiting for the first workflow event…"
             : "This run did not start any steps."}
         </div>{/if}
       {#if activity}
-        <section class="activity-detail">
-          <div class="detail-head">
-            <h2>{activity.label}</h2>
+        <section class="card card-border mt-5 gap-3 p-4 bg-base-200">
+          <div class="flex items-center justify-between gap-2.5">
+            <h2 class="text-sm font-semibold m-0 wrap-anywhere">
+              {activity.label}
+            </h2>
             <button
-              class="quiet"
+              class="btn btn-ghost btn-sm"
               onclick={() => (selected = "")}
               aria-label="Close activity details">×</button
             >
           </div>
-          <p class="hint">
+          <p class="text-base-content/60 text-xs leading-relaxed">
             {activity.kind} started at {duration(activity.startedAt)}
           </p>
           {#if activity.usage}<Usage usage={activity.usage} detail />{/if}
-          <pre><AnsiText
+          <pre
+            class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere max-h-110 overflow-auto"><AnsiText
               text={activity.logs.length
                 ? activity.logs.join("\n\n")
                 : "No logs for this activity."}
@@ -106,158 +138,26 @@
         </section>
       {/if}
       {#if run.status === "completed" && run.output !== null}
-        <section class="result">
-          <h2>Output</h2>
-          <pre>{pretty(run.output)}</pre>
+        <section class="mt-6 space-y-3 border-t border-base-300 pt-5">
+          <h2 class="text-sm font-semibold m-0 wrap-anywhere">Output</h2>
+          <pre
+            class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere max-h-110 overflow-auto">{pretty(
+              run.output,
+            )}</pre>
         </section>
       {/if}
-    {:else if tab === "input"}<pre class="document">{pretty(run.input)}</pre>
-    {:else if tab === "output"}<pre class="document">{run.status === "running"
+    {:else if tab === "input"}<pre
+        class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0">{pretty(
+          run.input,
+        )}</pre>
+    {:else if tab === "output"}<pre
+        class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0">{run.status ===
+        "running"
           ? "Output will appear when the workflow finishes."
           : pretty(run.output)}</pre>
-    {:else}<pre class="document"><AnsiText
+    {:else}<pre
+        class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0"><AnsiText
           text={logs.length ? logs.join("\n\n") : "No logs yet."}
         /></pre>{/if}
   </div>
 </section>
-
-<style>
-  .inspector {
-    min-width: 0;
-  }
-  header {
-    padding: 30px 32px 18px;
-  }
-  .run-top {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  .source {
-    color: var(--muted);
-    font-size: 12px;
-  }
-  h1 {
-    font-size: 28px;
-    letter-spacing: -0.7px;
-    font-weight: 550;
-    margin: 14px 0;
-    overflow-wrap: anywhere;
-  }
-  .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 22px;
-    color: var(--muted);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-  }
-  .run-id {
-    color: var(--muted);
-    font-size: 11px;
-    display: flex;
-    justify-content: space-between;
-    margin: 20px 0 0;
-  }
-  .tabs {
-    display: flex;
-    padding: 0 32px;
-    gap: 25px;
-    border-bottom: 1px solid var(--line);
-  }
-  .tabs button {
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: none;
-    padding: 15px 0 13px;
-    color: var(--muted);
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .tabs button.active {
-    border-bottom-color: var(--blue);
-    color: var(--blue);
-  }
-  .tabs span {
-    margin-left: 5px;
-    font-size: 10px;
-    background: var(--wash);
-    padding: 2px 5px;
-    border-radius: 4px;
-  }
-  .content {
-    padding: 24px 32px;
-  }
-  .scale {
-    display: flex;
-    justify-content: space-between;
-    color: var(--muted);
-    font-size: 11px;
-    margin-bottom: 14px;
-  }
-  .hint {
-    color: var(--muted);
-    font-size: 11px;
-    line-height: 1.7;
-  }
-  .activity-detail {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    margin-top: 20px;
-    padding: 16px;
-    background: var(--surface);
-  }
-  .detail-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  h2 {
-    font-size: 13px;
-    font-weight: 600;
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
-  .result {
-    margin-top: 24px;
-    border-top: 1px solid var(--line);
-    padding-top: 20px;
-  }
-  pre {
-    font-size: 12px;
-    line-height: 1.8;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    max-height: 440px;
-    overflow: auto;
-  }
-  .document {
-    margin: 0;
-    max-height: none;
-  }
-  .error {
-    margin: 0 32px 10px;
-  }
-  .empty {
-    border: 1px dashed var(--line);
-    padding: 35px 20px;
-    color: var(--muted);
-    border-radius: 8px;
-    font-size: 13px;
-    text-align: center;
-  }
-  @media (max-width: 700px) {
-    header,
-    .content {
-      padding: 20px;
-    }
-    .tabs {
-      padding: 0 20px;
-      gap: 20px;
-    }
-    .error {
-      margin-inline: 20px;
-    }
-  }
-</style>

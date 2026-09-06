@@ -1,47 +1,56 @@
-:root {
-  color-scheme: light;
-  --surface: #fff;
-  --surface-soft: #f8faff;
-  --surface-raised: #f3f6fb;
-  --selected: #eaf0ff;
-  --selected-border: #aec2ef;
-  --selected-text: #274f9c;
-  --overlay: #f8faffee;
-  --map-shade: #dce4f288;
-  --grid-line: #e9edf5;
-  --error-bg: #fff0ef;
-  --error-text: #98332f;
-  --primary-bg: #315fce;
-  --primary-hover: #254dac;
+@import "tailwindcss";
+@plugin "@iconify/tailwind4";
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+@plugin "daisyui" {
+  themes:
+    light --default,
+    dark;
+  logs: false;
 }
-dialog {
-  background: var(--surface);
-  color: var(--ink);
+
+@layer base {
+  :where(button, select, summary, a[href], [role="button"]):not(:disabled):not(
+      [aria-disabled="true"]
+    ) {
+    @apply cursor-pointer;
+  }
 }
-html[data-theme="dark"] {
+
+@layer utilities {
+  :is(button, select, [role="button"]):is(:disabled, [aria-disabled="true"]) {
+    @apply cursor-not-allowed;
+  }
+}
+
+/* Neutral surfaces for the dark theme; no app-specific color tokens. */
+@plugin "daisyui/theme" {
+  name: "dark";
   color-scheme: dark;
-  --ink: #ededed;
-  --muted: #a3a3a3;
-  --blue: #8aafff;
-  --green: #75cfaa;
-  --red: #f29194;
-  --line: #2a2a2a;
-  --wash: #191919;
-  --surface: #111111;
-  --surface-soft: #0a0a0a;
-  --surface-raised: #191919;
-  --selected: #242424;
-  --selected-border: #555555;
-  --selected-text: #f5f5f5;
-  --overlay: #161616f5;
-  --map-shade: #00000099;
-  --grid-line: #222222;
-  --error-bg: #40292f;
-  --error-text: #ffb7b3;
-  --primary-bg: #416fce;
-  --primary-hover: #527fe0;
-  background: #050505;
+  --color-base-100: #111111;
+  --color-base-200: #191919;
+  --color-base-300: #2a2a2a;
+  --color-base-content: #ededed;
+  --color-primary: #507dc6;
+  --color-primary-content: #ffffff;
+  --color-secondary: #8864bb;
+  --color-secondary-content: #ffffff;
+  --color-accent: #338c86;
+  --color-accent-content: #ffffff;
+  --color-neutral: #242424;
+  --color-neutral-content: #ededed;
 }
-html[data-theme="dark"] dialog::backdrop {
-  background: #000000a6;
+
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+  --animate-shimmer: shimmer 2.4s ease-in-out infinite;
+
+  @keyframes shimmer {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 100% 0;
+    }
+  }
 }

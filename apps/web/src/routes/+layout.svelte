@@ -8,9 +8,3 @@
 </script>
 
 {@render children()}
-
-<style>
-  :global(:root) {
-    font-family: "Plus Jakarta Sans Variable", "Segoe UI", sans-serif;
-  }
-</style>

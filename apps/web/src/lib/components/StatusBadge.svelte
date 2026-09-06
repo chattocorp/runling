@@ -1,53 +1,24 @@
 <script lang="ts">
   let { status }: { status: string } = $props();
+  let label = $derived(status.charAt(0).toUpperCase() + status.slice(1));
+  let icon = $derived(
+    status === "completed"
+      ? "icon-[lucide--circle-check] text-success"
+      : status === "running"
+        ? "icon-[lucide--loader-circle] text-info animate-spin motion-reduce:animate-none"
+        : status === "failed"
+          ? "icon-[lucide--circle-x] text-error"
+          : status === "interrupted"
+            ? "icon-[lucide--circle-pause] text-warning"
+            : status === "blocked"
+              ? "icon-[lucide--ban] text-error"
+              : "icon-[lucide--circle-help] text-base-content/60",
+  );
 </script>
 
 <span
-  class="status"
-  class:live={status === "running"}
-  class:bad={status === "failed" || status === "blocked"}
-  class:good={status === "completed"}
->
-  <span class="dot"></span>{status}
-</span>
-
-<style>
-  .status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted);
-    font-size: 12px;
-    white-space: nowrap;
-  }
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    flex-shrink: 0;
-  }
-  .live {
-    color: var(--blue);
-  }
-  .good {
-    color: var(--green);
-  }
-  .bad {
-    color: var(--red);
-  }
-  .live .dot {
-    animation: pulse 1.7s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    50% {
-      opacity: 0.35;
-      box-shadow: 0 0 0 4px #527de421;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .live .dot {
-      animation: none;
-    }
-  }
-</style>
+  class={["inline-block size-4 shrink-0 align-middle", icon]}
+  role="img"
+  aria-label={label}
+  title={label}
+></span>

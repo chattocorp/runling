@@ -46,8 +46,10 @@
     const target = event.target;
     if (
       target instanceof HTMLElement &&
-      (target.isContentEditable || target.closest("input, textarea, select, [role='textbox']"))
-    ) return;
+      (target.isContentEditable ||
+        target.closest("input, textarea, select, [role='textbox']"))
+    )
+      return;
     event.preventDefault();
     if (!event.repeat) toggleSidebars();
   }
@@ -138,7 +140,8 @@
 
   onMount(() => {
     try {
-      sidebarsExpanded = localStorage.getItem("runling-sidebars") !== "collapsed";
+      sidebarsExpanded =
+        localStorage.getItem("runling-sidebars") !== "collapsed";
     } catch {
       // Keep the default layout when browser storage is unavailable.
     }
@@ -182,174 +185,283 @@
 
 <svelte:window onkeydown={handleSidebarShortcut} />
 
-<svelte:head
-  ><title>Runling — Runs</title><meta
+<svelte:head>
+  <title>Runling — Runs</title>
+  <meta
     name="description"
     content="Start workflows and inspect their live execution."
-  /></svelte:head
->
+  />
+</svelte:head>
 
-<div class="app">
-  {#if configError}<div class="error" role="alert">
+<div
+  class="flex min-h-screen flex-col bg-base-100 text-base-content lg:h-screen lg:overflow-hidden"
+>
+  {#if configError}
+    <div class="alert alert-error rounded-none" role="alert">
       Configuration reload failed. The last valid configuration is still active. {configError}
-    </div>{/if}
-  <header class="app-header">
-    <div class="header-navigation">
-      <SidebarToggle expanded={sidebarsExpanded} onclick={toggleSidebars} />
-      <a href="/" class="brand" aria-label="Runling home"
-        ><svg
-          viewBox="0 0 28 28"
-          width="26"
-          height="26"
-          fill="none"
-          aria-hidden="true"
-          ><path d="M3 25V12l7 4V9l7 4V3h7v22H3Z" fill="currentColor" /><path
-            d="M7 21h3m4 0h3m3 0h2"
-            stroke="white"
-            stroke-width="2"
-          /></svg
-        >runling<span> / </span><span class="section-name">Run console</span></a
-      >
     </div>
-    <div class="header-actions">
+  {/if}
+  <header
+    class="navbar shrink-0 gap-3 border-b border-base-300 bg-base-200 px-4"
+  >
+    <SidebarToggle expanded={sidebarsExpanded} onclick={toggleSidebars} />
+    <a
+      href="/"
+      class="flex items-center gap-2 text-xl font-semibold tracking-tight"
+      aria-label="Runling home"
+    >
+      <svg
+        class="size-7 text-primary"
+        viewBox="0 0 28 28"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path d="M3 25V12l7 4V9l7 4V3h7v22H3Z" fill="currentColor" />
+        <path
+          d="M7 21h3m4 0h3m3 0h2"
+          class="stroke-primary-content"
+          stroke-width="2"
+        />
+      </svg>
+      runling
+    </a>
+    <div class="ml-auto flex items-center gap-3">
       <ThemePicker />
-      <span class="live-label" class:connected={listConnected}
-        ><i></i>{listConnected ? "Connected" : "Reconnecting"}</span
-      ><button
-        class="button primary"
+      <span
+        class="hidden items-center gap-2 text-xs text-base-content/60 sm:flex"
+      >
+        <span
+          class="status"
+          class:status-success={listConnected}
+          class:status-warning={!listConnected}
+        ></span>
+        {listConnected ? "Connected" : "Reconnecting"}
+      </span>
+      <button
+        class="btn btn-primary btn-sm"
         disabled={!data.webhooks.length}
         onclick={() =>
           (composer =
             data.webhooks.find((hook) => hook.name === filter) ??
             data.webhooks[0] ??
-            null)}>＋ New run</button
+            null)}
       >
+        + New run
+      </button>
     </div>
   </header>
-  {#if notice}<div class="notice" role="status">
-      {notice}<button
-        class="quiet"
+  {#if notice}
+    <div class="alert alert-info rounded-none" role="status">
+      <span class="wrap-anywhere">{notice}</span>
+      <button
+        class="btn btn-ghost btn-xs"
         onclick={() => (notice = "")}
         aria-label="Dismiss notice">×</button
       >
-    </div>{/if}
-  <div class="workspace" class:sidebars-collapsed={!sidebarsExpanded}>
-    <aside class="catalog" id="webhook-sidebar" hidden={!sidebarsExpanded}>
-      <div class="sidebar-heading">
+    </div>
+  {/if}
+  <div
+    class={[
+      "grid min-h-0 flex-1",
+      sidebarsExpanded
+        ? "md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-[14rem_17rem_minmax(0,1fr)]"
+        : "grid-cols-1",
+    ]}
+  >
+    <aside
+      class="flex flex-col border-b border-base-300 bg-base-200 p-3 md:col-span-2 lg:col-span-1 lg:overflow-y-auto lg:border-r lg:border-b-0 [&[hidden]]:hidden"
+      id="webhook-sidebar"
+      hidden={!sidebarsExpanded}
+    >
+      <div class="menu-title flex items-center justify-between px-3">
         <h2>Webhooks</h2>
-        <span>{data.webhooks.length}</span>
+        <span class="badge badge-ghost badge-sm">{data.webhooks.length}</span>
       </div>
-      <button
-        class="all-runs"
-        class:current={!filter}
-        onclick={() => (filter = "")}
-        ><span>All runs</span><span>{runs.length}</span></button
-      >
-      <div class="webhooks">
-        {#each data.webhooks as webhook}
-          <div class="webhook" class:current={filter === webhook.name}>
-            <button class="webhook-name" onclick={() => (filter = webhook.name)}
-              ><span class="hook-icon">↳</span><span
-                ><strong>{webhook.name}</strong><small>{webhook.workflow}</small
-                ></span
-              ></button
+      <ul class="menu menu-sm w-full gap-1">
+        <li>
+          <button class:menu-active={!filter} onclick={() => (filter = "")}>
+            All runs <span class="badge badge-ghost badge-sm ml-auto"
+              >{runs.length}</span
             >
-            <div class="hook-actions">
+          </button>
+        </li>
+      </ul>
+      <ul
+        class="menu menu-sm w-full gap-1 py-1 max-md:flex-row max-md:flex-wrap"
+      >
+        {#each data.webhooks as webhook}
+          <li class="min-w-0 max-md:flex-1">
+            <div class="flex items-center gap-0.5 p-0 hover:bg-transparent">
               <button
-                onclick={() => (hookInfo = webhook)}
-                aria-label={`Information about ${webhook.name}`}>Info</button
+                class="min-w-0 flex-1 rounded-field px-2 py-1.5 text-left hover:bg-base-300"
+                class:menu-active={filter === webhook.name}
+                onclick={() => (filter = webhook.name)}
               >
-              <button
-                onclick={() => copyUrl(webhook)}
-                aria-label={`Copy URL for ${webhook.name}`}
-                >{copied === webhook.name ? "✓ Copied" : "Copy URL"}</button
-              ><button
-                onclick={() => (composer = webhook)}
-                aria-label={`Run ${webhook.name}`}>Run ↗</button
-              >
+                <span class="min-w-0"
+                  ><strong class="block truncate">{webhook.name}</strong>
+                  <span
+                    class="block truncate text-xs text-base-content/60"
+                    title={webhook.workflow}>{webhook.workflow}</span
+                  >
+                </span>
+              </button>
+              <div class="flex shrink-0 items-center">
+                <button
+                  class="btn btn-ghost btn-square btn-xs text-base-content/60"
+                  onclick={() => (hookInfo = webhook)}
+                  title={`Information about ${webhook.name}`}
+                  aria-label={`Information about ${webhook.name}`}
+                  ><span class="icon-[lucide--info] size-3.5" aria-hidden="true"
+                  ></span></button
+                >
+                <button
+                  class="btn btn-ghost btn-square btn-xs text-base-content/60"
+                  onclick={() => copyUrl(webhook)}
+                  aria-label={`Copy URL for ${webhook.name}`}
+                  title={copied === webhook.name
+                    ? "URL copied"
+                    : "Copy webhook URL"}
+                >
+                  <span
+                    class={copied === webhook.name
+                      ? "icon-[lucide--check] size-3.5 text-success"
+                      : "icon-[lucide--copy] size-3.5"}
+                    aria-hidden="true"
+                  ></span>
+                </button>
+                <button
+                  class="btn btn-ghost btn-square btn-xs text-base-content/60"
+                  onclick={() => (composer = webhook)}
+                  title={`Run ${webhook.name}`}
+                  aria-label={`Run ${webhook.name}`}
+                  ><span class="icon-[lucide--play] size-3.5" aria-hidden="true"
+                  ></span></button
+                >
+              </div>
             </div>
-          </div>
-        {:else}<p class="sidebar-empty">
+          </li>
+        {:else}
+          <li class="p-3 text-sm text-base-content/60">
             No webhooks configured. Add one to runling.config.ts. Changes load
             automatically.
-          </p>{/each}
-      </div>
-      <div class="catalog-foot">
-        <span class="count">{activeCount}</span><span
-          >running now<br /><small>History saved automatically</small></span
-        >
+          </li>
+        {/each}
+      </ul>
+      <div
+        class="mt-auto hidden items-center gap-3 px-3 pt-6 pb-2 text-xs text-base-content/60 lg:flex"
+      >
+        <span class="badge badge-primary badge-soft">{activeCount}</span>
+        <span>Running now<br />History saved automatically</span>
       </div>
     </aside>
     <section
-      class="run-list"
+      class="flex min-h-0 min-w-0 flex-col border-b border-base-300 bg-base-100 md:border-r md:border-b-0 [&[hidden]]:hidden"
       id="runs-sidebar"
       hidden={!sidebarsExpanded}
       aria-label="Workflow runs"
     >
-      <div class="list-header">
-        <h2>{filter || "Recent runs"}</h2>
-        <span>{visibleRuns.length}</span>
+      <div class="flex shrink-0 items-center justify-between gap-2 px-3 py-3">
+        <h2 class="truncate text-sm font-semibold">
+          {filter || "Recent runs"}
+        </h2>
+        <span class="badge badge-ghost badge-sm">{visibleRuns.length}</span>
       </div>
-      <div class="runs">
-        {#each visibleRuns as run (run.id)}
-          <button
-            class="run-row"
-            class:selected={selected === run.id}
-            onclick={() => selectRun(run.id)}
-            aria-pressed={selected === run.id}
-            title={`Run ${run.id} · ${new Date(run.startedAt).toLocaleString()}`}
-          >
-            <span class="run-heading">
-              <span class="run-title">{run.workflow}</span>
-              <time datetime={new Date(run.startedAt).toISOString()}
-                >{new Date(run.startedAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}</time>
-            </span><span class="run-meta"
-              ><StatusBadge status={run.status} /><span
-                >{run.durationMs !== undefined
-                  ? duration(run.durationMs)
-                  : "In progress"}</span
-              ></span
-            >
-            <Usage usage={run.usage} compact />
-          </button>
-        {:else}<div class="list-empty">
-            <span>◇</span>
-            <p>No runs yet.</p>
-            <small
-              >Start a run or send a webhook to see its progress here.</small
-            >
-          </div>{/each}
+      <div
+        class="flex min-h-0 flex-1 overflow-x-auto md:block lg:overflow-y-auto"
+      >
+        <ul class="list max-md:flex max-md:flex-row">
+          {#each visibleRuns as run (run.id)}
+            <li class="max-md:w-64 max-md:shrink-0">
+              <button
+                class={[
+                  "w-full border-l-2 px-3 py-2 text-left transition-colors hover:bg-base-200 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary",
+                  selected === run.id
+                    ? "border-l-primary bg-primary/10"
+                    : "border-l-transparent",
+                ]}
+                onclick={() => selectRun(run.id)}
+                aria-pressed={selected === run.id}
+                title={`Run ${run.id} · ${new Date(run.startedAt).toLocaleString()}`}
+              >
+                <span class="mb-1 flex items-center gap-2">
+                  <StatusBadge status={run.status} />
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium"
+                    >{run.workflow}</span
+                  >
+                  <time
+                    class="shrink-0 text-xs text-base-content/50 tabular-nums"
+                    datetime={new Date(run.startedAt).toISOString()}
+                  >
+                    {new Date(run.startedAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </time>
+                </span>
+                <span
+                  class="flex items-center justify-between gap-2 text-xs text-base-content/60"
+                >
+                  <Usage usage={run.usage} compact />
+                  <span class="shrink-0"
+                    >{run.durationMs !== undefined
+                      ? duration(run.durationMs)
+                      : "In progress"}</span
+                  >
+                </span>
+              </button>
+            </li>
+          {:else}
+            <li class="p-4 text-sm text-base-content/60">
+              No runs yet. Start a run or send a webhook to see its progress
+              here.
+            </li>
+          {/each}
+        </ul>
       </div>
-      <div class="list-foot">Latest 100 runs</div>
+      <div
+        class="hidden shrink-0 border-t border-base-300 px-4 py-3 text-xs text-base-content/50 md:block"
+      >
+        Latest 100 runs
+      </div>
     </section>
-    <main class="detail-pane">
+    <main class="min-w-0 bg-base-100 lg:overflow-y-auto">
       {#if detail}
         {#key detail.id}<RunInspector run={detail} {connection} />{/key}
-      {:else if selected}<div class="welcome">
-          <div class="loading-mark">◌</div>
-          <h1>{detailError ? "Run unavailable" : "Loading run"}</h1>
-          <p>{detailError || connection}</p>
-          {#if detailError}<button
-              class="button"
-              onclick={() => selectRun(selected)}>Retry</button
-            >{/if}
+      {:else if selected}
+        <div class="hero min-h-96 p-8">
+          <div class="hero-content flex-col text-center">
+            {#if !detailError}<span
+                class="loading loading-spinner loading-lg text-primary"
+              ></span>{/if}
+            <h1 class="text-2xl font-semibold">
+              {detailError ? "Run unavailable" : "Loading run"}
+            </h1>
+            <p class="text-base-content/60">{detailError || connection}</p>
+            {#if detailError}<button
+                class="btn btn-sm"
+                onclick={() => selectRun(selected)}>Retry</button
+              >{/if}
+          </div>
         </div>
       {:else}
-        <div class="welcome">
-          <div class="welcome-mark" aria-hidden="true">
-            <span></span><span></span><span></span>
+        <div class="hero min-h-96 p-8">
+          <div class="hero-content flex-col text-center">
+            <h1 class="text-3xl font-semibold tracking-tight">
+              Follow the work.
+            </h1>
+            <p class="max-w-sm text-base-content/60">
+              Every step, from the first request to the final result.
+            </p>
+            <button
+              class="btn btn-primary"
+              disabled={!data.webhooks.length}
+              onclick={() => (composer = data.webhooks[0] ?? null)}
+              >Start your first run</button
+            >
+            <p class="text-sm text-base-content/60">
+              Or select a past run to inspect its timeline.
+            </p>
           </div>
-          <h1>Follow the work.</h1>
-          <p>Every step, from the first request<br />to the final result.</p>
-          <button
-            class="button primary"
-            disabled={!data.webhooks.length}
-            onclick={() => (composer = data.webhooks[0] ?? null)}
-            >Start your first run</button
-          ><small>Or select a past run to inspect its timeline.</small>
         </div>
       {/if}
     </main>
@@ -367,534 +479,3 @@
       selectRun(id);
     }}
   />{/if}
-
-<style>
-  :global(:root) {
-    --ink: #23334c;
-    --muted: #65758e;
-    --blue: #315fce;
-    --green: #28735c;
-    --red: #b13f3c;
-    --line: #dce3ee;
-    --wash: #edf2f8;
-    color: var(--ink);
-    background: #f6f8fc;
-    font-synthesis: none;
-  }
-  :global(*) {
-    box-sizing: border-box;
-  }
-  :global(body) {
-    margin: 0;
-  }
-  :global(button),
-  :global(textarea) {
-    font-family: inherit;
-  }
-  :global(button) {
-    touch-action: manipulation;
-  }
-  :global(button:disabled) {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  :global(:focus-visible) {
-    outline: 2px solid var(--blue);
-    outline-offset: 3px;
-  }
-  :global(pre),
-  :global(code) {
-    font-family: "SFMono-Regular", Consolas, monospace;
-  }
-  :global(.button) {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 10px 15px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 550;
-    background: var(--surface);
-    color: var(--ink);
-  }
-  :global(.button.primary) {
-    background: var(--primary-bg);
-    color: white;
-    border-color: var(--primary-bg);
-    box-shadow: 0 2px 3px #24479719;
-  }
-  :global(.button.primary:hover:not(:disabled)) {
-    background: var(--primary-hover);
-  }
-  :global(.quiet) {
-    border: 0;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-    padding: 5px;
-  }
-  :global(.error) {
-    background: var(--error-bg);
-    color: var(--error-text);
-    padding: 13px 15px;
-    font-size: 12px;
-    line-height: 1.7;
-    border-radius: 6px;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  .app {
-    min-height: 100vh;
-  }
-  .app-header {
-    height: 74px;
-    padding: 0 30px;
-    border-bottom: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-  }
-  .header-navigation {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 22px;
-    font-weight: 650;
-    text-decoration: none;
-    letter-spacing: -0.7px;
-    color: var(--ink);
-  }
-  .brand svg {
-    color: var(--blue);
-  }
-  .brand > span {
-    color: #b1bccd;
-    margin-left: 9px;
-    font-weight: 400;
-  }
-  .brand .section-name {
-    color: var(--muted);
-    font-size: 13px;
-    letter-spacing: 0;
-    margin-left: 0;
-  }
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-  }
-  .live-label {
-    font-size: 11px;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--muted);
-  }
-  .live-label i {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #9aa5b7;
-  }
-  .connected i {
-    background: var(--green);
-  }
-  .workspace {
-    display: grid;
-    grid-template-columns: 238px 270px minmax(0, 1fr);
-    min-height: calc(100vh - 74px);
-  }
-  .catalog {
-    padding: 0 12px 16px;
-    background: var(--surface-raised);
-    border-right: 1px solid var(--line);
-    display: flex;
-    flex-direction: column;
-  }
-  .sidebar-heading,
-  .list-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .sidebar-heading {
-    margin: 0 10px;
-    min-height: 52px;
-  }
-  h2 {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-  }
-  .all-runs {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 10px;
-    border: 0;
-    border-radius: 6px;
-    background: none;
-    font-size: 12px;
-    color: var(--muted);
-    cursor: pointer;
-    margin-bottom: 8px;
-  }
-  .all-runs.current {
-    background: var(--selected);
-    color: var(--selected-text);
-  }
-  .webhook {
-    border: 1px solid transparent;
-    border-radius: 7px;
-    margin-bottom: 4px;
-  }
-  .webhook.current {
-    background: var(--surface-soft);
-    border-color: var(--selected-border);
-  }
-  .webhook-name {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    text-align: left;
-    background: none;
-    border: 0;
-    padding: 9px 8px 4px;
-    color: var(--ink);
-    cursor: pointer;
-  }
-  .webhook-name strong {
-    font-size: 13px;
-    font-weight: 600;
-    display: block;
-    overflow-wrap: anywhere;
-  }
-  .webhook-name small {
-    display: block;
-    color: var(--muted);
-    font-size: 11px;
-    margin-top: 2px;
-  }
-  .hook-icon {
-    width: 20px;
-    height: 24px;
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    color: var(--blue);
-    font-size: 17px;
-  }
-  .hook-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
-    padding: 0 6px 6px 30px;
-  }
-  .hook-actions button {
-    font-size: 10px;
-    color: var(--muted);
-    padding: 5px 6px;
-    min-height: 26px;
-    border-radius: 4px;
-    border: 0;
-    background: none;
-    cursor: pointer;
-  }
-  .hook-actions button:hover {
-    color: var(--blue);
-    background: var(--selected);
-  }
-  .catalog-foot {
-    margin-top: auto;
-    padding: 35px 12px 0;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    font-size: 12px;
-    line-height: 1.7;
-  }
-  .catalog-foot .count {
-    font-size: 33px;
-    font-weight: 400;
-    color: var(--blue);
-  }
-  .catalog-foot small {
-    color: var(--muted);
-    font-size: 10px;
-  }
-  .sidebar-empty {
-    font-size: 12px;
-    line-height: 1.8;
-    color: var(--muted);
-    margin: 12px;
-  }
-  .run-list {
-    border-right: 1px solid var(--line);
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  .list-header {
-    padding: 0 16px;
-    min-height: 52px;
-  }
-  .list-header h2 {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .runs {
-    flex: 1;
-  }
-  .run-row {
-    display: block;
-    width: 100%;
-    background: transparent;
-    border: 0;
-    border-left: 3px solid transparent;
-    border-top: 1px solid var(--surface-raised);
-    padding: 12px 14px 12px 13px;
-    text-align: left;
-    cursor: pointer;
-    color: var(--ink);
-  }
-  .run-row.selected {
-    background: var(--selected);
-    border-left-color: var(--blue);
-  }
-  .run-row:hover {
-    background: var(--surface-soft);
-  }
-  .run-row.selected:hover {
-    background: var(--selected);
-  }
-  .run-heading {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 7px;
-  }
-  .run-heading time {
-    flex-shrink: 0;
-    font-size: 9px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-  }
-  .run-title {
-    display: block;
-    font-size: 13px;
-    font-weight: 550;
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .run-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    align-items: center;
-    font-size: 10px;
-    color: var(--muted);
-  }
-  .list-empty {
-    padding: 35px 22px;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.6;
-  }
-  .list-empty > span {
-    font-size: 25px;
-    color: var(--selected-border);
-  }
-  .list-empty p {
-    margin: 12px 0 5px;
-  }
-  .list-empty small {
-    font-size: 12px;
-  }
-  .list-foot {
-    border-top: 1px solid var(--line);
-    color: #7e8b9f;
-    font-size: 10px;
-    padding: 16px 20px;
-  }
-  .detail-pane {
-    min-width: 0;
-    background: var(--surface-soft);
-  }
-  .welcome {
-    min-height: 70vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    padding: 40px;
-    text-align: center;
-  }
-  .welcome h1 {
-    font-size: 32px;
-    letter-spacing: -0.9px;
-    font-weight: 500;
-    margin: 28px 0 0;
-  }
-  .welcome p {
-    font-size: 14px;
-    line-height: 1.8;
-    color: var(--muted);
-    margin: 15px 0 26px;
-  }
-  .welcome small {
-    font-size: 11px;
-    margin-top: 20px;
-    color: var(--muted);
-  }
-  .welcome-mark {
-    width: 120px;
-    display: grid;
-    gap: 9px;
-    padding-left: 20px;
-    border-left: 1px solid var(--selected-border);
-    transform: rotate(-8deg);
-  }
-  .welcome-mark span {
-    height: 24px;
-    border: 1px solid var(--selected-border);
-    background: var(--selected);
-    border-radius: 4px;
-  }
-  .welcome-mark span:nth-child(2) {
-    margin-left: 16px;
-    background: var(--selected);
-  }
-  .welcome-mark span:nth-child(3) {
-    margin-left: 16px;
-    width: 44px;
-  }
-  .loading-mark {
-    font-size: 40px;
-    color: var(--blue);
-  }
-  .notice {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 30px;
-    font-size: 12px;
-    background: var(--selected);
-    overflow-wrap: anywhere;
-  }
-  @media (min-width: 1050px) {
-    .workspace {
-      height: calc(100vh - 74px);
-      min-height: 0;
-    }
-    .catalog,
-    .runs,
-    .detail-pane {
-      overflow-y: auto;
-    }
-  }
-  @media (max-width: 1100px) {
-    .workspace {
-      grid-template-columns: 205px 235px minmax(0, 1fr);
-    }
-    .brand .section-name {
-      display: none;
-    }
-  }
-  @media (max-width: 850px) {
-    .workspace {
-      grid-template-columns: 215px minmax(0, 1fr);
-    }
-    .catalog {
-      grid-column: 1 / -1;
-      padding: 15px;
-      border-bottom: 1px solid var(--line);
-    }
-    .sidebar-heading,
-    .catalog-foot {
-      display: none;
-    }
-    .webhooks {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .webhook {
-      margin: 0;
-    }
-    .all-runs {
-      max-width: 180px;
-      margin: 0 0 8px;
-      gap: 30px;
-    }
-    .welcome {
-      padding: 30px 20px;
-    }
-  }
-  @media (max-width: 580px) {
-    .app-header {
-      padding: 12px 16px;
-      min-height: 64px;
-      height: auto;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .header-actions {
-      gap: 10px;
-    }
-    .live-label {
-      display: none;
-    }
-    .brand > span {
-      display: none;
-    }
-    .workspace {
-      display: flex;
-      flex-direction: column;
-    }
-    .run-list {
-      max-height: 230px;
-      overflow-y: auto;
-      border-bottom: 1px solid var(--line);
-    }
-    .runs {
-      display: flex;
-      overflow-x: auto;
-      flex-shrink: 0;
-    }
-    .run-row {
-      min-width: 210px;
-      border-right: 1px solid var(--line);
-    }
-    .list-header {
-      padding: 14px 20px;
-      min-height: auto;
-    }
-    .list-foot {
-      display: none;
-    }
-    .welcome {
-      min-height: 50vh;
-    }
-  }
-
-  .workspace.sidebars-collapsed {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .catalog[hidden],
-  .run-list[hidden] {
-    display: none;
-  }
-</style>

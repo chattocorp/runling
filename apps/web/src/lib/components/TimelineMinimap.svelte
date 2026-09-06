@@ -148,9 +148,17 @@
   }
 </script>
 
-<div class="minimap" class:collapsed>
-  <div class="caption">
+<div
+  class={[
+    "card absolute bottom-3 right-3 z-5 max-w-full border border-base-300 bg-base-200/95 p-2 shadow-lg backdrop-blur-sm",
+    collapsed ? "w-28" : "w-56",
+  ]}
+>
+  <div
+    class="flex justify-between items-center text-base-content/60 text-xs mb-1.5"
+  >
     <span>Overview</span><button
+      class="btn btn-ghost btn-xs btn-square"
       onclick={() => (collapsed = !collapsed)}
       aria-expanded={!collapsed}
       aria-label={collapsed ? "Show minimap" : "Hide minimap"}
@@ -160,8 +168,10 @@
   {#if !collapsed}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (Two-dimensional overview supports pointer and keyboard navigation.) -->
     <div
-      class="map"
-      class:dragging={!!gesture || middleDragging}
+      class={[
+        "h-32 relative bg-base-100 border border-base-300 rounded-field overflow-hidden touch-none focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2",
+        gesture || middleDragging ? "cursor-grabbing" : "cursor-grab",
+      ]}
       {@attach attachMiddleDrag}
       role="region"
       tabindex="0"
@@ -176,12 +186,28 @@
       onkeydown={key}
     >
       <svg
+        class="absolute w-full h-full pointer-events-none"
         viewBox={`0 0 1000 ${axis.total}`}
         preserveAspectRatio="none"
         aria-hidden="true"
       >
         {#each rows as { node, top, height } (node.id)}
           <rect
+            class={[
+              node.status === "failed" || node.status === "blocked"
+                ? "fill-error light:fill-rose-300"
+                : node.status === "interrupted"
+                  ? "fill-neutral light:fill-slate-300"
+                  : node.kind === "agent"
+                    ? "fill-secondary light:fill-violet-300"
+                    : node.kind === "command"
+                      ? "fill-accent light:fill-teal-300"
+                      : node.kind === "input"
+                        ? "fill-warning light:fill-amber-300"
+                        : "fill-primary light:fill-blue-300",
+              node.id === selected &&
+                "stroke-base-content stroke-1 [vector-effect:non-scaling-stroke]",
+            ]}
             x={(node.startedAt / total) * 1000}
             y={top + height * 0.2}
             width={Math.max(
@@ -192,123 +218,25 @@
             )}
             height={height * 0.6}
             data-kind={node.kind}
-            class:failed={node.status === "failed" || node.status === "blocked"}
-            class:selected={node.id === selected}
           />
         {/each}
       </svg>
       <span
-        class="window"
+        class="absolute pointer-events-none border-2 border-primary bg-primary/5 light:border-slate-400 light:bg-slate-400/5 min-w-0.5 min-h-0.5 box-border shadow-[0_0_0_1000px] shadow-base-300/60"
         style:left={`${(view.start / total) * 100}%`}
         style:width={`${(view.span / total) * 100}%`}
         style:top={`${(top / axis.total) * 100}%`}
         style:height={`${(visible / axis.total) * 100}%`}
       ></span>
-      <span class="playhead" style:left={`${(elapsed / total) * 100}%`}></span>
+      <span
+        class="absolute pointer-events-none top-0 bottom-0 w-0.5 bg-error"
+        style:left={`${(elapsed / total) * 100}%`}
+      ></span>
     </div>
-    <div class="caption bounds">
+    <div
+      class="flex justify-between items-center text-base-content/60 text-xs mb-1.5 mt-1.5 mr-0 mb-0 ml-0 tabular-nums"
+    >
       <span>0</span><span>{duration(total)}</span>
     </div>
   {/if}
 </div>
-
-<style>
-  .minimap {
-    position: absolute;
-    bottom: 12px;
-    right: 24px;
-    z-index: 5;
-    width: 230px;
-    max-width: calc(100% - 36px);
-    padding: 8px;
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    background: var(--overlay);
-    box-shadow: 0 3px 14px #24324b26;
-  }
-  .minimap.collapsed {
-    width: 105px;
-  }
-  .caption {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--muted);
-    font-size: 10px;
-    margin-bottom: 6px;
-  }
-  .caption button {
-    background: none;
-    border: 0;
-    color: var(--muted);
-    cursor: pointer;
-    padding: 0 6px;
-    font-size: 14px;
-  }
-  .bounds {
-    margin: 5px 0 0;
-    font-variant-numeric: tabular-nums;
-  }
-  .map {
-    height: 130px;
-    position: relative;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    overflow: hidden;
-    touch-action: none;
-    cursor: grab;
-  }
-  .map.dragging {
-    cursor: grabbing;
-  }
-  .map:focus-visible {
-    outline: 2px solid var(--blue);
-    outline-offset: 3px;
-  }
-  svg {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-  rect {
-    fill: #547dbc;
-  }
-  rect[data-kind="agent"] {
-    fill: #8866b3;
-  }
-  rect[data-kind="command"] {
-    fill: #43998a;
-  }
-  rect[data-kind="input"] {
-    fill: #bf903e;
-  }
-  rect.failed {
-    fill: #c4525c;
-  }
-  rect.selected {
-    stroke: var(--ink);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-  .window,
-  .playhead {
-    position: absolute;
-    pointer-events: none;
-  }
-  .window {
-    border: 2px solid #547dbc;
-    background: #547dbc0d;
-    min-width: 2px;
-    min-height: 2px;
-    box-sizing: border-box;
-    box-shadow: 0 0 0 1000px var(--map-shade);
-  }
-  .playhead {
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: #c4525c;
-  }
-</style>

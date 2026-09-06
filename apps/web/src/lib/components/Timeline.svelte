@@ -35,11 +35,8 @@
   } = $props();
   let board: HTMLDivElement;
   let ruler: HTMLDivElement;
-  let grid: HTMLDivElement;
   let scrollTop = $state(0);
   let visibleHeight = $state(1);
-  let contentHeight = $state(1);
-  let rowMetrics = $state<{ top: number; height: number }[]>([]);
   let rowHeight = $state(48);
   function beginMiddleZoom(anchor: number, y = visibleHeight / 2) {
     const initialManual = manual;
@@ -66,10 +63,12 @@
     clampWindow(manual ?? fitWindow(elapsed), fitWindow(elapsed).span),
   );
   let rows = $derived(flattenActivities(nodes, collapsed));
+  let contentHeight = $derived(Math.max(1, rows.length * rowHeight));
   let miniRows = $derived(
     rows.map(({ node }, index) => ({
       node,
-      ...(rowMetrics[index] ?? { top: index * rowHeight, height: rowHeight }),
+      top: index * rowHeight,
+      height: rowHeight,
     })),
   );
   let ticks = $derived(timelineTicks(view, plotWidth));
@@ -101,7 +100,7 @@
     if (event.key === "Tab") {
       const controls = [
         ...panel.querySelectorAll<HTMLElement>('button, [tabindex="0"]'),
-      ];
+      ].filter((element) => !element.closest("[inert]"));
       const first = controls[0];
       const last = controls.at(-1);
       if (event.shiftKey && document.activeElement === first) {
@@ -133,21 +132,15 @@
     const observer = new ResizeObserver(() => {
       plotWidth = Math.max(1, ruler.clientWidth);
       visibleHeight = Math.max(1, board.clientHeight - ruler.offsetHeight);
-      contentHeight = Math.max(1, grid.scrollHeight - ruler.offsetHeight);
       scrollTop = board.scrollTop;
-      const top = grid.getBoundingClientRect().top + ruler.offsetHeight;
-      rowMetrics = [...grid.querySelectorAll<HTMLElement>(".lane")].map(
-        (lane) => ({
-          top: lane.getBoundingClientRect().top - top,
-          height: lane.offsetHeight,
-        }),
-      );
     });
     observer.observe(ruler);
     observer.observe(board);
-    observer.observe(grid);
     const wheel = (event: WheelEvent) => {
-      if (!(event.target instanceof Element) || !event.target.closest(".plot"))
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.closest("[data-timeline-plot]")
+      )
         return;
       event.preventDefault();
       const unit =
@@ -198,7 +191,7 @@
       if (
         (event.button !== 0 && event.button !== 1) ||
         !(event.target instanceof Element) ||
-        (event.button !== 1 && !event.target.closest(".plot"))
+        (event.button !== 1 && !event.target.closest("[data-timeline-plot]"))
       )
         return;
       if (event.button === 1) event.preventDefault();
@@ -289,43 +282,53 @@
 <svelte:window onkeydown={globalKey} />
 
 <section
-  class="timeline"
-  class:expanded
-  class:dense={rowHeight < 44}
-  class:compact={rowHeight < 32}
+  class={[
+    "border border-base-300 rounded-box bg-base-100 overflow-hidden",
+    expanded &&
+      "fixed inset-2 z-50 flex flex-col shadow-2xl ring-32 ring-black/50 sm:inset-5",
+  ]}
   style:--row-height={`${rowHeight}px`}
   aria-label="Execution timeline"
   bind:this={panel}
 >
-  <div class="toolbar">
-    <div class="mode">
-      <span class:live={running} class="mode-dot"></span>{manual
-        ? "Explore"
-        : running
-          ? "Live fit"
-          : "Full timeline"}<span class="zoom-value"
+  <div
+    class="min-h-12 flex items-center justify-between gap-2.5 py-2 px-3 border-b border-b-base-300 bg-base-100 max-sm:p-2"
+  >
+    <div
+      class="flex items-center gap-2 text-xs text-base-content/60 whitespace-nowrap"
+    >
+      <span
+        class={[
+          "status status-sm",
+          running ? "status-primary" : "bg-base-content/40",
+        ]}
+      ></span>{manual ? "Explore" : running ? "Live fit" : "Full timeline"}<span
+        class="text-base-content/60 pl-1.5 tabular-nums max-sm:hidden"
         >{zoom.toFixed(zoom < 10 ? 1 : 0)}×</span
       >
     </div>
-    <div class="controls">
+    <div class="flex items-center flex-wrap gap-1.5">
       <button
+        class="btn btn-xs btn-square"
         onclick={() => zoomBy(1 / 0.7)}
         aria-label="Zoom out"
         disabled={zoom <= 1}
         title="Zoom out (−)">−</button
       >
       <button
+        class="btn btn-xs btn-square"
         onclick={() => zoomBy(0.7)}
         aria-label="Zoom in"
         title="Zoom in (+)">+</button
       >
       <button
-        class="fit"
-        class:active={!manual}
+        class="btn btn-xs"
+        class:btn-active={!manual}
         onclick={fit}
         title="Fit full timeline (F)">Fit timeline</button
       >
       <button
+        class="btn btn-xs btn-square"
         bind:this={expandButton}
         onclick={toggleExpanded}
         aria-label={expanded ? "Exit expanded timeline" : "Expand timeline"}
@@ -334,11 +337,14 @@
       >
     </div>
   </div>
-  <div class="chart">
+  <div class={["relative min-h-0", expanded && "flex-1"]}>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (The scrollable chart is focusable for its documented pan and zoom keyboard controls.) -->
     <div
-      class="board"
-      class:dragging
+      class={[
+        "overflow-y-auto overflow-x-hidden -outline-offset-2 [scrollbar-gutter:stable]",
+        expanded ? "h-full" : "h-120",
+        dragging && "cursor-grabbing",
+      ]}
       bind:this={board}
       tabindex="0"
       role="region"
@@ -347,12 +353,27 @@
       onkeydown={keyboard}
       onscroll={() => (scrollTop = board.scrollTop)}
     >
-      <div class="grid" bind:this={grid} style:--row-count={rows.length}>
-        <div class="label-heading">Activity <span>{rows.length}</span></div>
-        <div class="ruler plot" bind:this={ruler}>
+      <div
+        class="grid grid-cols-[clamp(125px,_29%,_235px)_minmax(0,_1fr)] grid-rows-[35px] auto-rows-auto min-w-0 max-sm:grid-cols-[120px_minmax(0,_1fr)]"
+      >
+        <div
+          class="sticky top-0 z-3 bg-base-200 border-b border-b-base-300 text-xs text-base-content/60 flex items-center justify-between py-0 px-3 border-r border-r-base-300"
+        >
+          Activity <span class="text-xs text-base-content/60"
+            >{rows.length}</span
+          >
+        </div>
+        <div
+          class={[
+            "sticky top-0 z-3 bg-base-200 border-b border-base-300 overflow-hidden touch-none select-none",
+            dragging ? "cursor-grabbing" : "cursor-grab",
+          ]}
+          data-timeline-plot
+          bind:this={ruler}
+        >
           {#each ticks as tick (tick)}
             <span
-              class="tick"
+              class="absolute top-0 h-full pt-2.5 pr-0 pb-0 pl-1.5 border-l border-l-base-300 whitespace-nowrap text-base-content/60 text-xs tabular-nums"
               style:left={`${((tick - view.start) / view.span) * 100}%`}
               >{tickLabel(
                 tick,
@@ -362,98 +383,183 @@
           {/each}
           {#if cursor >= 0 && cursor <= 100}
             <span
-              class="cursor-label"
-              class:live={running}
+              class={[
+                "absolute bottom-0 -translate-x-1/2 text-xs px-1 rounded-t-sm pointer-events-none",
+                running
+                  ? "bg-error text-error-content"
+                  : "bg-neutral text-neutral-content",
+              ]}
               style:left={`${cursor}%`}>{running ? "Now" : "End"}</span
             >
           {/if}
         </div>
-        {#each rows as { node, depth } (node.id)}
+        {#snippet branch(node: Activity, depth: number)}
           {@const end =
             node.startedAt +
             (node.durationMs ?? Math.max(0, elapsed - node.startedAt))}
           {@const bar = barPosition(node.startedAt, end, view)}
           <div
-            class="label"
-            class:chosen={selected === node.id}
-            style:padding-left={`${8 + Math.min(depth, 6) * 13}px`}
+            class="col-span-2 grid grid-cols-subgrid h-(--row-height) min-h-0 overflow-hidden"
+            data-timeline-row={node.id}
           >
-            {#if node.children.length}
-              <button
-                class="toggle"
-                aria-label={`${collapsed.has(node.id) ? "Expand" : "Collapse"} ${node.label}`}
-                aria-expanded={!collapsed.has(node.id)}
-                onclick={() => toggle(node.id)}
-                >{collapsed.has(node.id) ? "▸" : "▾"}</button
-              >
-            {:else}<span class="leaf" aria-hidden="true"
-                >{node.kind === "agent"
-                  ? "◈"
-                  : node.kind === "command"
-                    ? "›_"
-                    : "◇"}</span
-              >{/if}
-            <button
-              class="label-select"
-              onclick={() => onselect(node.id)}
-              aria-pressed={selected === node.id}
-              title={`${node.label} (${node.kind}, ${node.status})`}
-              ><strong>{node.label}</strong>
-              {#if node.usage}<span class="row-usage"
-                  ><Usage usage={node.usage} compact /></span
-                >{:else}<small>{node.kind}</small>{/if}</button
+            <div
+              class={[
+                "overflow-hidden flex items-center border-b border-r border-base-300 pr-1.5 min-w-0",
+                selected === node.id ? "bg-primary/10" : "bg-base-200/50",
+              ]}
+              style:padding-left={`${8 + Math.min(depth, 6) * 13}px`}
             >
-          </div>
-          <div class="lane plot" class:chosen={selected === node.id}>
-            {#each ticks as tick (tick)}<span
-                class="gridline"
-                style:left={`${((tick - view.start) / view.span) * 100}%`}
-                aria-hidden="true"
-              ></span>{/each}
-            {#if cursor >= 0 && cursor <= 100}<span
-                class="playhead"
-                class:live={running}
-                style:left={`${cursor}%`}
-                aria-hidden="true"
-              ></span>{/if}
-            {#if bar}
-              <button
-                class="bar"
-                class:running={node.status === "running"}
-                class:failed={node.status === "failed" ||
-                  node.status === "blocked"}
-                class:interrupted={node.status === "interrupted"}
-                class:selected={selected === node.id}
-                class:clipped-start={bar.clippedStart}
-                class:clipped-end={bar.clippedEnd}
-                data-kind={node.kind}
-                style:left={`${bar.left}%`}
-                style:width={`max(6px, ${bar.width}%)`}
-                aria-label={`${node.label}, ${node.status}, starts at ${duration(node.startedAt)}, duration ${duration(end - node.startedAt)}`}
-                aria-pressed={selected === node.id}
-                onclick={() => onselect(node.id)}
-                title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}${node.preview ? `\n${node.preview}` : ""}`}
-              >
-                {#if bar.clippedStart}
-                  <span class="continuation start" aria-hidden="true">‹‹</span>
-                {/if}
-                <span class="bar-label"
-                  >{node.kind === "agent" && node.preview
-                    ? node.preview
-                    : bar.clippedStart
-                      ? ""
-                      : node.label}</span
+              {#if node.children.length}
+                <button
+                  class="btn btn-ghost btn-xs w-5 px-0 shrink-0"
+                  aria-label={`${collapsed.has(node.id) ? "Expand" : "Collapse"} ${node.label}`}
+                  aria-expanded={!collapsed.has(node.id)}
+                  onclick={() => toggle(node.id)}
+                  ><span
+                    class="icon-[lucide--chevron-right] size-3.5 transition-transform duration-150 ease-out motion-reduce:transition-none"
+                    class:rotate-90={!collapsed.has(node.id)}
+                    aria-hidden="true"
+                  ></span></button
                 >
-                {#if !bar.clippedEnd}
-                  <span class="bar-duration"
-                    >{duration(end - node.startedAt)}</span
+              {:else}<span
+                  class="shrink-0 w-5 grid place-items-center text-sm text-base-content/60"
+                  aria-hidden="true"
+                  >{node.kind === "agent"
+                    ? "◈"
+                    : node.kind === "command"
+                      ? "›_"
+                      : "◇"}</span
+                >{/if}
+              <button
+                class="grid gap-1 min-w-0 flex-1 bg-transparent border-0 p-1 overflow-hidden text-left cursor-pointer text-base-content"
+                onclick={() => onselect(node.id)}
+                aria-pressed={selected === node.id}
+                title={`${node.label} (${node.kind}, ${node.status})`}
+                ><strong
+                  class="leading-4 text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis"
+                  >{node.label}</strong
+                >
+                {#if node.usage}<span
+                    class={[
+                      "block max-h-4 overflow-hidden leading-4",
+                      rowHeight < 44 && "hidden",
+                    ]}><Usage usage={node.usage} compact /></span
+                  >{:else}<small
+                    class={[
+                      "text-xs leading-3 text-base-content/60",
+                      rowHeight < 32 && "hidden",
+                    ]}>{node.kind}</small
+                  >{/if}</button
+              >
+            </div>
+            <div
+              class={[
+                "touch-none select-none relative border-b border-base-300 min-w-0 overflow-hidden",
+                dragging ? "cursor-grabbing" : "cursor-grab",
+                selected === node.id ? "bg-primary/10" : "even:bg-base-200/50",
+              ]}
+              data-timeline-lane
+              data-timeline-plot
+            >
+              {#each ticks as tick (tick)}<span
+                  class="absolute top-0 bottom-0 w-px bg-base-300 pointer-events-none"
+                  style:left={`${((tick - view.start) / view.span) * 100}%`}
+                  aria-hidden="true"
+                ></span>{/each}
+              {#if cursor >= 0 && cursor <= 100}<span
+                  class={[
+                    "absolute inset-y-0 w-px z-2 pointer-events-none",
+                    running ? "bg-error" : "bg-primary/50",
+                  ]}
+                  style:left={`${cursor}%`}
+                  aria-hidden="true"
+                ></span>{/if}
+              {#if bar}
+                <button
+                  class={[
+                    "absolute inset-y-1 min-w-1.5 flex items-center gap-2 overflow-hidden rounded-field border text-left inset-shadow-2xs inset-shadow-white/10 bg-linear-to-b from-white/5 to-black/5 hover:brightness-105",
+                    dragging ? "cursor-grabbing" : "cursor-pointer",
+                    node.status === "failed" || node.status === "blocked"
+                      ? "bg-error border-error text-error-content light:bg-rose-100 light:border-rose-200 light:text-rose-950"
+                      : node.status === "interrupted"
+                        ? "bg-neutral border-neutral text-neutral-content border-dashed light:bg-slate-100 light:border-slate-300 light:text-slate-800"
+                        : node.kind === "agent"
+                          ? "bg-secondary border-secondary text-secondary-content light:bg-violet-100 light:border-violet-200 light:text-violet-950"
+                          : node.kind === "command"
+                            ? "bg-accent border-accent text-accent-content light:bg-teal-100 light:border-teal-200 light:text-teal-950"
+                            : node.kind === "input"
+                              ? "bg-warning border-warning text-warning-content light:bg-amber-100 light:border-amber-200 light:text-amber-950"
+                              : "bg-primary border-primary text-primary-content light:bg-blue-100 light:border-blue-200 light:text-blue-950",
+                    selected === node.id &&
+                      "outline-2 outline-base-content -outline-offset-2 z-2",
+                    bar.clippedStart && "rounded-l-none border-l-0 pl-5",
+                    bar.clippedEnd && "rounded-r-none border-r-0 pr-5",
+                  ]}
+                  data-kind={node.kind}
+                  style:left={`${bar.left}%`}
+                  style:width={`max(6px, ${bar.width}%)`}
+                  aria-label={`${node.label}, ${node.status}, starts at ${duration(node.startedAt)}, duration ${duration(end - node.startedAt)}`}
+                  aria-pressed={selected === node.id}
+                  onclick={() => onselect(node.id)}
+                  title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}${node.preview ? `\n${node.preview}` : ""}`}
+                >
+                  {#if node.status === "running"}
+                    <span
+                      aria-hidden="true"
+                      class="pointer-events-none absolute inset-0 animate-shimmer bg-linear-to-r from-transparent via-white/25 to-transparent motion-reduce:animate-none"
+                    ></span>
+                  {/if}
+                  {#if bar.clippedStart}
+                    <span
+                      class="absolute top-0 bottom-0 w-5 grid place-items-center bg-black/20 text-lg leading-none tracking-tighter pointer-events-none z-1 left-0 border-r border-r-current/40 border-dashed"
+                      aria-hidden="true">‹‹</span
+                    >
+                  {/if}
+                  <span
+                    class="relative z-1 text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis min-w-0 pl-2 flex-1"
+                    >{node.kind === "agent" && node.preview
+                      ? node.preview
+                      : bar.clippedStart
+                        ? ""
+                        : node.label}</span
                   >
-                {:else}
-                  <span class="continuation end" aria-hidden="true">››</span>
-                {/if}
-              </button>
-            {/if}
+                  {#if !bar.clippedEnd}
+                    <span
+                      class="relative z-1 pr-2 text-xs whitespace-nowrap opacity-90"
+                      >{duration(end - node.startedAt)}</span
+                    >
+                  {:else}
+                    <span
+                      class="absolute top-0 bottom-0 w-5 grid place-items-center bg-black/20 text-lg leading-none tracking-tighter pointer-events-none z-1 right-0 border-l border-l-current/40 border-dashed"
+                      aria-hidden="true">››</span
+                    >
+                  {/if}
+                </button>
+              {/if}
+            </div>
           </div>
+          {#if node.children.length}
+            <div
+              class={[
+                "col-span-2 grid grid-cols-subgrid transition-[grid-template-rows] duration-150 ease-out motion-reduce:transition-none",
+                collapsed.has(node.id) ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+              ]}
+              data-timeline-branch={node.id}
+              inert={collapsed.has(node.id)}
+              aria-hidden={collapsed.has(node.id)}
+            >
+              <div
+                class="col-span-2 grid grid-cols-subgrid min-h-0 overflow-hidden"
+              >
+                {#each node.children as child (child.id)}
+                  {@render branch(child, depth + 1)}
+                {/each}
+              </div>
+            </div>
+          {/if}
+        {/snippet}
+        {#each nodes as node (node.id)}
+          {@render branch(node, 0)}
         {/each}
       </div>
     </div>
@@ -472,470 +578,26 @@
     />
   </div>
   {#if expanded && inspected}
-    <div class="expanded-detail">
-      <strong>{inspected.label}</strong><small>{inspected.status}</small>
+    <div class="py-3.5 px-5 border-t border-t-base-300 shrink-0">
+      <strong class="text-xs">{inspected.label}</strong><small
+        class="ml-3 text-base-content/60 text-xs">{inspected.status}</small
+      >
       {#if inspected.usage}<Usage usage={inspected.usage} detail />{/if}
-      <pre><AnsiText
+      <pre
+        class="font-mono max-h-32.5 overflow-auto text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere mb-0"><AnsiText
           text={inspected.logs.length
             ? inspected.logs.join("\n\n")
             : "No logs for this activity."}
         /></pre>
     </div>
   {/if}
-  <footer>
+  <footer
+    class="flex flex-wrap justify-between gap-y-1.5 gap-x-4 py-2.5 px-3 border-t border-t-base-300 text-xs text-base-content/60 bg-base-100"
+  >
     <span
       >Scroll to zoom time · Middle-drag ↔ time / ↕ rows · Left-drag to pan</span
-    ><span class="range"
+    ><span class="tabular-nums"
       >{duration(view.start)} — {duration(view.start + view.span)}</span
     >
   </footer>
 </section>
-
-<style>
-  .timeline {
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: var(--surface);
-    overflow: hidden;
-  }
-  .timeline.expanded {
-    position: fixed;
-    inset: 20px;
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    box-shadow:
-      0 0 0 30px #1e304e65,
-      0 20px 100px #1e304e45;
-  }
-  .toolbar {
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--line);
-    background: var(--surface-soft);
-  }
-  .mode {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 11px;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .mode-dot {
-    width: 6px;
-    height: 6px;
-    background: #8f9eb4;
-    border-radius: 50%;
-  }
-  .mode-dot.live {
-    background: var(--blue);
-  }
-  .zoom-value {
-    color: #8290a5;
-    padding-left: 5px;
-    font-variant-numeric: tabular-nums;
-  }
-  .controls {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-  .row-usage {
-    display: block;
-    max-height: 14px;
-    overflow: hidden;
-    line-height: 14px;
-  }
-  .dense .row-usage,
-  .compact .label-select small {
-    display: none;
-  }
-  .controls button {
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: var(--surface);
-    color: var(--ink);
-    padding: 3px 8px;
-    cursor: pointer;
-    height: 28px;
-    min-width: 28px;
-    font-size: 16px;
-  }
-  .controls .fit {
-    font-size: 11px;
-    padding: 4px 9px;
-  }
-  .controls .active {
-    background: var(--selected);
-    color: var(--blue);
-    border-color: var(--selected-border);
-  }
-  .board {
-    height: 480px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    outline-offset: -3px;
-    scrollbar-gutter: stable;
-  }
-  .expanded .board {
-    max-height: none;
-    height: 100%;
-  }
-  .chart {
-    position: relative;
-    min-height: 0;
-  }
-  .expanded .chart {
-    flex: 1;
-    min-height: 0;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: clamp(125px, 29%, 235px) minmax(0, 1fr);
-    grid-template-rows: 35px repeat(var(--row-count), var(--row-height));
-    min-width: 0;
-  }
-  .label-heading,
-  .ruler {
-    position: sticky;
-    top: 0;
-    z-index: 3;
-    background: var(--surface-raised);
-    border-bottom: 1px solid var(--line);
-  }
-  .label-heading {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 12px;
-    border-right: 1px solid var(--line);
-  }
-  .label-heading span {
-    font-size: 10px;
-    color: #8491a5;
-  }
-  .ruler {
-    overflow: hidden;
-  }
-  .cursor-label {
-    position: absolute;
-    bottom: 0;
-    transform: translateX(-50%);
-    background: #8093b2;
-    color: white;
-    font-size: 9px;
-    padding: 2px 5px;
-    border-radius: 3px 3px 0 0;
-    pointer-events: none;
-  }
-  .cursor-label.live {
-    background: #c45955;
-  }
-  .expanded-detail {
-    padding: 14px 20px;
-    border-top: 1px solid var(--line);
-    flex-shrink: 0;
-  }
-  .expanded-detail strong {
-    font-size: 12px;
-  }
-  .expanded-detail small {
-    margin-left: 12px;
-    color: var(--muted);
-    font-size: 11px;
-  }
-  .expanded-detail pre {
-    max-height: 130px;
-    overflow: auto;
-    font-size: 12px;
-    line-height: 1.7;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    margin-bottom: 0;
-  }
-  .tick {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    padding: 10px 0 0 6px;
-    border-left: 1px solid var(--grid-line);
-    white-space: nowrap;
-    color: var(--muted);
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
-  }
-  .label {
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid var(--grid-line);
-    border-right: 1px solid var(--line);
-    background: var(--surface-soft);
-    padding-right: 6px;
-    min-width: 0;
-  }
-  .label.chosen {
-    background: var(--selected);
-  }
-  .toggle,
-  .leaf {
-    flex-shrink: 0;
-    width: 20px;
-    display: grid;
-    place-items: center;
-    font-size: 13px;
-    color: #7787a0;
-  }
-  .toggle {
-    background: transparent;
-    padding: 7px 0;
-    border: 0;
-    cursor: pointer;
-  }
-  .label-select {
-    display: grid;
-    gap: 4px;
-    min-width: 0;
-    flex: 1;
-    background: none;
-    border: 0;
-    padding: 3px;
-    overflow: hidden;
-    text-align: left;
-    cursor: pointer;
-    color: var(--ink);
-  }
-  .label-select strong {
-    line-height: 14px;
-    font-size: 11px;
-    font-weight: 550;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .label-select small {
-    line-height: 11px;
-    font-size: 9px;
-    color: var(--muted);
-  }
-  .plot {
-    touch-action: none;
-    cursor: grab;
-    user-select: none;
-  }
-  .dragging,
-  .dragging .plot,
-  .dragging .bar {
-    cursor: grabbing;
-  }
-  .lane {
-    position: relative;
-    border-bottom: 1px solid var(--grid-line);
-    min-width: 0;
-    overflow: hidden;
-    background: var(--surface);
-  }
-  .lane:nth-child(4n) {
-    background: var(--surface-soft);
-  }
-  .lane.chosen {
-    background: var(--selected);
-  }
-  .gridline {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--grid-line);
-    pointer-events: none;
-  }
-  .playhead {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: #9aaecf;
-    z-index: 2;
-    pointer-events: none;
-  }
-  .playhead.live {
-    background: #d76560;
-  }
-  .bar {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    height: calc(100% - 6px);
-    padding: 0;
-    min-width: 6px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    overflow: hidden;
-    background-color: #507dc6;
-    background-image: linear-gradient(
-      to bottom,
-      #ffffff1c 0%,
-      #ffffff05 42%,
-      #00000008 65%,
-      #00000020 100%
-    );
-    border: 1px solid #3c69b1;
-    color: white;
-    border-radius: 4px;
-    cursor: pointer;
-    text-align: left;
-    box-shadow:
-      inset 0 1px 0 #ffffff38,
-      inset 0 -1px 0 #00000024,
-      0 1px 2px #00000026,
-      0 2px 4px #00000014;
-    text-shadow: 0 1px 1px #00000026;
-  }
-  .bar:hover {
-    filter: brightness(1.06);
-  }
-  .bar[data-kind="agent"] {
-    background-color: #8864bb;
-    border-color: #73519f;
-  }
-  .bar[data-kind="command"] {
-    background-color: #338c86;
-    border-color: #27716d;
-  }
-  .bar[data-kind="input"] {
-    background-color: #ad772e;
-    border-color: #956320;
-  }
-  .bar.failed {
-    background-color: #b65252;
-    border-color: #9c3939;
-  }
-  .bar.interrupted {
-    background-color: #7f8b9d;
-    border-style: dashed;
-    border-color: #55647b;
-  }
-  .bar.selected {
-    outline: 2px solid #23334c;
-    outline-offset: 2px;
-    z-index: 2;
-  }
-  .bar.clipped-start {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    border-left: 0;
-    padding-left: 22px;
-  }
-  .bar.clipped-end {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    border-right: 0;
-    padding-right: 22px;
-  }
-  .continuation {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 20px;
-    display: grid;
-    place-items: center;
-    background: #17274030;
-    font-size: 18px;
-    line-height: 1;
-    letter-spacing: -2px;
-    pointer-events: none;
-    z-index: 1;
-  }
-  .continuation.start {
-    left: 0;
-    border-right: 1px dashed #ffffff60;
-  }
-  .continuation.end {
-    right: 0;
-    border-left: 1px dashed #ffffff60;
-  }
-  .bar-label {
-    position: relative;
-    z-index: 1;
-    font-size: 11px;
-    font-weight: 550;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    padding-left: 8px;
-    flex: 1;
-  }
-  .bar-duration {
-    position: relative;
-    z-index: 1;
-    padding-right: 8px;
-    font-size: 9px;
-    white-space: nowrap;
-    opacity: 0.9;
-  }
-  .bar.running::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      105deg,
-      transparent 15%,
-      #ffffff0a 30%,
-      #ffffff40 50%,
-      #ffffff0a 70%,
-      transparent 85%
-    );
-    transform: translateX(-100%);
-    animation: shimmer 2.4s ease-in-out infinite;
-    pointer-events: none;
-  }
-  @keyframes shimmer {
-    to {
-      transform: translateX(100%);
-    }
-  }
-  footer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 5px 15px;
-    padding: 10px 12px;
-    border-top: 1px solid var(--line);
-    font-size: 10px;
-    color: var(--muted);
-    background: var(--surface-soft);
-  }
-  .range {
-    font-variant-numeric: tabular-nums;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .bar.running::after {
-      animation: none;
-      transform: none;
-    }
-  }
-  @media (max-width: 600px) {
-    .timeline.expanded {
-      inset: 8px;
-    }
-    .toolbar {
-      padding: 8px;
-    }
-    .zoom-value {
-      display: none;
-    }
-    .grid {
-      grid-template-columns: 120px minmax(0, 1fr);
-    }
-  }
-</style>
