@@ -15,7 +15,7 @@
     "runling": "node packages/runling/bin/runling.js",
     "dev:web": "node --import tsx apps/web/src/bin/runling-web.ts",
     "build": "pnpm --filter runling build && pnpm --filter @runling/web build && node scripts/bundle-web.mjs",
-    "test": "pnpm --filter runling build && vitest run",
+    "test": "pnpm --filter runling build && pnpm --filter @runling/web exec svelte-kit sync && vitest run",
     "check": "pnpm run check:root && pnpm -r check",
     "check:root": "tsc --noEmit",
     "test:package": "node scripts/test-package.mjs"

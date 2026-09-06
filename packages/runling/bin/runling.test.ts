@@ -47,7 +47,7 @@ describe("runling executable", () => {
   });
 
   test("reports invalid invocations without a stack trace", async () => {
-    const child = spawnProcess([process.execPath, executable, "--config", "missing-runling-config.ts"], {
+    const child = spawnProcess([process.execPath, executable, "--port", "not-a-port"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -58,7 +58,7 @@ describe("runling executable", () => {
     ]);
 
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("Runling web configuration not found:");
+    expect(stderr).toContain("Port must be an integer from 1 through 65535");
     expect(stderr).not.toContain("at ");
   });
 
