@@ -1,4 +1,5 @@
 import { dirname, relative, sep } from "node:path";
+import { stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import { createJiti } from "jiti";
 import * as runling from "./index.ts";
@@ -8,6 +9,7 @@ import { isWebConfig, type WebConfig } from "./web-config.ts";
 /** Reload project modules without replacing active runs or installed packages. */
 export class ConfigReloader {
   private current?: WebConfig;
+  private hasLoadedFile = false;
   private pending?: Promise<WebConfig>;
   private timer?: ReturnType<typeof setTimeout>;
   private disposed = false;
@@ -71,6 +73,21 @@ export class ConfigReloader {
   private async read(): Promise<WebConfig> {
     try {
       await this.ready;
+      let missing = false;
+      try {
+        await stat(this.path);
+      } catch (error) {
+        // Only an absent entry file is optional, not failed imports or invalid config.
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT" || this.hasLoadedFile)
+          throw error;
+        missing = true;
+      }
+      if (missing) {
+        this.current = { webhooks: {} };
+        this.error = undefined;
+        this.revision++;
+        return this.current;
+      }
       const jiti = createJiti(this.path, {
         moduleCache: false,
         tryNative: false,
@@ -84,6 +101,7 @@ export class ConfigReloader {
           `${this.path} must export a valid Runling configuration`,
         );
       this.current = module.default;
+      this.hasLoadedFile = true;
       this.error = undefined;
       this.revision++;
     } catch (error) {

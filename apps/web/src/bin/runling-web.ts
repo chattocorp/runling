@@ -29,14 +29,13 @@ export async function runRunlingWeb(
   const appRoot = resolve(import.meta.dirname, "../..");
   const workflowCwd = process.cwd();
   const configPath = resolve(workflowCwd, options.config);
-  if (!existsSync(configPath)) {
-    throw new Error(`Runling web configuration not found: ${configPath}`);
-  }
-  const configModule = await import(pathToFileURL(configPath).href);
-  if (!isWebConfig(configModule.default)) {
-    throw new Error(
-      `${configPath} must export a valid Runling web configuration`,
-    );
+  if (existsSync(configPath)) {
+    const configModule = await import(pathToFileURL(configPath).href);
+    if (!isWebConfig(configModule.default)) {
+      throw new Error(
+        `${configPath} must export a valid Runling web configuration`,
+      );
+    }
   }
 
   process.env.RUNLING_WEB_CONFIG = configPath;

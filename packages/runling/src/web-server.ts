@@ -35,13 +35,13 @@ With no arguments, start the web UI in the current project.`);
   }
   const cwd = process.cwd();
   const configPath = resolve(cwd, options.config);
-  if (!existsSync(configPath))
-    throw new Error(`Runling web configuration not found: ${configPath}`);
-  const config = await import(pathToFileURL(configPath).href);
-  if (!isWebConfig(config.default))
-    throw new Error(
-      `${configPath} must export a valid Runling web configuration`,
-    );
+  if (existsSync(configPath)) {
+    const config = await import(pathToFileURL(configPath).href);
+    if (!isWebConfig(config.default))
+      throw new Error(
+        `${configPath} must export a valid Runling web configuration`,
+      );
+  }
   process.env.RUNLING_WEB_CONFIG = configPath;
   process.env.RUNLING_WEB_WORKFLOW_CWD = cwd;
   process.env.HOST = options.host;
