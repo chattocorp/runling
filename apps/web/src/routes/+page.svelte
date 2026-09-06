@@ -297,24 +297,23 @@
             class:selected={selected === run.id}
             onclick={() => selectRun(run.id)}
             aria-pressed={selected === run.id}
+            title={`Run ${run.id} · ${new Date(run.startedAt).toLocaleString()}`}
           >
-            <span class="run-title">{run.workflow}</span><span class="run-meta"
+            <span class="run-heading">
+              <span class="run-title">{run.workflow}</span>
+              <time datetime={new Date(run.startedAt).toISOString()}
+                >{new Date(run.startedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}</time>
+            </span><span class="run-meta"
               ><StatusBadge status={run.status} /><span
                 >{run.durationMs !== undefined
                   ? duration(run.durationMs)
                   : "In progress"}</span
               ></span
             >
-            <Usage usage={run.usage} />
-            <span class="run-bottom"
-              ><span>{run.id.slice(0, 8)}</span><time
-                datetime={new Date(run.startedAt).toISOString()}
-                >{new Date(run.startedAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}</time
-              ></span
-            >
+            <Usage usage={run.usage} compact />
           </button>
         {:else}<div class="list-empty">
             <span>◇</span>
@@ -511,7 +510,7 @@
     min-height: calc(100vh - 74px);
   }
   .catalog {
-    padding: 25px 16px 20px;
+    padding: 0 12px 16px;
     background: var(--surface-raised);
     border-right: 1px solid var(--line);
     display: flex;
@@ -526,7 +525,8 @@
     color: var(--muted);
   }
   .sidebar-heading {
-    margin: 0 12px 22px;
+    margin: 0 10px;
+    min-height: 52px;
   }
   h2 {
     margin: 0;
@@ -537,14 +537,14 @@
   .all-runs {
     display: flex;
     justify-content: space-between;
-    padding: 11px 12px;
+    padding: 8px 10px;
     border: 0;
     border-radius: 6px;
     background: none;
     font-size: 12px;
     color: var(--muted);
     cursor: pointer;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
   .all-runs.current {
     background: var(--selected);
@@ -553,7 +553,7 @@
   .webhook {
     border: 1px solid transparent;
     border-radius: 7px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
   .webhook.current {
     background: var(--surface-soft);
@@ -563,11 +563,11 @@
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     text-align: left;
     background: none;
     border: 0;
-    padding: 12px 10px;
+    padding: 9px 8px 4px;
     color: var(--ink);
     cursor: pointer;
   }
@@ -581,31 +581,36 @@
     display: block;
     color: var(--muted);
     font-size: 11px;
-    margin-top: 4px;
+    margin-top: 2px;
   }
   .hook-icon {
-    width: 24px;
-    height: 28px;
+    width: 20px;
+    height: 24px;
+    flex-shrink: 0;
     display: grid;
     place-items: center;
     color: var(--blue);
-    font-size: 23px;
+    font-size: 17px;
   }
   .hook-actions {
     display: flex;
-    gap: 16px;
-    padding: 0 12px 12px 44px;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 0 6px 6px 30px;
   }
   .hook-actions button {
     font-size: 10px;
     color: var(--muted);
-    padding: 0;
+    padding: 5px 6px;
+    min-height: 26px;
+    border-radius: 4px;
     border: 0;
     background: none;
     cursor: pointer;
   }
   .hook-actions button:hover {
     color: var(--blue);
+    background: var(--selected);
   }
   .catalog-foot {
     margin-top: auto;
@@ -639,8 +644,8 @@
     min-width: 0;
   }
   .list-header {
-    padding: 25px 20px 22px;
-    min-height: 65px;
+    padding: 0 16px;
+    min-height: 52px;
   }
   .list-header h2 {
     overflow: hidden;
@@ -656,7 +661,7 @@
     border: 0;
     border-left: 3px solid transparent;
     border-top: 1px solid var(--surface-raised);
-    padding: 17px 19px 16px 17px;
+    padding: 12px 14px 12px 13px;
     text-align: left;
     cursor: pointer;
     color: var(--ink);
@@ -668,28 +673,38 @@
   .run-row:hover {
     background: var(--surface-soft);
   }
+  .run-row.selected:hover {
+    background: var(--selected);
+  }
+  .run-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 7px;
+  }
+  .run-heading time {
+    flex-shrink: 0;
+    font-size: 9px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
   .run-title {
     display: block;
     font-size: 13px;
     font-weight: 550;
-    margin-bottom: 10px;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .run-meta,
-  .run-bottom {
+  .run-meta {
     display: flex;
     justify-content: space-between;
     gap: 8px;
     align-items: center;
     font-size: 10px;
     color: var(--muted);
-  }
-  .run-bottom {
-    margin-top: 15px;
-    color: #7e8b9f;
-    font-variant-numeric: tabular-nums;
   }
   .list-empty {
     padding: 35px 22px;
