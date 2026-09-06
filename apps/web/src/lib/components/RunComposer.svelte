@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import type { WebhookInfo } from "$lib/runs.ts";
   import { sample } from "$lib/sample.ts";
+  import { submitFormShortcut } from "$lib/form-shortcut.ts";
   let {
     webhook,
     onclose,
@@ -25,6 +26,7 @@
   });
   async function start(event: SubmitEvent) {
     event.preventDefault();
+    if (pending) return;
     error = "";
     try {
       JSON.parse(body);
@@ -99,7 +101,8 @@
         >{copied ? "Copied" : "Copy URL"}</button
       >
     </div>
-    <form class="p-6" onsubmit={start}>
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions (Handles the submit shortcut from focused form controls.) -->
+    <form class="p-6" onsubmit={start} onkeydown={(event) => submitFormShortcut(event, pending)}>
       <label class="label mb-2 font-medium text-sm" for="request-body">Request body</label>
       <p class="text-xs text-base-content/60 leading-relaxed">
         Edit the sample request. The schema below defines the accepted values.
@@ -144,8 +147,8 @@
         </p>{/if}
       <footer class="flex gap-5 items-center justify-between mt-6">
         <span class="text-xs text-base-content/60 leading-relaxed"
-          >The run continues if you close this window.</span
-        ><button class="btn btn-sm btn-primary" disabled={pending}
+          >Cmd/Ctrl+Enter to start. The run continues if you close this window.</span
+        ><button class="btn btn-sm btn-primary" disabled={pending} aria-keyshortcuts="Meta+Enter Control+Enter"
           >{pending ? "Starting…" : "Start run"}</button
         >
       </footer>

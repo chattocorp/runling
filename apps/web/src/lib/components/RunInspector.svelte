@@ -8,6 +8,7 @@
   import AnsiText from "./AnsiText.svelte";
   import Usage from "./Usage.svelte";
   import RunOutput from "./RunOutput.svelte";
+  import ActivityInspector from "./ActivityInspector.svelte";
   let { run, connection }: { run: RunDetail; connection: string } = $props();
   let now = $state(Date.now());
   let selected = $state("");
@@ -115,28 +116,7 @@
             : "This run did not start any steps."}
         </div>{/if}
       {#if activity}
-        <section class="card card-border mt-5 gap-3 p-4 bg-base-200">
-          <div class="flex items-center justify-between gap-2.5">
-            <h2 class="text-sm font-semibold m-0 wrap-anywhere">
-              {activity.label}
-            </h2>
-            <button
-              class="btn btn-ghost btn-sm"
-              onclick={() => (selected = "")}
-              aria-label="Close activity details">×</button
-            >
-          </div>
-          <p class="text-base-content/60 text-xs leading-relaxed">
-            {activity.kind} started at {duration(activity.startedAt)}
-          </p>
-          {#if activity.usage}<Usage usage={activity.usage} detail />{/if}
-          <pre
-            class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere max-h-110 overflow-auto"><AnsiText
-              text={activity.logs.length
-                ? activity.logs.join("\n\n")
-                : "No logs for this activity."}
-            /></pre>
-        </section>
+        <ActivityInspector {activity} onclose={() => (selected = "")} />
       {/if}
     {:else if tab === "input"}<pre
         class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0">{pretty(
