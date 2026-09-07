@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.5.0](https://github.com/chattocorp/runling/compare/v0.4.1...v0.5.0) (2026-09-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* make run usage accounting controls internal
+* slim runtime API and scope usage totals to runs
+
+### Features
+
+* start web server without a config file ([1c8eb61](https://github.com/chattocorp/runling/commit/1c8eb61d931eb23438ebdb35ab9ceb73a3551e5f))
+* **web:** improve output tab and remove duplicate timeline output ([53d6f55](https://github.com/chattocorp/runling/commit/53d6f55373b97fca32b7f97ee131c05d55d08e5c))
+* **web:** inspect activities in a modal and add form submit shortcut ([ab5bb85](https://github.com/chattocorp/runling/commit/ab5bb852a4f0f2720659b930cd1d153ec86a7786))
+* **web:** migrate UI to Tailwind and DaisyUI ([9d29f15](https://github.com/chattocorp/runling/commit/9d29f159205951053fc06327bb811932635a4f01))
+* **web:** show Braille spinner on active timeline tasks ([74cb237](https://github.com/chattocorp/runling/commit/74cb23760eef29c0e8ee30637079c8d4b195f2bc))
+* **web:** streamline sidebar layout and run summaries ([4fad0eb](https://github.com/chattocorp/runling/commit/4fad0eb2900570a71774e5a40ee3c1971c686d09))
+
+
+### Bug Fixes
+
+* prepare SvelteKit files for tests and update CLI validation test ([a8c92ac](https://github.com/chattocorp/runling/commit/a8c92acca4de418ebf00514d3e0c0661c5aacae7))
+* **web:** bound timeline zoom to actual activity endpoints ([b27483b](https://github.com/chattocorp/runling/commit/b27483bd83e44964753cf9d9f3a111000b64dcd4))
+* **web:** give timeline labels a two-line layout ([48ac84e](https://github.com/chattocorp/runling/commit/48ac84e531b9989434442ca9aa5def7626ce7f23))
+
+
+### Code Refactoring
+
+* make run usage accounting controls internal ([c9c9945](https://github.com/chattocorp/runling/commit/c9c99450c01e6dd0a089b1f28def2a476903c75b))
+* slim runtime API and scope usage totals to runs ([5bc51f5](https://github.com/chattocorp/runling/commit/5bc51f500556d8a2bc2bbfb7ed57c08a276d405d))
+
 ## [0.4.1](https://github.com/chattocorp/runling/compare/v0.4.0...v0.4.1) (2026-09-05)
 
 
