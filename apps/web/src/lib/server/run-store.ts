@@ -24,6 +24,8 @@ import {
   type RunSummary,
 } from "../runs.ts";
 
+import { summarizeRunActivity } from "../run-activity.ts";
+
 const validId = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
 type Listener = (id: string, record: RunRecord) => void;
 
@@ -81,7 +83,10 @@ export class RunStore {
     return [...this.runs.values()]
       .sort((a, b) => b.startedAt - a.startedAt)
       .slice(0, 100)
-      .map(({ input: _, output: _o, error: _e, events: _v, ...run }) => run);
+      .map((detail) => {
+        const { input: _, output: _o, error: _e, events: _v, ...run } = detail;
+        return { ...run, activity: summarizeRunActivity(detail) };
+      });
   }
 
   get(id: string): RunDetail | undefined {

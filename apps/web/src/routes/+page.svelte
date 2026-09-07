@@ -16,6 +16,7 @@
     type WebhookInfo,
   } from "$lib/runs.ts";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
+  import RunActivityPreview from "$lib/components/RunActivityPreview.svelte";
   import ActivityIndicator from "$lib/components/ActivityIndicator.svelte";
   import RunInspector from "$lib/components/RunInspector.svelte";
   import RunComposer from "$lib/components/RunComposer.svelte";
@@ -411,6 +412,9 @@
                     })}
                   </time>
                 </span>
+                {#if run.status === "running"}
+                  <RunActivityPreview activity={run.activity} />
+                {/if}
                 <span
                   class="flex items-center justify-between gap-2 text-xs text-base-content/60"
                 >

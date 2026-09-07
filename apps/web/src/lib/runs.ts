@@ -1,7 +1,15 @@
 import type { RunlingEvent, TokenUsage } from "runling";
 
 export type RunStatus = "running" | "completed" | "failed" | "interrupted";
+export interface RunActivity {
+  label: string;
+  step?: string;
+  preview?: string;
+  waiting: boolean;
+  parallel: number;
+}
 export interface RunSummary {
+  activity?: RunActivity | null;
   id: string;
   webhook: string;
   workflow: string;
