@@ -16,6 +16,7 @@
     type WebhookInfo,
   } from "$lib/runs.ts";
   import StatusBadge from "$lib/components/StatusBadge.svelte";
+  import ActivityIndicator from "$lib/components/ActivityIndicator.svelte";
   import RunInspector from "$lib/components/RunInspector.svelte";
   import RunComposer from "$lib/components/RunComposer.svelte";
   import WebhookInfoModal from "$lib/components/WebhookInfo.svelte";
@@ -390,7 +391,13 @@
                 title={`Run ${run.id} · ${new Date(run.startedAt).toLocaleString()}`}
               >
                 <span class="mb-1 flex items-center gap-2">
-                  <StatusBadge status={run.status} />
+                  {#if run.status === "running"}
+                    <span class="inline-flex size-4 shrink-0 items-center justify-center text-info" role="img" aria-label="Running" title="Running">
+                      <ActivityIndicator />
+                    </span>
+                  {:else}
+                    <StatusBadge status={run.status} />
+                  {/if}
                   <span class="min-w-0 flex-1 truncate text-sm font-medium"
                     >{run.workflow}</span
                   >
