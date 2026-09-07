@@ -29,9 +29,6 @@
   let visibleRuns = $derived(
     runs.filter((run) => !filter || run.webhook === filter),
   );
-  let activeCount = $derived(
-    runs.filter((run) => run.status === "running").length,
-  );
   let selected = $state("");
   let detail = $state<RunDetail | null>(null);
   let connection = $state("Connecting…");
@@ -354,12 +351,6 @@
           </li>
         {/each}
       </ul>
-      <div
-        class="mt-auto hidden items-center gap-3 px-3 pt-6 pb-2 text-xs text-base-content/60 lg:flex"
-      >
-        <span class="badge badge-primary badge-soft">{activeCount}</span>
-        <span>Running now<br />History saved automatically</span>
-      </div>
       <ColumnResizer bind:width={webhookWidth} storageKey="runling-width-webhooks" label="Webhooks column width" minWidth={160} class="hidden lg:block" />
     </aside>
     <section
