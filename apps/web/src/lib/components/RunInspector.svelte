@@ -5,8 +5,8 @@
   import { buildTimeline, findActivity } from "$lib/timeline.ts";
   import StatusBadge from "./StatusBadge.svelte";
   import Timeline from "./Timeline.svelte";
-  import AnsiText from "./AnsiText.svelte";
   import Usage from "./Usage.svelte";
+  import RunValue from "./RunValue.svelte";
   import RunOutput from "./RunOutput.svelte";
   import ActivityInspector from "./ActivityInspector.svelte";
   let { run, connection }: { run: RunDetail; connection: string } = $props();
@@ -19,8 +19,6 @@
   let logs = $derived(
     run.events.filter((e) => e.type === "log").map((e) => e.message),
   );
-  const pretty = (value: unknown) =>
-    typeof value === "string" ? value : JSON.stringify(value, null, 2);
   onMount(() => {
     const timer = setInterval(() => {
       now = Date.now();
@@ -118,15 +116,12 @@
       {#if activity}
         <ActivityInspector {activity} onclose={() => (selected = "")} />
       {/if}
-    {:else if tab === "input"}<pre
-        class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0">{pretty(
-          run.input,
-        )}</pre>
+    {:else if tab === "input"}
+      {#key run.id}<RunValue value={run.input} kind="input" />{/key}
     {:else if tab === "output"}
       {#key run.id}<RunOutput {run} />{/key}
-    {:else}<pre
-        class="font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere overflow-auto m-0"><AnsiText
-          text={logs.length ? logs.join("\n\n") : "No logs yet."}
-        /></pre>{/if}
+    {:else}
+      {#key run.id}<RunValue value={logs.join("\n\n")} kind="logs" />{/key}
+    {/if}
   </div>
 </section>
