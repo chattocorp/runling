@@ -1,5 +1,6 @@
 <script lang="ts">
   import ColumnResizer from "$lib/components/ColumnResizer.svelte";
+  import ConnectionOverlay from "$lib/components/ConnectionOverlay.svelte";
   import ThemePicker from "$lib/components/ThemePicker.svelte";
   import SidebarToggle from "$lib/components/SidebarToggle.svelte";
   import { isSidebarShortcut } from "$lib/sidebar-shortcut.ts";
@@ -44,7 +45,7 @@
   let sidebarsExpanded = $state(true);
 
   function handleSidebarShortcut(event: KeyboardEvent) {
-    if (!isSidebarShortcut(event)) return;
+    if (!listConnected || !isSidebarShortcut(event)) return;
     const target = event.target;
     if (
       target instanceof HTMLElement &&
@@ -488,3 +489,5 @@
       selectRun(id);
     }}
   />{/if}
+
+{#if !listConnected}<ConnectionOverlay />{/if}
