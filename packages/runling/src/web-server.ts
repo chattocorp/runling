@@ -57,6 +57,7 @@ With no arguments, start the web UI in the current project.`);
   const host = options.host.includes(":") ? `[${options.host}]` : options.host;
   console.log(`Runling listening on http://${host}:${options.port}`);
   const shutdown = () => {
+    console.log("Runling is shutting down...");
     server.close(() => {
       process.off("SIGINT", shutdown);
       process.off("SIGTERM", shutdown);
