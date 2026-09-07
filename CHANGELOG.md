@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://github.com/chattocorp/runling/compare/v0.5.0...v0.6.0) (2026-09-07)
+
+
+### Features
+
+* add persistent column resizing ([c7346ad](https://github.com/chattocorp/runling/commit/c7346ad785b69d861b01cf0836df6dc00f5e2f5c))
+* dim and disable UI while disconnected ([206bba8](https://github.com/chattocorp/runling/commit/206bba8af5c8dd2bdbb64329c93f23d159b50820))
+* show live activity in recent runs ([ba5cfa5](https://github.com/chattocorp/runling/commit/ba5cfa5f0cfb1dec8b5760c662b9a30b3d70d8b9))
+* unify input output and logs panels ([69f1fb3](https://github.com/chattocorp/runling/commit/69f1fb349130172a9d9ef5451a3204a3f715f909))
+* use braille indicators for recent runs ([2983c65](https://github.com/chattocorp/runling/commit/2983c65865aa03b1e690e4347647042168b31026))
+
+
+### Bug Fixes
+
+* log when the web server starts shutting down ([31298b7](https://github.com/chattocorp/runling/commit/31298b746d638754175394538e1f492ebf020ee5))
+
 ## [0.5.0](https://github.com/chattocorp/runling/compare/v0.4.1...v0.5.0) (2026-09-06)
 
 
