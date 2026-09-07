@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ColumnResizer from "$lib/components/ColumnResizer.svelte";
   import ThemePicker from "$lib/components/ThemePicker.svelte";
   import SidebarToggle from "$lib/components/SidebarToggle.svelte";
   import { isSidebarShortcut } from "$lib/sidebar-shortcut.ts";
@@ -39,6 +40,8 @@
   let copied = $state("");
   let notice = $state("");
   let configError = $state("");
+  let webhookWidth = $state<number>();
+  let runsWidth = $state<number>();
   let sidebarsExpanded = $state(true);
 
   function handleSidebarShortcut(event: KeyboardEvent) {
@@ -264,12 +267,14 @@
     class={[
       "grid min-h-0 flex-1",
       sidebarsExpanded
-        ? "md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-[14rem_17rem_minmax(0,1fr)]"
+        ? "md:grid-cols-[min(var(--runs-width),40%)_minmax(0,1fr)] lg:grid-cols-[min(var(--webhook-width),25%)_min(var(--runs-width),30%)_minmax(0,1fr)]"
         : "grid-cols-1",
     ]}
+    style:--webhook-width={webhookWidth === undefined ? "14rem" : `${webhookWidth}px`}
+    style:--runs-width={runsWidth === undefined ? "17rem" : `${runsWidth}px`}
   >
     <aside
-      class="flex flex-col border-b border-base-300 bg-base-200 p-3 md:col-span-2 lg:col-span-1 lg:overflow-y-auto lg:border-r lg:border-b-0 [&[hidden]]:hidden"
+      class="relative min-w-0 flex flex-col border-b border-base-300 bg-base-200 p-3 md:col-span-2 lg:col-span-1 lg:overflow-y-auto lg:border-r lg:border-b-0 [&[hidden]]:hidden"
       id="webhook-sidebar"
       hidden={!sidebarsExpanded}
     >
@@ -353,9 +358,10 @@
         <span class="badge badge-primary badge-soft">{activeCount}</span>
         <span>Running now<br />History saved automatically</span>
       </div>
+      <ColumnResizer bind:width={webhookWidth} storageKey="runling-width-webhooks" label="Webhooks column width" minWidth={160} class="hidden lg:block" />
     </aside>
     <section
-      class="flex min-h-0 min-w-0 flex-col border-b border-base-300 bg-base-100 md:border-r md:border-b-0 [&[hidden]]:hidden"
+      class="relative flex min-h-0 min-w-0 flex-col border-b border-base-300 bg-base-100 md:border-r md:border-b-0 [&[hidden]]:hidden"
       id="runs-sidebar"
       hidden={!sidebarsExpanded}
       aria-label="Workflow runs"
@@ -423,6 +429,7 @@
       >
         Latest 100 runs
       </div>
+      <ColumnResizer bind:width={runsWidth} storageKey="runling-width-runs" label="Runs column width" minWidth={180} class="hidden md:block" />
     </section>
     <main class="min-w-0 bg-base-100 lg:overflow-y-auto">
       {#if detail}

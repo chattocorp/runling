@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import ColumnResizer from "./ColumnResizer.svelte";
   import Usage from "./Usage.svelte";
   import AnsiText from "./AnsiText.svelte";
   import TimelineMinimap from "./TimelineMinimap.svelte";
@@ -35,6 +36,7 @@
     elapsed: number;
     running: boolean;
   } = $props();
+  let activityWidth = $state<number>();
   let board: HTMLDivElement;
   let ruler: HTMLDivElement;
   let scrollTop = $state(0);
@@ -357,7 +359,8 @@
       onscroll={() => (scrollTop = board.scrollTop)}
     >
       <div
-        class="grid grid-cols-[clamp(125px,_29%,_235px)_minmax(0,_1fr)] grid-rows-[35px] auto-rows-auto min-w-0 max-sm:grid-cols-[120px_minmax(0,_1fr)]"
+        class="relative grid grid-cols-[var(--activity-width)_minmax(0,1fr)] grid-rows-[35px] auto-rows-auto min-w-0 [--default-activity-width:clamp(125px,29%,235px)] max-sm:[--default-activity-width:120px]"
+        style:--activity-width={activityWidth === undefined ? "var(--default-activity-width)" : `min(${activityWidth}px, 65%)`}
       >
         <div
           class="sticky top-0 z-3 bg-base-200 border-b border-b-base-300 text-xs text-base-content/60 flex items-center justify-between py-0 px-3 border-r border-r-base-300"
@@ -565,6 +568,9 @@
         {#each nodes as node (node.id)}
           {@render branch(node, 0)}
         {/each}
+        <div class="pointer-events-none absolute inset-y-0 left-0 z-4 w-(--activity-width)">
+          <ColumnResizer bind:width={activityWidth} storageKey="runling-width-timeline-activity" label="Timeline activity column width" />
+        </div>
       </div>
     </div>
     <TimelineMinimap
