@@ -53,7 +53,7 @@ try {
   );
   await exec(
     "npm",
-    ["install", "--no-audit", "--no-fund", resolve(directory, packed.filename)],
+    ["install", "--no-audit", "--no-fund", resolve(directory, packed.filename), `zod@${manifest.devDependencies.zod}`],
     { cwd: project, maxBuffer: 8 * 1024 * 1024 },
   );
   await writeFile(resolve(project, "message.txt"), "consumer cwd");
@@ -64,9 +64,10 @@ try {
   await writeFile(resolve(project, "helper.ts"), 'export const suffix = "";\n');
   await writeFile(
     resolve(project, "workflow.ts"),
-    `import { task, Type, exec, step, log } from "runling";
+    `import { task, exec, step, log } from "runling";
+import { z } from "zod";
 import { suffix } from "./helper.ts";
-export default task({ name: "Consumer echo", input: Type.Object({ topic: Type.String(), directory: Type.String() }), output: Type.String() }, async (input) => {
+export default task({ name: "Consumer echo", input: z.object({ topic: z.string(), directory: z.string() }), output: z.string() }, async (input) => {
   return step("Echo input", async () => {
     await new Promise(resolve => setTimeout(resolve, input.topic === "slow" ? 2000 : 250));
     const cwd = await exec\`node -e \${"process.stdout.write(require('node:fs').readFileSync('message.txt', 'utf8'))"}\`.cwd(input.directory).text();
@@ -187,7 +188,13 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
   const asset = html.match(/(?:href|src)="([^" ]+\.css)"/)?.[1];
   assert(asset, "UI contains a stylesheet");
   assert.equal((await fetch(new URL(asset, origin))).status, 200);
-  assert.equal((await fetch(`${origin}/api/webhooks/echo`)).status, 200);
+  const schemaResponse = await fetch(`${origin}/api/webhooks/echo`);
+  assert.equal(schemaResponse.status, 200);
+  const schemas = await schemaResponse.json();
+  assert.equal(schemas.input.type, "object");
+  assert.equal(schemas.input.properties.topic.type, "string");
+  assert.equal(schemas.output.type, "string");
+  assert(!JSON.stringify(schemas).includes("~standard"));
   const post = (path, body) =>
     fetch(`${origin}${path}`, {
       method: "POST",

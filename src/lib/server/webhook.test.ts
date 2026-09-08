@@ -2,6 +2,9 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import { task, Type, type WorkflowExecution } from "runling";
 import { defineWebConfig, isWebConfig } from "runling/web";
 import { describeWebhook, handleWebhook, prepareWebhook } from "./webhook.ts";
+import { z } from "zod";
+import * as v from "valibot";
+import { toStandardJsonSchema } from "@valibot/to-json-schema";
 
 const joke = task(
   {
@@ -37,6 +40,75 @@ const execution = (output: string): WorkflowExecution<string> => ({
 });
 
 describe("configured webhooks", () => {
+  test("runs Zod webhooks with parsed values and exports the correct schema sides", async () => {
+    const input = z.object({ count: z.number().default(1) });
+    const output = z.object({ count: z.number().default(2) });
+    const echo = task({ name: "Zod", input, output }, value => value);
+    const config = defineWebConfig({ webhooks: { echo: { task: echo } } });
+    expect(isWebConfig(config)).toBe(true);
+    const response = await handleWebhook("echo", request("{}"), { config, log: () => {} });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ output: { count: 1 } });
+    const description = await describeWebhook("echo", { config }).json();
+    expect(description.input.required ?? []).not.toContain("count");
+    expect(description.output.required).toContain("count");
+    expect(description.input).not.toHaveProperty("~standard");
+  });
+
+  test("validates async refinements before a webhook run", async () => {
+    const echo = task({
+      name: "Refined",
+      input: z.object({ topic: z.string().refine(async value => value === "ok", "Expected ok") }),
+      output: z.string(),
+    }, value => value.topic);
+    const config = defineWebConfig({ webhooks: { echo: { task: echo } } });
+    const response = await handleWebhook("echo", request('{"topic":"bad"}'), {
+      config,
+      run: async () => { throw new Error("Must not start"); },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ issues: [{ path: "/topic", message: "Expected ok" }] });
+  });
+
+  test("passes raw input to the task after webhook validation", async () => {
+    const length = task({
+      name: "Length",
+      input: z.string().transform(value => value.length),
+      output: z.number(),
+    }, value => value);
+    const config = defineWebConfig({ webhooks: { length: { task: length } } });
+    const response = await handleWebhook("length", request('"hello"'), { config, log: () => {} });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ output: 5 });
+  });
+
+  test("accepts Valibot's Standard JSON Schema adapter", async () => {
+    const schema = toStandardJsonSchema(v.string());
+    const echo = task({ name: "Valibot", input: schema, output: schema }, value => value);
+    expectTypeOf<Parameters<typeof echo>>().toEqualTypeOf<[string]>();
+    expectTypeOf<ReturnType<typeof echo>>().toEqualTypeOf<Promise<string>>();
+    const config = defineWebConfig({ webhooks: { echo: { task: echo } } });
+    expect(isWebConfig(config)).toBe(true);
+    const response = await handleWebhook("echo", request('"hello"'), { config, log: () => {} });
+    expect(await response.json()).toEqual({ output: "hello" });
+    expect(await describeWebhook("echo", { config }).json()).toMatchObject({ input: { type: "string" }, output: { type: "string" } });
+  });
+
+  test("permits validation-only tasks but requires export for webhooks", async () => {
+    const echo = task({ name: "Local", input: v.string(), output: v.string() }, value => value);
+    await expect(echo("hello")).resolves.toBe("hello");
+    const config = { webhooks: { echo: { task: echo } } };
+    expect(isWebConfig(config)).toBe(false);
+    expect(() => defineWebConfig(config)).toThrow('Webhook "echo" cannot export task schemas');
+  });
+
+  test("rejects output schemas that cannot be exported", () => {
+    const echo = task({ name: "Local", input: z.string(), output: z.string().transform(value => value.length) }, value => value);
+    const config = { webhooks: { echo: { task: echo } } };
+    expect(isWebConfig(config)).toBe(false);
+    expect(() => defineWebConfig(config)).toThrow("cannot export task schemas");
+  });
+
   test("preserves task types and hook names without a wrapper", () => {
     expectTypeOf(config.webhooks.joke.task).toEqualTypeOf<typeof joke>();
     expectTypeOf<keyof typeof config.webhooks>().toEqualTypeOf<"joke">();

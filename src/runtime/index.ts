@@ -54,7 +54,17 @@ export {
   type TaskFunction,
 } from "./workflow.ts";
 export { Type, type Static, type TSchema } from "typebox";
-export { isWorkflowSchema } from "./schema.ts";
+export {
+  isWorkflowSchema,
+  validateSchema,
+  toJsonSchema,
+  type WorkflowSchema,
+  type SchemaInput,
+  type SchemaOutput,
+  type SchemaIssue,
+  type SchemaResult,
+} from "./schema.ts";
+export type { StandardSchemaV1, StandardJSONSchemaV1 } from "@standard-schema/spec";
 export {
   type JsonValue,
   type WorkflowResult,

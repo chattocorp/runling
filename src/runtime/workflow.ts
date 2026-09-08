@@ -1,9 +1,17 @@
-import type { Static, TSchema } from "typebox";
-import { Check, Errors } from "typebox/value";
-import { isWorkflowSchema } from "./schema.ts";
+import type { TSchema } from "typebox";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+import {
+  isWorkflowSchema,
+  isStandardSchema,
+  validateSchema,
+  type SchemaIssue,
+  type SchemaInput,
+  type SchemaOutput,
+  type WorkflowSchema,
+} from "./schema.ts";
 import { step } from "./step.ts";
 
-export interface TaskDefinition<InputSchema extends TSchema, OutputSchema extends TSchema> {
+export interface TaskDefinition<InputSchema extends WorkflowSchema, OutputSchema extends WorkflowSchema> {
   name: string;
   input: InputSchema;
   output: OutputSchema;
@@ -11,38 +19,49 @@ export interface TaskDefinition<InputSchema extends TSchema, OutputSchema extend
 
 export type TaskFunction = (...args: any[]) => any;
 export type Task<
-  InputSchema extends TSchema = TSchema,
-  OutputSchema extends TSchema = TSchema,
-  Run extends TaskFunction = (input: Static<InputSchema>) => Static<OutputSchema> | Promise<Static<OutputSchema>>,
-> = ((input: Static<InputSchema>) => ReturnType<Run>) & Readonly<TaskDefinition<InputSchema, OutputSchema>>;
+  InputSchema extends WorkflowSchema = WorkflowSchema,
+  OutputSchema extends WorkflowSchema = WorkflowSchema,
+  Run extends TaskFunction = (input: SchemaOutput<InputSchema>) => SchemaInput<OutputSchema> | Promise<SchemaInput<OutputSchema>>,
+> = ((input: SchemaInput<InputSchema>) =>
+  InputSchema extends StandardSchemaV1 ? Promise<SchemaOutput<OutputSchema>>
+    : OutputSchema extends StandardSchemaV1 ? Promise<SchemaOutput<OutputSchema>> : ReturnType<Run>
+) & Readonly<TaskDefinition<InputSchema, OutputSchema>>;
 
 const taskMarker = Symbol.for("runling.task");
 
 const validationMessage = (
   name: string,
   boundary: "input" | "output",
-  schema: TSchema,
-  value: unknown,
+  issues: SchemaIssue[],
 ): string => {
-  const details = Errors(schema, value).slice(0, 3).map(({ instancePath, message }) =>
-    `${instancePath === "" ? "/" : instancePath}: ${message}`,
+  const details = issues.slice(0, 3).map(({ path, message }) =>
+    `${path}: ${message}`,
   ).join("; ");
   return `Task ${JSON.stringify(name)} ${boundary} is invalid${details === "" ? "" : `: ${details}`}`;
 };
 
 /** Track an ordinary function without changing its arguments or return behavior. */
 export function task<Run extends TaskFunction>(run: Run): Run;
-/** Track a function with validated JSON Schema input and output. */
+/** Track a function with TypeBox input and output, preserving synchronous results. */
 export function task<
-  const InputSchema extends TSchema,
-  const OutputSchema extends TSchema,
-  const Run extends (input: Static<InputSchema>) => unknown,
+  const InputSchema extends TSchema & { "~standard"?: never },
+  const OutputSchema extends TSchema & { "~standard"?: never },
+  const Run extends (input: SchemaOutput<InputSchema>) => unknown,
+>(
+  definition: TaskDefinition<InputSchema, OutputSchema>,
+  run: Run,
+): Task<InputSchema, OutputSchema, Run>;
+/** Track a function with Standard Schema validation and parsed input and output. */
+export function task<
+  const InputSchema extends WorkflowSchema,
+  const OutputSchema extends WorkflowSchema,
+  const Run extends (input: SchemaOutput<InputSchema>) => SchemaInput<OutputSchema> | Promise<SchemaInput<OutputSchema>>,
 >(
   definition: TaskDefinition<InputSchema, OutputSchema>,
   run: Run,
 ): Task<InputSchema, OutputSchema, Run>;
 export function task(
-  definitionOrRun: TaskDefinition<TSchema, TSchema> | TaskFunction,
+  definitionOrRun: TaskDefinition<WorkflowSchema, WorkflowSchema> | TaskFunction,
   implementation?: TaskFunction,
 ): TaskFunction {
   const definition = typeof definitionOrRun === "function" ? undefined : definitionOrRun;
@@ -55,23 +74,32 @@ export function task(
       }
     }
   }
-  const validateOutput = (output: unknown) => {
-    if (definition && !Check(definition.output, output)) {
-      throw new TypeError(validationMessage(name, "output", definition.output, output));
-    }
-    return output;
+  const parse = (boundary: "input" | "output", value: unknown) => {
+    const check = (result: Awaited<ReturnType<typeof validateSchema>>) => {
+      if (result.issues) throw new TypeError(validationMessage(name, boundary, result.issues));
+      return result.value;
+    };
+    const result = validateSchema(definition![boundary], value);
+    return result instanceof Promise ? result.then(check) : check(result);
+  };
+  const standard = definition && (isStandardSchema(definition.input) || isStandardSchema(definition.output));
+  const runStandard = async (receiver: unknown, args: unknown[]) => {
+    const input = await parse("input", args[0]);
+    return step(name, async () => {
+      const output = await Reflect.apply(run, receiver, [input, ...args.slice(1)]);
+      return parse("output", output);
+    });
   };
   const defined = function (this: unknown, ...args: unknown[]) {
-    if (definition && !Check(definition.input, args[0])) {
-      throw new TypeError(validationMessage(name, "input", definition.input, args[0]));
-    }
+    if (standard) return runStandard(this, args);
+    if (definition) args[0] = parse("input", args[0]);
     return step(name, () => {
       const output = Reflect.apply(run, this, args);
       if (!definition) return output;
       if (output != null && typeof output.then === "function") {
-        return Promise.resolve(output).then(validateOutput);
+        return Promise.resolve(output).then(value => parse("output", value));
       }
-      return validateOutput(output);
+      return parse("output", output);
     });
   };
   Object.defineProperties(defined, {
