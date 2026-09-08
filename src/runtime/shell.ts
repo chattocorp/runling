@@ -152,6 +152,7 @@ function track(
   formattedCommand: string,
   options: CreateShellOptions,
 ) {
+  const cwd = options.cwd === undefined ? undefined : requireDirectory(options.cwd);
   const id = crypto.randomUUID();
   const startedAt = performance.now();
   emitRunlingEvent({
@@ -164,7 +165,6 @@ function track(
     `${log.highlight("Running", COMMAND_COLOR)} ${formattedCommand}`,
   );
   command.quiet(!(options.verbose ?? executionServices()?.verbose ?? false));
-  const cwd = options.cwd;
   const configured = cwd === undefined ? command : command.cwd(cwd);
 
   queueMicrotask(() => {

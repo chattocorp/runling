@@ -122,6 +122,14 @@ describe("createShell", () => {
     await expect(context.shell`true`).rejects.toThrow("An explicit directory is required");
   });
 
+  test("rejects an invalid factory directory before starting an activity", () => {
+    const events: RunlingEvent[] = [];
+    observeRunlingEvents(event => events.push(event), () => {
+      expect(() => createShell({ cwd: "" })`true`).toThrow("An explicit directory is required");
+    });
+    expect(events).toEqual([]);
+  });
+
   test("allows an explicit default cwd", async () => {
     const cwd = vi.spyOn(ShellCommand.prototype, "cwd");
 
