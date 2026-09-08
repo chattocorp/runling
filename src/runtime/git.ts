@@ -57,6 +57,9 @@ async function updateUntrackedFile(hasher: Hash, cwd: string, path: string) {
 export async function workingTreeHash(cwd = process.cwd()) {
   const hasher = createHash("sha256");
   if (await hasHead(cwd)) {
+    // The diff alone is empty at every clean commit. Include its base tree,
+    // but not commit metadata, so committed file changes remain visible.
+    updateField(hasher, await git(cwd, ["rev-parse", "HEAD^{tree}"]));
     updateField(hasher, await git(cwd, ["diff", "--binary", "HEAD"]));
   } else {
     updateField(hasher, await git(cwd, ["diff", "--binary", "--cached"]));
