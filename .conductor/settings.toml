@@ -1,0 +1,11 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "mise install && mise exec -- pnpm install --frozen-lockfile && mise exec -- pnpm --filter runling build"
+run_mode = "concurrent"
+
+[scripts.run.dev]
+available_in = ["local"]
+command = 'mise exec -- pnpm dev:web --port "$CONDUCTOR_PORT"'
+default = true
+icon = "play"
