@@ -2,13 +2,13 @@
 
 [Back to the README](../README.md)
 
-This pnpm monorepo contains a TypeScript/Node.js framework for agent workflows and the
-applications that use it.
+This repository contains one `runling` package with a TypeScript/Node.js
+framework, a command-line interface, and a SvelteKit run console.
 
-- `packages/runling` contains the `runling` package and command.
+- `src/runtime` contains framework primitives; `bin` contains the command.
 - `workflows` contains workflow scripts.
-- `apps/web` contains the SvelteKit run console. Its production build is
-  included in the `runling` package.
+- `src/routes` and `src/lib` contain the run console.
+- `extensions` contains Pi extensions.
 
 A workflow is a TypeScript function with JSON Schema input and output. The
 `runling` command loads the function and passes a `Runling` object and an
@@ -46,7 +46,7 @@ To test local changes instead, build and pack this repo:
 ```bash
 pnpm install
 pnpm build
-pnpm --filter runling pack --pack-destination ../..
+pnpm pack
 ```
 
 In your own npm project, install the generated tarball. Replace `<version>` with
@@ -115,18 +115,38 @@ Install the tools and dependencies:
 ```bash
 mise install
 pnpm install
-pnpm build
 ```
 
-Start the packaged UI from the repository root:
+Start the development server from the repository root:
 
 ```bash
+pnpm dev
+```
+
+This command loads the framework from TypeScript source. No build is required.
+The command watches imported modules and restarts the server when they change.
+Server restarts interrupt active runs. Vite handles UI changes, and the config
+loader reloads local workflows.
+Use `pnpm dev --port 6000` to select a port. `pnpm dev:web` is an alias.
+
+To develop the CLI or TUI, run a workflow directly:
+
+```bash
+pnpm runling workflows/joke.ts "TypeScript"
+```
+
+This command loads the runner and framework from TypeScript source. No build is
+required. Rerun the command after edits; active workflows do not restart.
+
+To build and start the packaged UI instead:
+
+```bash
+pnpm build
 pnpm runling
 ```
 
 Configure credentials for each model that a workflow uses.
-Use `pnpm dev:web` for the Vite development server when changing the UI.
-Rebuild the framework after changing its source. No global package link is required.
+No global package link is required.
 
 ## Run a workflow
 

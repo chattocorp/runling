@@ -1,14 +1,17 @@
-import { spawnProcess } from "../../../test/process.ts";
+import { spawnProcess } from "../test/process.ts";
 import { describe, expect, test } from "vitest";
 import { resolve } from "node:path";
 
 const executable = resolve(import.meta.dirname, "runling.js");
 const fixture = resolve(import.meta.dirname, "../test/fixtures/echo-workflow.ts");
 
-describe("runling executable", () => {
+describe.each([
+  { mode: "compiled", flags: [] },
+  { mode: "source", flags: ["--conditions=runling-source"] },
+])("runling executable ($mode)", ({ flags }) => {
   test("loads a workflow file and injects the runling runtime", async () => {
     const child = spawnProcess(
-      [process.execPath, executable, fixture, "A workflow result"],
+      [process.execPath, ...flags, executable, fixture, "A workflow result"],
       {
         cwd: import.meta.dirname,
         stdout: "pipe",
@@ -30,7 +33,7 @@ describe("runling executable", () => {
 
   test("runs a workflow without a prompt", async () => {
     const child = spawnProcess(
-      [process.execPath, executable, fixture, "--json"],
+      [process.execPath, ...flags, executable, fixture, "--json"],
       {
         stdout: "pipe",
         stderr: "pipe",
@@ -47,7 +50,7 @@ describe("runling executable", () => {
   });
 
   test("reports invalid invocations without a stack trace", async () => {
-    const child = spawnProcess([process.execPath, executable, "--port", "not-a-port"], {
+    const child = spawnProcess([process.execPath, ...flags, executable, "--port", "not-a-port"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -64,7 +67,7 @@ describe("runling executable", () => {
 
   test("prints one structured document to stdout in JSON mode", async () => {
     const child = spawnProcess(
-      [process.execPath, executable, fixture, "--json", "A JSON result"],
+      [process.execPath, ...flags, executable, fixture, "--json", "A JSON result"],
       {
         stdout: "pipe",
         stderr: "pipe",
@@ -95,7 +98,7 @@ describe("runling executable", () => {
   });
 
   test("reports failures as JSON with a nonzero exit status", async () => {
-    const child = spawnProcess([process.execPath, executable, "--json"], {
+    const child = spawnProcess([process.execPath, ...flags, executable, "--json"], {
       stdout: "pipe",
       stderr: "pipe",
     });

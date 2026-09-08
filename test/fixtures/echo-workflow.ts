@@ -1,4 +1,4 @@
-import { randomId, task, Type } from "../../src/index.ts";
+import { randomId, task, Type } from "runling";
 
 export default task(
   {

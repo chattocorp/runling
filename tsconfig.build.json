@@ -7,6 +7,6 @@
     "outDir": "dist",
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/**/*.ts", "extensions/**/*.ts"],
+  "include": ["src/runtime/**/*.ts", "extensions/**/*.ts"],
   "exclude": ["**/*.test.ts"]
 }

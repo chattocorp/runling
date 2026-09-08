@@ -4,8 +4,10 @@ This repository is an experiment in building the core primitive of an agentic so
 
 - Use ASD-STE100 for prose and documentation.
 - Use Conventional Commits for commit messages and PR titles.
-- The framework package lives in `packages/runling/`
-- The SvelteKit web app lives in `apps/web/`
+- The repository root is the publishable `runling` package.
+- Framework primitives live in `src/runtime/`.
+- The SvelteKit web app lives in `src/routes/` and `src/lib/`.
+- CLI entrypoints live in `bin/`; Pi extensions live in `extensions/`.
 - Workflow scripts live in `workflows/`
 - `workflows/implement.ts` is a workflow entrypoint that implements and validates a requested change in the current working directory
 - `workflows/make-pr.ts` is a workflow entrypoint that runs the implementation and review workflows in a worktree, opens a pull request, and posts the review as a comment

@@ -55,7 +55,7 @@ The first release needs a new `fix:` or `feat:` commit.
 
 The whole repository is one release component. Thus, web-only changes can
 request a release. The `simple` release strategy updates root `version.txt`
-and `CHANGELOG.md`; a JSON updater changes `packages/runling/package.json`.
+and `CHANGELOG.md`; a JSON updater changes the root `package.json`.
 The private workspace packages do not get separate releases.
 See the [release-please configuration documentation](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md).
 

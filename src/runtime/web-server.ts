@@ -38,7 +38,7 @@ With no arguments, start the web UI in the current project.`);
   process.env.HOST = options.host;
   process.env.PORT = String(options.port);
   // Import only after setting the adapter's startup environment. Keep the project cwd.
-  const serverUrl = new URL("../web/handler.js", import.meta.url);
+  const serverUrl = new URL("../../web/handler.js", import.meta.url);
   if (!existsSync(serverUrl))
     throw new Error(
       "Runling web assets are missing. Build the package before running it.",

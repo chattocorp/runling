@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { task, Type } from "runling";
-import { recordTokenUsage } from "../../../../../packages/runling/src/usage.ts";
+import { recordTokenUsage } from "../../runtime/usage.ts";
 import { historyDirectory, RunStore } from "./run-store.ts";
 import { buildTimeline } from "../timeline.ts";
 import type { RunRecord } from "../runs.ts";

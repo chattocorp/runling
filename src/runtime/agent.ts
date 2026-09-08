@@ -12,7 +12,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
-import webFetchExtension from "../extensions/web-fetch.ts";
+import webFetchExtension from "../../extensions/web-fetch.ts";
 import { bindRunlingContext, emitRunlingEvent } from "./events.ts";
 import { randomId } from "./id.ts";
 import { log, withLogSource } from "./log.ts";

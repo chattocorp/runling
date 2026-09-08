@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { spawnProcess } from "../../../test/process.ts";
+import { spawnProcess } from "../../test/process.ts";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { chmod, mkdtemp, rm, symlink, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";

@@ -1,4 +1,4 @@
-import { spawnProcess } from "../../../../test/process.ts";
+import { spawnProcess } from "../../test/process.ts";
 import { expect, test } from "vitest";
 import { shellQuote, webhookCurl } from "./webhook-curl.ts";
 

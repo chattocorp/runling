@@ -25,12 +25,12 @@ try {
   const { stdout } = await exec(
     "npm",
     ["pack", "--json", "--pack-destination", directory],
-    { cwd: resolve(root, "packages/runling") },
+    { cwd: root },
   );
   const [packed] = JSON.parse(stdout);
   assert.equal(packed.name, "runling");
   const manifest = JSON.parse(
-    await readFile(resolve(root, "packages/runling/package.json"), "utf8"),
+    await readFile(resolve(root, "package.json"), "utf8"),
   );
   assert.equal(packed.version, manifest.version);
   assert(packed.files.some(({ path }) => path === "README.md"));
@@ -38,7 +38,7 @@ try {
   assert(packed.files.some(({ path }) => path === "bin/runling.js"));
   assert(!packed.files.some(({ path }) => path === "bin/factory.js"));
   assert(packed.files.some(({ path }) => path === "dist/web/index.js"));
-  assert(packed.files.some(({ path }) => path === "dist/src/index.d.ts"));
+  assert(packed.files.some(({ path }) => path === "dist/src/runtime/index.d.ts"));
   assert(!packed.files.some(({ path }) => path.endsWith(".test.ts")));
   const project = resolve(directory, "project with spaces");
   await mkdir(project);
