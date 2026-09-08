@@ -1,4 +1,5 @@
 import { concat, task, Type, type Runling } from "runling";
+import * as git from "runling/git";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -41,7 +42,7 @@ export const implement = task(
     output: Type.String({ description: "A summary of the implementation" }),
   },
   async (f, input): Promise<string> => {
-    const pwd = await f.getPwd();
+    const pwd = await git.getPwd(f.cwd);
 
     await using implementationAgent = await f.agent({
       model,

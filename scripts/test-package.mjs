@@ -79,7 +79,9 @@ export default task({ name: "Consumer echo", input: Type.Object({ topic: Type.St
   await writeFile(
     resolve(project, "cli.ts"),
     `import { task, Type } from "runling";
+import * as git from "runling/git";
 export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, (_f, input) => {
+  if (typeof git.getPwd !== "function" || typeof git.workingTreeHash !== "function" || typeof git.WorkingDirectory.create !== "function") throw new Error("Git helpers were not exported");
   if (process.env.RUNLING_PACKAGE_TEST_ENV !== "loaded") throw new Error("Project .env was not loaded");
   return input;
 });

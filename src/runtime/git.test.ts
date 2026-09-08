@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { chmod, mkdtemp, rm, symlink, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getPwd, workingTreeHash } from "./git.ts";
+import { getPwd, workingTreeHash } from "runling/git";
 
 async function git(cwd: string, ...args: string[]) {
   const process = spawnProcess(["git", ...args], {

@@ -1,6 +1,15 @@
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { type Runling, type Exec } from "runling";
+import * as git from "runling/git";
 import { implement } from "./implement.ts";
+
+vi.mock("runling/git", () => ({
+  getPwd: vi.fn(async () => ({ hasChanges: Promise.resolve(true) })),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 const contextValues = {
   cwd: "/project",
@@ -85,7 +94,6 @@ function runtimeWith({
         },
       };
     },
-    getPwd: async () => ({ hasChanges: Promise.resolve(true) }),
     log: { info: (message: string) => messages.push(message) },
     step: <T>(label: string, work: () => T) => {
       messages.push(label);
@@ -119,6 +127,7 @@ describe("implement workflow", () => {
 
     await expect(implement(runling, "Make the change")).resolves.toBe("Implementation summary");
     expect(prompts).toEqual(["Make the change"]);
+    expect(git.getPwd).toHaveBeenCalledExactlyOnceWith(runling.cwd);
   });
 
   test("runs agents on Sol with medium thinking", async () => {
