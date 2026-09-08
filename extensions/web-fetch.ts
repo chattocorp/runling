@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { Type } from "typebox";
+import { Agent } from "undici";
 
 const MAX_RESPONSE_BYTES = 100_000;
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -15,12 +16,12 @@ const parameters = Type.Object({
 });
 
 interface WebFetchDependencies {
-  fetch(input: URL, init: RequestInit): Promise<Response>;
+  fetch(input: URL, init: RequestInit, addresses: readonly string[]): Promise<Response>;
   resolveAddresses(hostname: string): Promise<readonly string[]>;
 }
 
 const defaultDependencies: WebFetchDependencies = {
-  fetch: (input, init) => globalThis.fetch(input, init),
+  fetch: fetchWithPinnedAddresses,
   async resolveAddresses(hostname) {
     if (isIP(hostname) !== 0) return [hostname];
     return (await lookup(hostname, { all: true, verbatim: true })).map(
@@ -28,6 +29,41 @@ const defaultDependencies: WebFetchDependencies = {
     );
   },
 };
+
+/** Connect only to checked addresses while retaining the URL's Host and TLS name. */
+export async function fetchWithPinnedAddresses(
+  input: URL,
+  init: RequestInit,
+  addresses: readonly string[],
+): Promise<Response> {
+  const resolved = addresses.map((address) => ({ address, family: isIP(address) }));
+  const dispatcher = new Agent({
+    autoSelectFamily: true,
+    connect: {
+      lookup(_hostname, options, callback) {
+        const matches = options.family
+          ? resolved.filter(({ family }) => family === options.family)
+          : resolved;
+        const first = matches[0];
+        if (!first) {
+          callback(new Error("No checked address for the requested IP family"), "", 0);
+        } else if (options.all) {
+          callback(null, matches);
+        } else {
+          callback(null, first.address, first.family);
+        }
+      },
+    },
+  });
+  try {
+    // Redirects are checked separately, with a new dispatcher for each hop.
+    const options = { ...init, redirect: "manual" as const, dispatcher };
+    return await globalThis.fetch(input, options);
+  } finally {
+    // Close after the response body is consumed or cancelled, not before returning it.
+    dispatcher.close(() => {});
+  }
+}
 
 export function createWebFetchExtension(
   dependencies: WebFetchDependencies = defaultDependencies,
@@ -113,7 +149,7 @@ async function fetchPublicUrl(
   let url = initialUrl;
 
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
-    await assertPublicDestination(url, dependencies.resolveAddresses);
+    const addresses = await assertPublicDestination(url, dependencies.resolveAddresses);
     const response = await dependencies.fetch(url, {
       headers: {
         accept:
@@ -122,7 +158,7 @@ async function fetchPublicUrl(
       },
       redirect: "manual",
       signal,
-    });
+    }, addresses);
 
     if (!isRedirect(response.status)) return response;
 
@@ -152,7 +188,7 @@ function isRedirect(status: number): boolean {
 async function assertPublicDestination(
   url: URL,
   resolveAddresses: WebFetchDependencies["resolveAddresses"],
-): Promise<void> {
+): Promise<readonly string[]> {
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
   const addresses = await resolveAddresses(hostname);
   if (addresses.length === 0) {
@@ -165,6 +201,7 @@ async function assertPublicDestination(
       `web_fetch blocked non-public destination ${url.hostname} (${blockedAddress})`,
     );
   }
+  return addresses;
 }
 
 function isPublicIpAddress(address: string): boolean {
