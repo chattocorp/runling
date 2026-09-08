@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from "node:util";
 import {
   createAgentSession,
+  convertToLlm,
   DefaultResourceLoader,
   defineTool,
   getAgentDir,
@@ -201,12 +202,11 @@ export async function agent(options: AgentOptions): Promise<RunlingAgent> {
   return createRunlingAgent(options);
 }
 
-type AgentSession = Awaited<ReturnType<typeof createAgentSession>>["session"];
-
 async function createRunlingAgent(
   options: AgentOptions,
-  initialize?: (session: AgentSession) => void,
+  history: Parameters<typeof convertToLlm>[0] = [],
 ): Promise<RunlingAgent> {
+  const inheritedMessages = convertToLlm(structuredClone(history));
   const agentId = randomId();
   const color = takeAgentColor();
   const progress = (text: string) => {
@@ -310,13 +310,19 @@ async function createRunlingAgent(
   });
   await resourceLoader.reload();
 
+  const sessionManager = SessionManager.inMemory(cwd);
+  // Persist the inherited model context so Pi can compact and restore it.
+  // Pi converts existing compaction/branch summaries into normal messages.
+  for (const message of inheritedMessages) {
+    sessionManager.appendMessage(message);
+  }
   const { session } = await createAgentSession({
     cwd,
     model,
     thinkingLevel: options.thinkingLevel,
     modelRuntime,
     resourceLoader,
-    sessionManager: SessionManager.inMemory(),
+    sessionManager,
     settingsManager,
     customTools: [reportOutcome],
     tools: [
@@ -332,7 +338,6 @@ async function createRunlingAgent(
       ]),
     ],
   });
-  initialize?.(session);
 
   let disposed = false;
   let running = false;
@@ -603,10 +608,7 @@ async function createRunlingAgent(
         throw new Error(`Agent ${agentId} is already running`);
       }
 
-      const messages = session.agent.state.messages;
-      return createRunlingAgent(options, (forkedSession) => {
-        forkedSession.agent.state.messages = messages;
-      });
+      return createRunlingAgent(options, session.agent.state.messages);
     },
 
     dispose,

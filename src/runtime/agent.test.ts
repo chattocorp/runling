@@ -24,8 +24,10 @@ let abortCalls = 0;
 let disposed = false;
 let modelAvailable = true;
 
-vi.doMock("@earendil-works/pi-coding-agent", () => {
+vi.doMock("@earendil-works/pi-coding-agent", async () => {
+  const actual = await vi.importActual<typeof import("@earendil-works/pi-coding-agent")>("@earendil-works/pi-coding-agent");
   return {
+    convertToLlm: actual.convertToLlm,
     ModelRuntime: {
       create: async () => ({
         getModel: () => (modelAvailable ? fakeModel : undefined),
@@ -53,14 +55,13 @@ vi.doMock("@earendil-works/pi-coding-agent", () => {
         };
       },
     },
-    SessionManager: {
-      inMemory: () => ({}),
-    },
+    SessionManager: actual.SessionManager,
     createAgentSession: async (options: unknown) => {
       sessionCreations++;
       sessionOptions = options;
-      let messages: any[] = [];
+      let messages: any[] = sessionOptions.sessionManager.buildSessionContext().messages;
       const session = {
+        sessionManager: sessionOptions.sessionManager,
         agent: {
           state: {
             get messages() {
@@ -923,11 +924,40 @@ describe("agent", () => {
       expect(createdSessions[1].agent.state.messages).toEqual(
         createdSessions[0].agent.state.messages,
       );
+      expect(createdSessions[1].sessionManager.buildSessionContext().messages).toEqual(
+        createdSessions[0].agent.state.messages,
+      );
 
       createdSessions[1].agent.state.messages.push({ role: "assistant" });
       expect(createdSessions[0].agent.state.messages).toHaveLength(1);
       expect(createdSessions[1].agent.state.messages).toHaveLength(2);
       expect(sessionOptions.tools).toEqual(["read", "report_outcome"]);
+    } finally {
+      fork.dispose();
+      instance.dispose();
+    }
+  });
+
+  test("keeps inherited summaries in Pi history across further compaction", async () => {
+    const instance = await agent({ model: "anthropic/claude-opus-4-5" });
+    createdSessions[0].agent.state.messages = [
+      { role: "compactionSummary", summary: "Investigation found a race condition", tokensBefore: 5000, timestamp: 1 },
+      { role: "user", content: "Review the race condition", timestamp: 2 },
+    ];
+    const fork = await instance.fork();
+    try {
+      const manager = createdSessions[1].sessionManager;
+      // Pi's compactor reads the persisted branch, not agent.state.messages.
+      const branch = manager.getBranch();
+      expect(JSON.stringify(branch)).toContain("Investigation found a race condition");
+      expect(JSON.stringify(branch)).toContain("Review the race condition");
+      const inherited = branch.find((entry: any) => entry.type === "message");
+      manager.appendMessage({ role: "user", content: "Continue the review", timestamp: 3 });
+      manager.appendCompaction("Earlier work", inherited.id, 6000);
+      const restored = manager.buildSessionContext().messages;
+      expect(JSON.stringify(restored)).toContain("Investigation found a race condition");
+      expect(JSON.stringify(restored)).toContain("Continue the review");
+      expect(createdSessions[0].agent.state.messages).toHaveLength(2);
     } finally {
       fork.dispose();
       instance.dispose();
