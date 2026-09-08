@@ -11,6 +11,10 @@ export async function runRunlingWeb(options: ServeOptions): Promise<void> {
   const configPath = resolve(options.config);
   process.env.RUNLING_WEB_CONFIG = configPath;
 
+  // SvelteKit resolves its app files from the process directory, even with Vite's
+  // root set. This is the tooling root; tasks still require explicit directories.
+  process.chdir(appRoot);
+
   const server = await createServer({
     root: appRoot,
     configFile: resolve(appRoot, "vite.config.ts"),
