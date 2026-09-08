@@ -50,7 +50,10 @@ describe("GitHub Actions test workflow", () => {
     expect(Object.keys(workflow.jobs ?? {})).toEqual(["test"]);
     expect(steps?.flatMap((step) => step.run ? [step.run] : [])).toEqual([
       "pnpm install --frozen-lockfile",
+      "pnpm check",
       "pnpm test",
+      "pnpm build",
+      "pnpm test:package",
     ]);
   });
 });

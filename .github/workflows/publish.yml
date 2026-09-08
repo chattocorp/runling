@@ -62,12 +62,11 @@ jobs:
         if: github.event_name == 'push'
         run: node scripts/check-release.mjs
       - run: pnpm install --frozen-lockfile
+      - run: pnpm check
       - run: pnpm build
       - run: pnpm test
-      - name: Pack the release tarball
-        run: |
-          mkdir -p "$RUNLING_RELEASE_DIR"
-          npm pack --pack-destination "$RUNLING_RELEASE_DIR"
+      - name: Test and save the release tarball
+        run: pnpm test:package
         env:
           RUNLING_RELEASE_DIR: ${{ runner.temp }}/runling-release
       - uses: actions/upload-artifact@v4
