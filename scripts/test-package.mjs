@@ -96,7 +96,7 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
   );
   const cli = await exec(
     "npm",
-    ["run", "--silent", "runling", "--", "cli.ts", "explicit input", "--json"],
+    ["run", "--silent", "runling", "--", "run", "cli.ts", "explicit input", "--json"],
     { cwd: project },
   );
   assert.equal(JSON.parse(cli.stdout).output, "explicit input");
@@ -117,6 +117,7 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
       "--silent",
       "runling",
       "--",
+      "run",
       "cli.ts",
       "commonjs project",
       "--json",
@@ -150,7 +151,7 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
   const origin = `http://127.0.0.1:${port}`;
   server = spawn(
     "npm",
-    ["run", "runling", "--", "--host", "127.0.0.1", "--port", String(port)],
+    ["run", "runling", "--", "serve", "--host", "127.0.0.1", "--port", String(port)],
     {
       cwd: project,
       detached: process.platform !== "win32",

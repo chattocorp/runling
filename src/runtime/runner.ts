@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { cli } from "./cli.ts";
+import type { RunOptions } from "./cli.ts";
 import {
   observeRunlingEvents,
   type RunlingEventListener,
@@ -305,25 +305,27 @@ export async function loadWorkflow(path: string): Promise<Task> {
   return module.default;
 }
 
-export async function runRunling(argv: readonly string[] = process.argv.slice(2)) {
-  const json = argv.includes("--json");
-  const presentation = shouldUseTui(argv) ? "tui" : "log";
-  const title =
-    argv.find((argument) => !argument.startsWith("-")) ?? "Workflow";
+export async function runRunling(
+  workflowPath: string,
+  prompt: string,
+  options: RunOptions,
+) {
+  const { json, verbose } = options;
+  const presentation = shouldUseTui(options) ? "tui" : "log";
+  log.level = verbose ? "debug" : "info";
   await reportExecution(
     async ({ handleInput }) => {
-      const { workflowPath, prompt, verbose } = cli(argv, "runling");
       const cwd = process.cwd();
       const run = await loadWorkflow(workflowPath);
       const f = createRunling({ cwd, prompt, verbose, handleInput });
       return log.indented(() => run(f, prompt));
     },
-    { json, presentation, title },
+    { json, presentation, title: workflowPath },
   );
 }
 
 export function shouldUseTui(
-  argv: readonly string[],
+  options: RunOptions,
   terminal: { stdinIsTTY?: boolean; stdoutIsTTY?: boolean } = {
     stdinIsTTY: process.stdin.isTTY,
     stdoutIsTTY: process.stdout.isTTY,
@@ -332,9 +334,8 @@ export function shouldUseTui(
   return (
     terminal.stdinIsTTY === true &&
     terminal.stdoutIsTTY === true &&
-    !argv.includes("--json") &&
-    !argv.includes("--log") &&
-    !argv.includes("--verbose") &&
-    !argv.includes("-v")
+    !options.json &&
+    !options.log &&
+    !options.verbose
   );
 }

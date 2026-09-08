@@ -1,69 +1,83 @@
-import { describe, expect, test } from "vitest";
-import { cli } from "./cli.ts";
-import { log } from "./log.ts";
+import { describe, expect, test, vi } from "vitest";
+import { createCli } from "./cli.ts";
 
-describe("cli", () => {
-  test("parses a workflow and prompt with quiet output by default", () => {
-    expect(cli(["workflows/implement.ts", "make the change"])).toEqual({
-      workflowPath: "workflows/implement.ts",
-      prompt: "make the change",
-      json: false,
-      logMode: false,
-      verbose: false,
+function harness() {
+  const run = vi.fn(async () => {});
+  const serve = vi.fn(async () => {});
+  let stdout = "";
+  let stderr = "";
+  const cli = createCli("1.2.3", { run, serve });
+  for (const command of [cli, ...cli.commands]) command.configureOutput({
+    writeOut: (text) => { stdout += text; },
+    writeErr: (text) => { stderr += text; },
+  });
+  return { run, serve, parse: (args: string[]) => cli.parseAsync(args, { from: "user" }),
+    stdout: () => stdout, stderr: () => stderr };
+}
+
+describe("CLI commands", () => {
+  test("passes a file, prompt, and defaults to the runner", async () => {
+    const h = harness();
+    await h.parse(["run", "workflow.ts", "make the change"]);
+    expect(h.run).toHaveBeenCalledWith("workflow.ts", "make the change", {
+      json: false, log: false, verbose: false,
+    });
+    expect(h.serve).not.toHaveBeenCalled();
+  });
+
+  test("accepts options around arguments and an omitted prompt", async () => {
+    const h = harness();
+    await h.parse(["run", "-v", "workflow.ts", "--json", "--log"]);
+    expect(h.run).toHaveBeenCalledWith("workflow.ts", "", {
+      json: true, log: true, verbose: true,
     });
   });
 
-  test("accepts JSON output mode", () => {
-    expect(cli(["workflow.ts", "--json", "make the change"]).json).toBe(true);
-  });
-
-  test("accepts append-only log mode", () => {
-    expect(cli(["workflow.ts", "--log"]).logMode).toBe(true);
-  });
-
-  test("accepts both verbose flags", () => {
-    expect(cli(["-v", "workflow.ts", "make the change"]).verbose).toBe(true);
-    expect(log.level).toBe("debug");
-    expect(cli(["workflow.ts", "--verbose", "make the change"]).verbose).toBe(
-      true,
-    );
-    expect(log.level).toBe("debug");
-  });
-
-  test("allows the prompt to be omitted", () => {
-    expect(cli(["workflows/review.ts"])).toEqual({
-      workflowPath: "workflows/review.ts",
-      prompt: "",
-      json: false,
-      logMode: false,
-      verbose: false,
+  test("preserves a flag-like prompt after the option terminator", async () => {
+    const h = harness();
+    await h.parse(["run", "workflow.ts", "--", "--json"]);
+    expect(h.run).toHaveBeenCalledWith("workflow.ts", "--json", {
+      json: false, log: false, verbose: false,
     });
   });
 
-  test("reports a missing workflow", () => {
-    try {
-      cli([], "runling");
-      throw new Error("Expected parsing to fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toBe(
-        "Usage: runling [-v|--verbose] [--log|--json] <workflow.ts> [prompt]",
-      );
-    }
+  test("passes server defaults", async () => {
+    const h = harness();
+    await h.parse(["serve"]);
+    expect(h.serve).toHaveBeenCalledWith({ config: "runling.config.ts", host: "localhost", port: 5173, open: false });
+    expect(h.run).not.toHaveBeenCalled();
   });
 
-  test("rejects silently truncated prompts", () => {
-    expect(() => cli(["workflow.ts", "make", "the change"])).toThrow(
-      "The prompt must be passed as a single quoted argument",
-    );
+  test("passes parsed server options", async () => {
+    const h = harness();
+    await h.parse(["serve", "--port=3000", "--host", "::1", "--config", "custom.ts", "--open"]);
+    expect(h.serve).toHaveBeenCalledWith({ config: "custom.ts", host: "::1", port: 3000, open: true });
   });
 
-  test("reports invalid options", () => {
-    try {
-      cli(["--unknown", "workflow.ts", "make the change"]);
-      throw new Error("Expected parsing to fail");
-    } catch (error) {
-      expect(String(error)).toContain("Unknown option");
-    }
+  test.each(["nope", "0", "65536", "1.5", "1e3", "", "-1"])("rejects invalid port %j before starting the server", async (port) => {
+    const h = harness();
+    await expect(h.parse(["serve", `--port=${port}`])).rejects.toThrow("Port must be an integer from 1 through 65535");
+    expect(h.serve).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["run"], ["run", "workflow.ts", "too", "many"],
+    ["run", "workflow.ts", "--unknown"], ["serve", "--json"],
+    ["web"], ["workflow.ts"], ["--port", "3000"], ["serve", "extra"],
+  ])("rejects invalid invocation %j without executing", async (...args) => {
+    const h = harness();
+    await expect(h.parse(args)).rejects.toThrow();
+    expect(h.run).not.toHaveBeenCalled();
+    expect(h.serve).not.toHaveBeenCalled();
+    expect(h.stderr()).toContain("error:");
+  });
+
+  test.each([[], ["--help"], ["run", "--help"], ["serve", "--help"], ["help", "run"], ["--version"]])("shows help or version for %j without executing", async (...args) => {
+    const h = harness();
+    try { await h.parse(args); } catch (error) { expect(error).toMatchObject({ exitCode: 0 }); }
+    expect(h.stdout()).toContain(args[0] === "--version" ? "1.2.3" : "Usage:");
+    expect(h.stderr()).toBe("");
+    expect(h.run).not.toHaveBeenCalled();
+    expect(h.serve).not.toHaveBeenCalled();
   });
 });

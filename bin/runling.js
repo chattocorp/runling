@@ -1,26 +1,35 @@
 #!/usr/bin/env node
 import "tsx/esm";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
+import { CommanderError } from "commander";
+import { createCli } from "#cli";
 import { resolve } from "./workflow-loader.js";
 
 registerHooks({ resolve });
+const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+const loadEnv = () => {
+  if (existsSync(".env")) process.loadEnvFile(".env");
+};
 
 try {
-  if (existsSync(".env")) process.loadEnvFile(".env");
-  const args = process.argv.slice(2);
-  if (
-    args.length === 0 ||
-    args[0] === "web" ||
-    ["--config", "--host", "--port", "--open", "--help", "-h"].includes(args[0].split("=")[0])
-  ) {
-    const { runRunlingWeb } = await import("../dist/src/runtime/web-server.js");
-    await runRunlingWeb(args[0] === "web" ? args.slice(1) : args);
-  } else {
-    const { runRunling } = await import("#runner");
-    await runRunling(args);
-  }
+  await createCli(version, {
+    async run(file, prompt, options) {
+      loadEnv();
+      const { runRunling } = await import("#runner");
+      await runRunling(file, prompt, options);
+    },
+    async serve(options) {
+      loadEnv();
+      const { runRunlingWeb } = await import("../dist/src/runtime/web-server.js");
+      await runRunlingWeb(options);
+    },
+  }).parseAsync(process.argv);
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+  if (error instanceof CommanderError) {
+    process.exitCode = error.exitCode;
+  } else {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

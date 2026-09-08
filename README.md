@@ -40,7 +40,7 @@ export default task(
 );
 ```
 
-Run it with `npm run runling -- workflows/echo.ts "hello"`. Yay!
+Run it with `npm run runling -- run workflows/echo.ts "hello"`. Yay!
 
 Much more exciting though is Runling's ability to spin up a long-running process that will automatically execute workflows in response to webhooks being sent to it.
 
@@ -57,7 +57,7 @@ export default defineWebConfig({
 });
 ```
 
-Run `npm run runling`, then open `http://localhost:5173`.
+Run `npm run runling -- serve`, then open `http://localhost:5173`.
 
 Use the console to start a run or send a request:
 
@@ -67,6 +67,9 @@ curl http://localhost:5173/api/webhooks/echo \
 ```
 
 And off it goes!
+
+Run `npm run runling -- --help` to list commands. Use `run --help` or
+`serve --help` to see command options, and `--version` to print the version.
 
 ## License
 

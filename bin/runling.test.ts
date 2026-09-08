@@ -1,5 +1,6 @@
 import { spawnProcess } from "../test/process.ts";
 import { describe, expect, test } from "vitest";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const executable = resolve(import.meta.dirname, "runling.js");
@@ -9,9 +10,55 @@ describe.each([
   { mode: "compiled", flags: [] },
   { mode: "source", flags: ["--conditions=runling-source"] },
 ])("runling executable ($mode)", ({ flags }) => {
+  test.each([
+    { args: [], expected: "Usage: runling" },
+    { args: ["--help"], expected: "serve" },
+    { args: ["run", "--help"], expected: "<file> [prompt]" },
+    { args: ["serve", "--help"], expected: "--config <path>" },
+    { args: ["help", "run"], expected: "<file> [prompt]" },
+    { args: ["--version"], expected: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version },
+  ])("prints help or version for $args", async ({ args, expected }) => {
+    const child = spawnProcess([process.execPath, ...flags, executable, ...args], {
+      cwd: import.meta.dirname,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain(expected);
+    expect(stdout).not.toContain("Runling starting");
+    expect(stderr).toBe("");
+  });
+
+  test("rejects a missing file before workflow execution", async () => {
+    const child = spawnProcess([process.execPath, ...flags, executable, "run", "--json"], {
+      stdout: "pipe", stderr: "pipe",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
+    ]);
+    expect(exitCode).toBe(1);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("missing required argument 'file'");
+    expect(stderr).not.toContain("at ");
+  });
+
+  test("treats a flag-like prompt as input after --", async () => {
+    const child = spawnProcess([process.execPath, ...flags, executable, "run", fixture, "--json", "--", "--verbose"], {
+      stdout: "pipe", stderr: "pipe",
+    });
+    const [exitCode, stdout] = await Promise.all([
+      child.exited, new Response(child.stdout).text(),
+    ]);
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).result.summary).toBe("--verbose");
+  });
+
   test("loads a workflow file and injects the runling runtime", async () => {
     const child = spawnProcess(
-      [process.execPath, ...flags, executable, fixture, "A workflow result"],
+      [process.execPath, ...flags, executable, "run", fixture, "A workflow result"],
       {
         cwd: import.meta.dirname,
         stdout: "pipe",
@@ -33,7 +80,7 @@ describe.each([
 
   test("runs a workflow without a prompt", async () => {
     const child = spawnProcess(
-      [process.execPath, ...flags, executable, fixture, "--json"],
+      [process.execPath, ...flags, executable, "run", fixture, "--json"],
       {
         stdout: "pipe",
         stderr: "pipe",
@@ -50,7 +97,7 @@ describe.each([
   });
 
   test("reports invalid invocations without a stack trace", async () => {
-    const child = spawnProcess([process.execPath, ...flags, executable, "--port", "not-a-port"], {
+    const child = spawnProcess([process.execPath, ...flags, executable, "serve", "--port", "not-a-port"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -67,7 +114,7 @@ describe.each([
 
   test("prints one structured document to stdout in JSON mode", async () => {
     const child = spawnProcess(
-      [process.execPath, ...flags, executable, fixture, "--json", "A JSON result"],
+      [process.execPath, ...flags, executable, "run", fixture, "--json", "A JSON result"],
       {
         stdout: "pipe",
         stderr: "pipe",
@@ -98,7 +145,7 @@ describe.each([
   });
 
   test("reports failures as JSON with a nonzero exit status", async () => {
-    const child = spawnProcess([process.execPath, ...flags, executable, "--json"], {
+    const child = spawnProcess([process.execPath, ...flags, executable, "run", "missing-workflow.ts", "--json"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -113,9 +160,8 @@ describe.each([
     expect(JSON.parse(stdout)).toMatchObject({
       ok: false,
       result: null,
-      error:
-        "Usage: runling [-v|--verbose] [--log|--json] <workflow.ts> [prompt]",
+      error: expect.stringContaining("missing-workflow.ts"),
     });
-    expect(stderr).toContain("Usage: runling");
+    expect(stderr).toContain("missing-workflow.ts");
   });
 });

@@ -1,36 +1,9 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseArgs } from "node:util";
+import type { ServeOptions } from "./cli.ts";
 import { createServer, type RequestListener } from "node:http";
 
-export function parseRunlingWebArguments(argv: readonly string[]) {
-  const { values } = parseArgs({
-    args: [...argv],
-    options: {
-      config: { type: "string", default: "runling.config.ts" },
-      host: { type: "string", default: "localhost" },
-      port: { type: "string", default: "5173" },
-      open: { type: "boolean", default: false },
-      help: { type: "boolean", short: "h", default: false },
-    },
-    strict: true,
-    allowPositionals: false,
-  });
-  const port = Number(values.port);
-  if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error("Port must be an integer from 1 through 65535");
-  return { ...values, port };
-}
-
-export async function runRunlingWeb(argv = process.argv.slice(2)) {
-  const options = parseRunlingWebArguments(argv);
-  if (options.help) {
-    console.log(`Usage: runling [web] [--config runling.config.ts] [--host localhost] [--port 5173] [--open]
-       runling <workflow.ts> [prompt] [--log|--json]
-
-With no arguments, start the web UI in the current project.`);
-    return;
-  }
+export async function runRunlingWeb(options: ServeOptions) {
   const cwd = process.cwd();
   const configPath = resolve(cwd, options.config);
   process.env.RUNLING_WEB_CONFIG = configPath;

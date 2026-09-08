@@ -3,27 +3,10 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createServer } from "vite";
-import { parseRunlingWebArguments } from "../runtime/web-server.ts";
-export { parseRunlingWebArguments } from "../runtime/web-server.ts";
+import { CommanderError } from "commander";
+import { createServeCommand, type ServeOptions } from "../runtime/cli.ts";
 
-const usage = `Usage: runling-web [options]
-
-Options:
-  --config <path>  Configuration file (default: runling.config.ts)
-  --host <host>  Hostname to listen on (default: localhost)
-  --port <port>  Port to listen on (default: 5173)
-  --open         Open the app in a browser
-  -h, --help     Show this help`;
-
-export async function runRunlingWeb(
-  argv: readonly string[] = process.argv.slice(2),
-): Promise<void> {
-  const options = parseRunlingWebArguments(argv);
-  if (options.help) {
-    console.log(usage);
-    return;
-  }
-
+export async function runRunlingWeb(options: ServeOptions): Promise<void> {
   const appRoot = resolve(import.meta.dirname, "../..");
   const workflowCwd = process.cwd();
   const configPath = resolve(workflowCwd, options.config);
@@ -53,9 +36,17 @@ if (
   pathToFileURL(resolve(process.argv[1])).href === import.meta.url
 ) {
   try {
-    await runRunlingWeb();
+    await createServeCommand()
+      .name("runling-web")
+      .exitOverride()
+      .action(runRunlingWeb)
+      .parseAsync(process.argv);
   } catch (cause) {
-    console.error(cause instanceof Error ? cause.message : String(cause));
-    process.exitCode = 1;
+    if (cause instanceof CommanderError) {
+      process.exitCode = cause.exitCode;
+    } else {
+      console.error(cause instanceof Error ? cause.message : String(cause));
+      process.exitCode = 1;
+    }
   }
 }

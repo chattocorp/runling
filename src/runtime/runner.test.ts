@@ -403,18 +403,18 @@ describe("shouldUseTui", () => {
   const interactive = { stdinIsTTY: true, stdoutIsTTY: true };
 
   test("uses the TUI for an interactive terminal", () => {
-    expect(shouldUseTui(["workflow.ts"], interactive)).toBe(true);
+    expect(shouldUseTui({ json: false, log: false, verbose: false }, interactive)).toBe(true);
   });
 
   test("uses logs for redirected input or output", () => {
     expect(
-      shouldUseTui(["workflow.ts"], {
+      shouldUseTui({ json: false, log: false, verbose: false }, {
         stdinIsTTY: false,
         stdoutIsTTY: true,
       }),
     ).toBe(false);
     expect(
-      shouldUseTui(["workflow.ts"], {
+      shouldUseTui({ json: false, log: false, verbose: false }, {
         stdinIsTTY: true,
         stdoutIsTTY: false,
       }),
@@ -422,10 +422,9 @@ describe("shouldUseTui", () => {
   });
 
   test("allows log, verbose, and JSON modes to override an interactive terminal", () => {
-    expect(shouldUseTui(["workflow.ts", "--log"], interactive)).toBe(false);
-    expect(shouldUseTui(["workflow.ts", "--verbose"], interactive)).toBe(false);
-    expect(shouldUseTui(["workflow.ts", "-v"], interactive)).toBe(false);
-    expect(shouldUseTui(["workflow.ts", "--json"], interactive)).toBe(false);
+    expect(shouldUseTui({ json: false, log: true, verbose: false }, interactive)).toBe(false);
+    expect(shouldUseTui({ json: false, log: false, verbose: true }, interactive)).toBe(false);
+    expect(shouldUseTui({ json: true, log: false, verbose: false }, interactive)).toBe(false);
   });
 });
 
