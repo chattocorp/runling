@@ -13,7 +13,7 @@ import type { InputRequest } from "./input.ts";
 import { createRunling } from "./runtime.ts";
 import { recordTokenUsage } from "./usage.ts";
 import { Type } from "typebox";
-import { workflow } from "./workflow.ts";
+import { task } from "./workflow.ts";
 
 const initialExitCode = process.exitCode;
 
@@ -291,7 +291,7 @@ describe("executeWorkflow", () => {
 describe("runWorkflow", () => {
   test("does not use the removed prompt option as workflow input", async () => {
     let started = false;
-    const echo = workflow(
+    const echo = task(
       { name: "Echo", input: Type.String(), output: Type.String() },
       (_f, input) => { started = true; return input; },
     );
@@ -306,7 +306,7 @@ describe("runWorkflow", () => {
     const events: RunlingEvent[] = [];
     const requested = Promise.withResolvers<InputRequest>();
     const answer = Promise.withResolvers<string>();
-    const joke = workflow(
+    const joke = task(
       {
         name: "Tell joke",
         input: Type.String(),
@@ -354,7 +354,7 @@ describe("runWorkflow", () => {
 
   test("captures failures without changing the process exit code", async () => {
     const exitCode = process.exitCode;
-    const failing = workflow(
+    const failing = task(
       { name: "Fail", input: Type.String(), output: Type.String() },
       async () => {
         throw new Error("Nope");

@@ -65,9 +65,9 @@ Add a script to your project's `package.json`:
 Create `workflows/echo.ts`:
 
 ```ts
-import { Type, workflow } from "runling";
+import { task, Type } from "runling";
 
-export default workflow(
+export default task(
   { name: "Echo", input: Type.String(), output: Type.String() },
   async (f, input) => f.step("Echo input", () => {
     f.log.info(input);
@@ -193,9 +193,9 @@ await f.shell`printf hello | tr a-z A-Z`;
 ```
 
 ```ts
-import { Type, workflow } from "runling";
+import { task, Type } from "runling";
 
-export default workflow(
+export default task(
   {
     name: "Check project",
     input: Type.String(),
@@ -215,9 +215,9 @@ Use `f.runAgent` for one agent turn. This function creates and disposes the
 agent session.
 
 ```ts
-import { Type, workflow } from "runling";
+import { task, Type } from "runling";
 
-export default workflow(
+export default task(
   {
     name: "Answer question",
     input: Type.String(),
@@ -248,9 +248,9 @@ Use `f.agent` when multiple turns must share one conversation. Dispose the
 session with `await using`.
 
 ```ts
-import { Type, workflow } from "runling";
+import { task, Type } from "runling";
 
-export default workflow(
+export default task(
   {
     name: "Implement change",
     input: Type.String(),
@@ -284,9 +284,9 @@ An agent-local extension can inspect agent events. It can add local diagnostics
 to a tool result. Keep final validation in the workflow.
 
 ```ts
-import { defineAgentExtension, Type, workflow } from "runling";
+import { defineAgentExtension, task, Type } from "runling";
 
-export default workflow(
+export default task(
   {
     name: "Implement with feedback",
     input: Type.String(),

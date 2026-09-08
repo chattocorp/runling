@@ -44,9 +44,10 @@ export {
 export { concat, type ConcatPart } from "./utils.ts";
 export {
   isWorkflow,
-  workflow,
+  task,
   type Workflow,
   type WorkflowDefinition,
+  type WorkflowFunction,
 } from "./workflow.ts";
 export { Type, type Static, type TSchema } from "typebox";
 export { isWorkflowSchema } from "./schema.ts";

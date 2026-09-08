@@ -1,8 +1,8 @@
-import { Type, workflow } from "runling";
+import { task, Type } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 
-export const joke = workflow(
+export const joke = task(
   {
     name: "Tell a joke",
     input: Type.String({ description: "The subject of the joke" }),

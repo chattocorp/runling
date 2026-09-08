@@ -1,10 +1,10 @@
-import { concat, Type, workflow } from "runling";
+import { concat, task, Type } from "runling";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
 const documentationRoot =
   "https://docs.chatto.run/getting-started/introduction/";
 
-export const chattoDocs = workflow(
+export const chattoDocs = task(
   {
     name: "Answer Chatto documentation question",
     input: Type.String({ description: "A question about Chatto" }),

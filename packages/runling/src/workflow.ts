@@ -12,13 +12,29 @@ export interface WorkflowDefinition<
   output: OutputSchema;
 }
 
+export type WorkflowFunction = (
+  f: Runling,
+  input: any,
+) => unknown | Promise<unknown>;
+
+type WorkflowInput<
+  Run extends WorkflowFunction,
+  Fallback,
+> = Parameters<Run> extends [Runling, infer Input, ...unknown[]]
+  ? Input
+  : Fallback;
+
 export type Workflow<
   InputSchema extends TSchema = TSchema,
   OutputSchema extends TSchema = TSchema,
+  Run extends WorkflowFunction = (
+    f: Runling,
+    input: Static<InputSchema>,
+  ) => Static<OutputSchema> | Promise<Static<OutputSchema>>,
 > = ((
   f: Runling,
-  input: Static<InputSchema>,
-) => Promise<Static<OutputSchema>> | Static<OutputSchema>) &
+  input: WorkflowInput<Run, Static<InputSchema>>,
+) => Promise<Awaited<ReturnType<Run>>>) &
   Readonly<WorkflowDefinition<InputSchema, OutputSchema>>;
 
 const validationMessage = (
@@ -37,17 +53,18 @@ const validationMessage = (
   return `Workflow ${JSON.stringify(workflowName)} ${boundary} is invalid${details === "" ? "" : `: ${details}`}`;
 };
 
-/** Define a named workflow with validated JSON Schema input and output. */
-export function workflow<
+/** Wrap a named task with validated JSON Schema input and output. */
+export function task<
   const InputSchema extends TSchema,
   const OutputSchema extends TSchema,
->(
-  definition: WorkflowDefinition<InputSchema, OutputSchema>,
-  run: (
+  const Run extends (
     f: Runling,
     input: Static<InputSchema>,
-  ) => Promise<Static<OutputSchema>> | Static<OutputSchema>,
-): Workflow<InputSchema, OutputSchema> {
+  ) => Static<OutputSchema> | Promise<Static<OutputSchema>>,
+>(
+  definition: WorkflowDefinition<InputSchema, OutputSchema>,
+  run: Run,
+): Workflow<InputSchema, OutputSchema, Run> {
   for (const boundary of ["input", "output"] as const) {
     if (!isWorkflowSchema(definition[boundary])) {
       throw new TypeError(
@@ -76,7 +93,7 @@ export function workflow<
       }
       return output;
     });
-  }) as Workflow<InputSchema, OutputSchema>;
+  }) as Workflow<InputSchema, OutputSchema, Run>;
 
   Object.defineProperties(defined, {
     name: { value: definition.name },
