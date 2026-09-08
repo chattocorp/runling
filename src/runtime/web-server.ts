@@ -4,10 +4,8 @@ import type { ServeOptions } from "./cli.ts";
 import { createServer, type RequestListener } from "node:http";
 
 export async function runRunlingWeb(options: ServeOptions) {
-  const cwd = process.cwd();
-  const configPath = resolve(cwd, options.config);
+  const configPath = resolve(options.config);
   process.env.RUNLING_WEB_CONFIG = configPath;
-  process.env.RUNLING_WEB_WORKFLOW_CWD = cwd;
   process.env.HOST = options.host;
   process.env.PORT = String(options.port);
   // Import only after setting the adapter's startup environment. Keep the project cwd.

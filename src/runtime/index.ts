@@ -22,6 +22,7 @@ export type {
 } from "./events.ts";
 export { randomId } from "./id.ts";
 export {
+  input,
   createInput,
   InputUnavailableError,
   type Input,
@@ -32,6 +33,8 @@ export {
 export { log, type LogLevel } from "./log.ts";
 export { step, type StepWork } from "./step.ts";
 export {
+  shell,
+  exec,
   createShell,
   createExec,
   CommandError,
@@ -44,6 +47,7 @@ export {
 export { concat, type ConcatPart } from "./utils.ts";
 export {
   isTask,
+  isSchemaTask,
   task,
   type Task,
   type TaskDefinition,
@@ -52,9 +56,6 @@ export {
 export { Type, type Static, type TSchema } from "typebox";
 export { isWorkflowSchema } from "./schema.ts";
 export {
-  createRunling,
-  type Runling,
-  type CreateRunlingOptions,
   type JsonValue,
   type WorkflowResult,
   type WorkflowReturn,

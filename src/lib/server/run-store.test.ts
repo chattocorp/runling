@@ -1,3 +1,4 @@
+import { log } from "runling";
 import { afterEach, expect, test } from "vitest";
 import {
   mkdir,
@@ -23,7 +24,7 @@ afterEach(async () => {
 async function store() {
   const directory = await mkdtemp(resolve(tmpdir(), "runling-runs-test-"));
   directories.push(directory);
-  const store = new RunStore(directory, directory);
+  const store = new RunStore(directory);
   await store.init();
   return store;
 }
@@ -46,14 +47,14 @@ test("streams ordered nested events and restores the completed run", async () =>
   const unsubscribe = original.subscribe((_id, record) => records.push(record));
   const nested = task(
     { name: "Nested", input: Type.String(), output: Type.String() },
-    async (f, input) => {
-      f.log.info("Inside nested workflow");
+    async (input) => {
+      log.info("Inside nested workflow");
       return input.toUpperCase();
     },
   );
   const parent = task(
     { name: "Parent", input: Type.String(), output: Type.String() },
-    (f, input) => nested(f, input),
+    (input) => nested(input),
   );
   const run = await original.start("test", parent, "hello", "web");
   await run.completion;
@@ -68,7 +69,7 @@ test("streams ordered nested events and restores the completed run", async () =>
   expect(timeline[0]?.children[0]?.label).toBe("Nested");
   expect(timeline[0]?.children[0]?.status).toBe("completed");
   expect(timeline[0]?.children[0]?.logs).toContain("Inside nested workflow");
-  const restored = new RunStore(original.directory, original.cwd);
+  const restored = new RunStore(original.directory);
   await restored.init();
   expect(await restored.get(run.id)).toEqual(JSON.parse(JSON.stringify(result)));
   expect(await restored.get("../../outside")).toBeUndefined();
@@ -118,13 +119,13 @@ test("recovers a truncated journal as interrupted and saves the recovery", async
   const path = resolve(history.directory, `${run.id}.jsonl`);
   const lines = (await readFile(path, "utf8")).trimEnd().split("\n");
   await writeFile(path, `${lines.slice(0, -1).join("\n")}\n{"type":`);
-  const recovered = new RunStore(history.directory, history.cwd);
+  const recovered = new RunStore(history.directory);
   await recovered.init();
   expect((await recovered.get(run.id))?.status).toBe("interrupted");
   expect(
     buildTimeline((await recovered.get(run.id))!.events, "interrupted")[0]?.status,
   ).toBe("completed");
-  const again = new RunStore(history.directory, history.cwd);
+  const again = new RunStore(history.directory);
   await again.init();
   expect(await again.get(run.id)).toEqual(await recovered.get(run.id));
   expect(await readdir(history.directory)).toEqual([`${run.id}.jsonl`]);
@@ -134,12 +135,12 @@ test("loads completed details on demand without retaining event arrays", async (
   const history = await store();
   const workflow = task(
     { name: "Logs", input: Type.String(), output: Type.String() },
-    (f, input) => { f.log.info("A retained journal event"); return input; },
+    (input) => { log.info("A retained journal event"); return input; },
   );
   const started = await history.start("logs", workflow, "first output", "web");
   await started.completion;
   const journal = await readFile(resolve(history.directory, `${started.id}.jsonl`), "utf8");
-  const restored = new RunStore(history.directory, history.cwd);
+  const restored = new RunStore(history.directory);
   await restored.init();
   for (const reader of [history, restored]) {
     expect(reader.list()[0]).not.toHaveProperty("events");

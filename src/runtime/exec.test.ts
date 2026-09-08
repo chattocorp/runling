@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 import { createExec, CommandError } from "./shell.ts";
-import { createRunling } from "./runtime.ts";
 import { observeRunlingEvents, type RunlingEvent } from "./events.ts";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -22,13 +21,13 @@ describe("createExec", () => {
       "line\nbreak",
     ];
     expect(
-      await createExec()`${process.execPath} -e ${printArgs} ${values}`.json(),
+      await createExec({ cwd: import.meta.dirname })`${process.execPath} -e ${printArgs} ${values}`.json(),
     ).toEqual(values);
   });
 
   test("joins adjacent interpolations into one argument", async () => {
     expect(
-      await createExec()`${process.execPath} -e ${printArgs} refs/${"feature a"}:${"target b"}`.json(),
+      await createExec({ cwd: import.meta.dirname })`${process.execPath} -e ${printArgs} refs/${"feature a"}:${"target b"}`.json(),
     ).toEqual(["refs/feature a:target b"]);
   });
 
@@ -40,7 +39,7 @@ describe("createExec", () => {
       (event) => events.push(event),
       async () => {
         const result =
-          await createExec()`${process.execPath} -e ${command}`.nothrow();
+          await createExec({ cwd: import.meta.dirname })`${process.execPath} -e ${command}`.nothrow();
         expect(result).toMatchObject({
           stdout: Buffer.from("stdout\n"),
           stderr: Buffer.from("stderr\n"),
@@ -55,7 +54,7 @@ describe("createExec", () => {
       output: { stdout: "stdout\n", stderr: "stderr\n" },
     });
     await expect(
-      createExec()`${process.execPath} -e ${command}`,
+      createExec({ cwd: import.meta.dirname })`${process.execPath} -e ${command}`,
     ).rejects.toBeInstanceOf(CommandError);
   });
 
@@ -65,7 +64,7 @@ describe("createExec", () => {
       (event) => events.push(event),
       async () => {
         const result =
-          await createExec()`runling-command-that-does-not-exist`.nothrow();
+          await createExec({ cwd: import.meta.dirname })`runling-command-that-does-not-exist`.nothrow();
         expect(result.exitCode).not.toBe(0);
       },
     );
@@ -74,29 +73,18 @@ describe("createExec", () => {
     ).toMatchObject({ status: "failed" });
   });
 
-  test("uses Runling context and allows a per-command cwd override", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "runling-exec-"));
+  test("keeps explicit directories isolated across concurrent commands", async () => {
+    const directories = await Promise.all([1, 2].map(() => mkdtemp(join(tmpdir(), "runling-exec-"))));
     try {
-      const f = createRunling({ cwd, prompt: "", verbose: false });
-      const script = "process.stdout.write(process.cwd())";
-      expect(
-        await realpath(await f.exec`${process.execPath} -e ${script}`.text()),
-      ).toBe(await realpath(cwd));
-      expect(
-        await realpath(
-          await f.exec`${process.execPath} -e ${script}`
-            .cwd(process.cwd())
-            .text(),
-        ),
-      ).toBe(await realpath(process.cwd()));
-      const copy = { ...f, cwd: process.cwd() };
-      expect(
-        await realpath(
-          await copy.exec`${process.execPath} -e ${script}`.text(),
-        ),
-      ).toBe(await realpath(process.cwd()));
+      const exec = createExec();
+      const script = "setTimeout(() => process.stdout.write(process.cwd()), 5)";
+      const results = await Promise.all(directories.map(async directory =>
+        realpath(await exec`${process.execPath} -e ${script}`.cwd(directory).text()),
+      ));
+      expect(results).toEqual(await Promise.all(directories.map(directory => realpath(directory))));
+      await expect(exec`${process.execPath} -e ${script}`).rejects.toThrow("An explicit directory is required");
     } finally {
-      await rm(cwd, { recursive: true, force: true });
+      await Promise.all(directories.map(directory => rm(directory, { recursive: true, force: true })));
     }
   });
 });

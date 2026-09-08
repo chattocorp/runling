@@ -1,4 +1,4 @@
-import { concat, task, Type } from "runling";
+import { agent, input as askInput, concat, task, Type } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -6,20 +6,21 @@ const thinkingLevel = "medium";
 export const plan = task(
   {
     name: "Plan change",
-    input: Type.String({ description: "The change to plan" }),
+    input: Type.Object({ directory: Type.String({ minLength: 1 }), prompt: Type.String({ description: "The change to plan" }) }),
     output: Type.Object({
       summary: Type.String(),
       details: Type.Optional(Type.String()),
       outputs: Type.Object({ plan: Type.String() }),
     }),
   },
-  async (f, input) => {
+  async ({ directory, prompt: input }) => {
     const request =
       input.trim() === ""
-        ? await f.input("What would you like to build or change?")
+        ? await askInput("What would you like to build or change?")
         : input;
 
-    await using planner = await f.agent({
+    await using planner = await agent({
+      cwd: directory,
       model,
       thinkingLevel,
       tools: ["read", "grep", "find", "ls"],
@@ -58,7 +59,7 @@ export const plan = task(
         throw new Error(`Planning failed: ${report.summary}`);
       }
 
-      const answer = await f.input(report.summary);
+      const answer = await askInput(report.summary);
       message = concat(
         "The human answered your question:",
         answer,

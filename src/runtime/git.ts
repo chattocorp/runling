@@ -1,3 +1,4 @@
+import { requireDirectory } from "./directory.ts";
 import { createReadStream } from "node:fs";
 import { lstat, readlink } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -54,7 +55,8 @@ async function updateUntrackedFile(hasher: Hash, cwd: string, path: string) {
   }
 }
 
-export async function workingTreeHash(cwd = process.cwd()) {
+export async function workingTreeHash(cwd: string) {
+  requireDirectory(cwd);
   const hasher = createHash("sha256");
   if (await hasHead(cwd)) {
     // The diff alone is empty at every clean commit. Include its base tree,
@@ -87,7 +89,7 @@ export class WorkingDirectory {
     private readonly initialHash: string,
   ) {}
 
-  static async create(path = process.cwd()) {
+  static async create(path: string) {
     return new WorkingDirectory(path, await workingTreeHash(path));
   }
 
@@ -98,6 +100,6 @@ export class WorkingDirectory {
   }
 }
 
-export function getPwd(path = process.cwd()) {
+export function getPwd(path: string) {
   return WorkingDirectory.create(path);
 }

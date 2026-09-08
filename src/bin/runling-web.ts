@@ -8,11 +8,8 @@ import { createServeCommand, type ServeOptions } from "../runtime/cli.ts";
 
 export async function runRunlingWeb(options: ServeOptions): Promise<void> {
   const appRoot = resolve(import.meta.dirname, "../..");
-  const workflowCwd = process.cwd();
-  const configPath = resolve(workflowCwd, options.config);
+  const configPath = resolve(options.config);
   process.env.RUNLING_WEB_CONFIG = configPath;
-  process.env.RUNLING_WEB_WORKFLOW_CWD = workflowCwd;
-  process.chdir(appRoot);
 
   const server = await createServer({
     root: appRoot,

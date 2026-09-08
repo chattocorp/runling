@@ -1,3 +1,4 @@
+import { executionServices } from "./execution.ts";
 import { bindRunlingContext, emitRunlingEvent } from "./events.ts";
 import { log, logInput } from "./log.ts";
 
@@ -68,3 +69,7 @@ export const createInput = (handleInput?: InputHandler): Input =>
       throw error;
     }
   };
+
+/** Ask the input handler of the active execution. */
+export const input: Input = (message, options) =>
+  createInput(executionServices()?.handleInput)(message, options);

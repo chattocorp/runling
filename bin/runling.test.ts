@@ -56,7 +56,30 @@ describe.each([
     expect(JSON.parse(stdout).result.summary).toBe("--verbose");
   });
 
-  test("loads a workflow file and injects the runling runtime", async () => {
+  test("passes structured input and an explicit directory to a task", async () => {
+    const directory = import.meta.dirname;
+    const child = spawnProcess([
+      process.execPath, ...flags, executable, "run",
+      resolve(directory, "../test/fixtures/directory-task.ts"),
+      "--input", JSON.stringify({ directory, prompt: "structured input" }), "--json",
+    ], { stdout: "pipe", stderr: "pipe" });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
+    ]);
+    expect(exitCode, stderr).toBe(0);
+    expect(JSON.parse(stdout).output).toEqual({ directory, prompt: "structured input" });
+  });
+
+  test("reports malformed JSON input without starting the task", async () => {
+    const child = spawnProcess([
+      process.execPath, ...flags, executable, "run", fixture, "--input", "{", "--json",
+    ], { stdout: "pipe", stderr: "pipe" });
+    const [exitCode, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, output: null, error: expect.any(String) });
+  });
+
+  test("loads a task file and passes only its input", async () => {
     const child = spawnProcess(
       [process.execPath, ...flags, executable, "run", fixture, "A workflow result"],
       {

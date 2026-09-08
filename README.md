@@ -36,7 +36,7 @@ import { task, Type } from "runling";
 
 export default task(
   { name: "Echo", input: Type.String(), output: Type.String() },
-  (r, input) => { return input },
+  (input) => { return input },
 );
 ```
 
@@ -70,6 +70,41 @@ And off it goes!
 
 Run `npm run runling -- --help` to list commands. Use `run --help` or
 `serve --help` to see command options, and `--version` to print the version.
+
+## Tasks and directories
+
+Wrap a normal function to track its calls. Arguments and synchronous or
+asynchronous return behavior stay the same:
+
+```ts
+import { task, exec } from "runling";
+
+const add = task((a: number, b: number) => a + b);
+add(2, 3); // 5
+
+const check = task(async (directory: string) => {
+  await exec`pnpm check`.cwd(directory);
+});
+await check("/path/to/project");
+```
+
+Tasks receive no context object. Import `agent`, `runAgent`, `exec`, `shell`,
+`step`, `log`, and `input` from `runling`. Commands require `.cwd(directory)`
+or an explicit factory directory. Agents require `{ cwd: directory }`, and
+Git helpers require a directory argument. No task inherits a directory from
+its caller or the server.
+
+The bundled workflows accept `{ directory, prompt }`. Use JSON input:
+
+```sh
+pnpm runling run workflows/implement.ts --input '{"directory":"/path/to/project","prompt":"Add a cache"}'
+```
+
+Use a schema-based task, as in the echo example, for a webhook. Its JSON body
+is the task input. The CLI accepts one string argument or `--input <json>`;
+call functions with multiple arguments directly from TypeScript. `input()`
+requires a host input handler; `runWorkflow(task, { input, onInput })` can
+provide one for programmatic execution.
 
 ## License
 

@@ -1,4 +1,4 @@
-import { concat, task, Type } from "runling";
+import { agent, exec, step, concat, task, Type } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -23,21 +23,22 @@ const perspectives = [
 export const review = task(
   {
     name: "Review",
-    input: Type.String({ description: "Optional review focus" }),
+    input: Type.Object({ directory: Type.String({ minLength: 1 }), prompt: Type.String({ description: "Optional review focus" }) }),
     output: Type.Object({
       summary: Type.String(),
       details: Type.Optional(Type.String()),
       outputs: Type.Optional(Type.Object({ review: Type.String() })),
     }),
   },
-  async (f, input) => {
-    const status = await f.exec`git status --short`.text();
+  async ({ directory, prompt: input }) => {
+    const status = await exec`git status --short`.cwd(directory).text();
     if (status.trim() === "") return { summary: "No changes to review" };
 
     const diff =
-      await f.exec`git diff HEAD --stat --patch --no-ext-diff`.text();
+      await exec`git diff HEAD --stat --patch --no-ext-diff`.cwd(directory).text();
 
-    await using orchestrator = await f.agent({
+    await using orchestrator = await agent({
+      cwd: directory,
       model,
       thinkingLevel,
       tools: ["read", "grep", "find", "ls", "web_fetch"],
@@ -47,7 +48,7 @@ export const review = task(
       ],
     });
 
-    await f.step("Investigate change", () =>
+    await step("Investigate change", () =>
       orchestrator.run(
         concat(
           "Build a factual understanding of the current working-tree change for several focused reviewers.",
@@ -66,7 +67,7 @@ export const review = task(
     const reviewResults = await Promise.allSettled(
       perspectives.map(async ({ name, prompt }) => {
         await using reviewer = await orchestrator.fork();
-        return await f.step(`Review ${name}`, () => reviewer.run(prompt));
+        return await step(`Review ${name}`, () => reviewer.run(prompt));
       }),
     );
 
@@ -85,7 +86,7 @@ export const review = task(
       result.status === "fulfilled" ? [result.value] : [],
     );
 
-    const report = await f.step("Synthesize review", () =>
+    const report = await step("Synthesize review", () =>
       orchestrator.run(
         concat(
           "Synthesize the focused reports below into one concise code review.",

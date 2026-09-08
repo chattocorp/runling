@@ -1,3 +1,4 @@
+import { withExecutionServices } from "./execution.ts";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { RunOptions } from "./cli.ts";
@@ -9,17 +10,13 @@ import type { InputHandler } from "./input.ts";
 import { log } from "./log.ts";
 import { renderMarkdown } from "./markdown.ts";
 import {
-  createRunling,
-  type Runling,
   type JsonValue,
   type WorkflowResult,
   type WorkflowReturn,
 } from "./runtime.ts";
-import type { Static, TSchema } from "typebox";
 import { TuiReporter } from "./tui.ts";
 import {
   isTask,
-  type Task,
   type TaskFunction,
 } from "./workflow.ts";
 import {
@@ -75,7 +72,6 @@ export interface ExecutionOptions {
 }
 
 export interface RunWorkflowOptions<Input = unknown> {
-  cwd?: string;
   input: Input;
   verbose?: boolean;
   onInput?: InputHandler;
@@ -155,41 +151,25 @@ export function normalizeWorkflowResult(
 }
 
 export async function executeWorkflow(
-  run: (f: Runling) => Promise<WorkflowReturn> | WorkflowReturn,
-  f: Runling,
+  run: () => Promise<WorkflowReturn> | WorkflowReturn,
   options: ExecutionOptions = {},
 ): Promise<WorkflowExecution> {
   return reportExecution(
-    () => log.indented(() => run(f)),
+    () => log.indented(run),
     options,
   );
 }
 
 /** Run a workflow without assuming a terminal, printing, or changing process state. */
-export async function runWorkflow<
-  InputSchema extends TSchema,
-  OutputSchema extends TSchema,
-  Run extends TaskFunction,
->(
-  run: Task<InputSchema, OutputSchema, Run>,
-  {
-    cwd = process.cwd(),
-    input,
-    verbose = false,
-    onInput,
-    onEvent = () => {},
-  }: RunWorkflowOptions<Static<InputSchema>>,
-): Promise<WorkflowExecution<Awaited<ReturnType<Run>>>> {
-  const f = createRunling({
-    cwd,
-    prompt: typeof input === "string" ? input : "",
-    verbose,
-    handleInput: onInput,
-  });
-
-  return observeRunlingEvents(onEvent, () =>
-    log.withDestination("silent", () =>
-      captureExecution(() => log.indented(() => run(f, input))),
+export async function runWorkflow<Input, Output>(
+  run: (input: Input) => Output,
+  { input, verbose = false, onInput, onEvent = () => {} }: RunWorkflowOptions<Input>,
+): Promise<WorkflowExecution<Awaited<Output>>> {
+  return withExecutionServices({ verbose, handleInput: onInput }, () =>
+    observeRunlingEvents(onEvent, () =>
+      log.withDestination("silent", () =>
+        captureExecution(() => log.indented(() => run(input))),
+      ),
     ),
   );
 }
@@ -294,12 +274,12 @@ async function captureExecutionInContext<Output>(
   };
 }
 
-export async function loadWorkflow(path: string): Promise<Task> {
+export async function loadWorkflow(path: string): Promise<TaskFunction> {
   const resolvedPath = resolve(path);
   const module = await import(/* @vite-ignore */ pathToFileURL(resolvedPath).href);
   if (!isTask(module.default)) {
     throw new Error(
-      `Workflow ${resolvedPath} must have a schemaful default workflow export`,
+      `Workflow ${resolvedPath} must have a default task export`,
     );
   }
   return module.default;
@@ -312,13 +292,13 @@ export async function runRunling(
 ) {
   const { json, verbose } = options;
   const presentation = shouldUseTui(options) ? "tui" : "log";
-  log.level = verbose ? "debug" : "info";
   await reportExecution(
     async ({ handleInput }) => {
-      const cwd = process.cwd();
       const run = await loadWorkflow(workflowPath);
-      const f = createRunling({ cwd, prompt, verbose, handleInput });
-      return log.indented(() => run(f, prompt));
+      const input = options.input === undefined ? prompt : JSON.parse(options.input);
+      return withExecutionServices({ verbose, handleInput }, () =>
+        log.indented(() => run(input)),
+      );
     },
     { json, presentation, title: workflowPath },
   );

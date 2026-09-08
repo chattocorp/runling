@@ -1,25 +1,25 @@
-import { concat, task, Type } from "runling";
+import { input as askInput, runAgent, step, concat, task, Type } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 
 export const ask = task(
   {
     name: "Answer repository question",
-    input: Type.String({ description: "A question about the repository" }),
+    input: Type.Object({ directory: Type.String({ minLength: 1 }), prompt: Type.String({ description: "A question about the repository" }) }),
     output: Type.Object({
       summary: Type.String(),
       details: Type.Optional(Type.String()),
       outputs: Type.Object({ answer: Type.String() }),
     }),
   },
-  async (f, input) => {
+  async ({ directory, prompt: input }) => {
     const question =
       input.trim() === ""
-        ? await f.input("What would you like to know about the repository?")
+        ? await askInput("What would you like to know about the repository?")
         : input;
 
-    const report = await f.step("Investigating repository", () =>
-      f.runAgent(
+    const report = await step("Investigating repository", () =>
+      runAgent(
         concat(
           "Answer this question about the repository:",
           question,
@@ -27,6 +27,7 @@ export const ask = task(
           "Inspect the repository before answering. Ground the answer in the current files rather than assumptions.",
         ),
         {
+          cwd: directory,
           model,
           thinkingLevel: "medium",
           tools: ["read", "grep", "find", "ls"],

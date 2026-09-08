@@ -1,53 +1,29 @@
 import { describe, expect, test } from "vitest";
-import { createRunling } from "./runtime.ts";
+import { runWorkflow } from "./runner.ts";
+import { task } from "./workflow.ts";
+import { input } from "./input.ts";
+import { log } from "./log.ts";
+import type { RunlingEvent } from "./events.ts";
 
-describe("runling", () => {
-  test("combines primitives and invocation state", () => {
-    const f = createRunling({
-      cwd: "/project",
-      prompt: "Make the change",
-      verbose: false,
+describe("execution services", () => {
+  test("isolates concurrent input handlers, logs, and verbosity", async () => {
+    const first = Promise.withResolvers<string>();
+    const second = Promise.withResolvers<string>();
+    const events: RunlingEvent[][] = [[], []];
+    const ask = task(async function ask(message: string) {
+      const answer = await input(message);
+      log.debug(`debug:${answer}`);
+      log.info(answer);
+      return answer;
     });
-
-    expect(f.agent).toBeTypeOf("function");
-    expect(f.input).toBeTypeOf("function");
-    expect(f.shell).toBeTypeOf("function");
-    expect(f.exec).toBeTypeOf("function");
-    expect(f).not.toHaveProperty("createExec");
-    expect(f).not.toHaveProperty("createShell");
-    expect(f).not.toHaveProperty("concat");
-    expect(f).not.toHaveProperty("randomId");
-    expect(f).not.toHaveProperty("CommandError");
-    expect(f).not.toHaveProperty("ShellError");
-    expect(f).not.toHaveProperty("AgentOutcomeError");
-    expect(f.cwd).toBe("/project");
-    expect(f.prompt).toBe("Make the change");
-  });
-
-  test("is a plain object that can be copied with selected state overridden", () => {
-    const f = createRunling({
-      cwd: "/project",
-      prompt: "Make the change",
-      verbose: false,
-    });
-
-    const derived = { ...f, cwd: "/worktree" };
-
-    expect(derived).not.toBe(f);
-    expect(derived.cwd).toBe("/worktree");
-    expect(derived.prompt).toBe(f.prompt);
-    expect(derived.agent).toBe(f.agent);
-    expect(f.cwd).toBe("/project");
-  });
-
-  test("delegates workflow input to its host callback", async () => {
-    const f = createRunling({
-      cwd: "/project",
-      prompt: "Make the change",
-      verbose: false,
-      handleInput: async ({ message }) => `Answered: ${message}`,
-    });
-
-    await expect(f.input("What now?")).resolves.toBe("Answered: What now?");
+    const one = runWorkflow(ask, { input: "one", verbose: true, onInput: () => first.promise, onEvent: e => events[0]!.push(e) });
+    const two = runWorkflow(ask, { input: "two", verbose: false, onInput: () => second.promise, onEvent: e => events[1]!.push(e) });
+    second.resolve("second answer");
+    first.resolve("first answer");
+    expect((await one).output).toBe("first answer");
+    expect((await two).output).toBe("second answer");
+    expect(events[0]!.filter(e => e.type === "log").filter(e => e.source === undefined).map(e => e.message)).toEqual(["debug:first answer", "first answer"]);
+    expect(events[1]!.filter(e => e.type === "log").filter(e => e.source === undefined).map(e => e.message)).toEqual(["second answer"]);
+    await expect(input("outside a run")).rejects.toThrow("this host cannot provide it");
   });
 });

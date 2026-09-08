@@ -1,6 +1,7 @@
 import { Command, InvalidArgumentError } from "commander";
 
 export interface RunOptions {
+  input?: string;
   json: boolean;
   log: boolean;
   verbose: boolean;
@@ -50,10 +51,14 @@ export function createCli(version: string, actions: CliActions): Command {
     .description("Run a workflow file")
     .argument("<file>", "TypeScript workflow file")
     .argument("[prompt]", "Input passed to the workflow", "")
+    .option("--input <json>", "Task input as JSON (instead of prompt)")
     .option("--json", "Write the result as JSON", false)
     .option("--log", "Use append-only logs instead of the TUI", false)
     .option("-v, --verbose", "Show debug logs", false)
-    .action(async (file: string, prompt: string, options: RunOptions) => {
+    .action(async (file: string, prompt: string, options: RunOptions, command: Command) => {
+      if (options.input !== undefined && command.args.length > 1) {
+        command.error("Use either a prompt or --input, not both");
+      }
       await actions.run(file, prompt, options);
     });
 
