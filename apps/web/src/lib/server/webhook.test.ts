@@ -1,9 +1,9 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { Type, workflow, type WorkflowExecution } from "runling";
+import { task, Type, type WorkflowExecution } from "runling";
 import { defineWebConfig, isWebConfig } from "runling/web";
 import { describeWebhook, handleWebhook, prepareWebhook } from "./webhook.ts";
 
-const joke = workflow(
+const joke = task(
   {
     name: "Tell joke",
     input: Type.String(),
@@ -71,7 +71,7 @@ describe("configured webhooks", () => {
   ])(
     "uses the workflow schema directly for $schema.type inputs",
     async ({ schema, value, invalid }) => {
-      const echo = workflow(
+      const echo = task(
         { name: "Echo", input: schema, output: schema },
         (_f, input) => input,
       );
@@ -142,7 +142,7 @@ describe("configured webhooks", () => {
   );
 
   test("runs and serializes an output with undefined optional properties", async () => {
-    const optional = workflow(
+    const optional = task(
       {
         name: "Optional output",
         input: Type.String(),

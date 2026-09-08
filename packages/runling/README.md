@@ -20,9 +20,9 @@ Add `"runling": "runling"` to the `scripts` in your `package.json`.
 Create `workflows/echo.ts`:
 
 ```ts
-import { Type, workflow } from "runling";
+import { task, Type } from "runling";
 
-export default workflow(
+export default task(
   { name: "Echo", input: Type.String(), output: Type.String() },
   (r, input) => r.step("Echo input", () => input),
 );

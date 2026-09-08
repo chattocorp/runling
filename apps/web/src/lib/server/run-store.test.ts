@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { Type, workflow } from "runling";
+import { task, Type } from "runling";
 import { recordTokenUsage } from "../../../../../packages/runling/src/usage.ts";
 import { historyDirectory, RunStore } from "./run-store.ts";
 import { buildTimeline } from "../timeline.ts";
@@ -44,14 +44,14 @@ test("streams ordered nested events and restores the completed run", async () =>
   const original = await store();
   const records: RunRecord[] = [];
   const unsubscribe = original.subscribe((_id, record) => records.push(record));
-  const nested = workflow(
+  const nested = task(
     { name: "Nested", input: Type.String(), output: Type.String() },
     async (f, input) => {
       f.log.info("Inside nested workflow");
       return input.toUpperCase();
     },
   );
-  const parent = workflow(
+  const parent = task(
     { name: "Parent", input: Type.String(), output: Type.String() },
     (f, input) => nested(f, input),
   );
@@ -78,7 +78,7 @@ test("records failures and keeps concurrent token totals separate", async () => 
   const history = await store();
   const ready = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
-  const slow = workflow(
+  const slow = task(
     { name: "Slow", input: Type.String(), output: Type.String() },
     async () => {
       recordTokenUsage({ input: 10, output: 1, cacheRead: 0, cacheWrite: 0 });
@@ -88,7 +88,7 @@ test("records failures and keeps concurrent token totals separate", async () => 
       return "Slow done";
     },
   );
-  const fast = workflow(
+  const fast = task(
     { name: "Fast", input: Type.String(), output: Type.String() },
     () => {
       recordTokenUsage({ input: 100, output: 5, cacheRead: 0, cacheWrite: 0 });
@@ -109,7 +109,7 @@ test("records failures and keeps concurrent token totals separate", async () => 
 
 test("recovers a truncated journal as interrupted and saves the recovery", async () => {
   const history = await store();
-  const quick = workflow(
+  const quick = task(
     { name: "Quick", input: Type.String(), output: Type.String() },
     () => "done",
   );

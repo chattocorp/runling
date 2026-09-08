@@ -1,4 +1,4 @@
-import { concat, Type, workflow } from "runling";
+import { concat, task, Type } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -20,7 +20,7 @@ const perspectives = [
   },
 ] as const;
 
-export const review = workflow(
+export const review = task(
   {
     name: "Review",
     input: Type.String({ description: "Optional review focus" }),

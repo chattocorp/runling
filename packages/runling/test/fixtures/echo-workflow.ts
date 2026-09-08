@@ -1,6 +1,6 @@
-import { randomId, Type, workflow } from "../../src/index.ts";
+import { randomId, task, Type } from "../../src/index.ts";
 
-export default workflow(
+export default task(
   {
     name: "Echo",
     input: Type.String(),
