@@ -11,6 +11,12 @@ export default defineConfig({
         ),
       },
       {
+        find: /^runling\/git$/,
+        replacement: fileURLToPath(
+          new URL("./src/runtime/git.ts", import.meta.url),
+        ),
+      },
+      {
         find: /^runling\/web$/,
         replacement: fileURLToPath(
           new URL("./src/runtime/web-config.ts", import.meta.url),

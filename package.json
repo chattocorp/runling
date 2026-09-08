@@ -28,6 +28,11 @@
       "types": "./dist/src/runtime/index.d.ts",
       "default": "./dist/src/runtime/index.js"
     },
+    "./git": {
+      "runling-source": "./src/runtime/git.ts",
+      "types": "./dist/src/runtime/git.d.ts",
+      "default": "./dist/src/runtime/git.js"
+    },
     "./web": {
       "runling-source": "./src/runtime/web-config.ts",
       "types": "./dist/src/runtime/web-config.d.ts",

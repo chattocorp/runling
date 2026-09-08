@@ -188,6 +188,30 @@ Each workflow call still runs as a named step, including nested calls.
 The workflow CLI accepts a string. Use a configured webhook or `runWorkflow`
 for object, array, or other JSON inputs.
 
+## Inspect Git changes
+
+Import Git helpers from `runling/git`:
+
+```ts
+import * as git from "runling/git";
+
+const snapshot = await git.getPwd(f.cwd);
+// Run commands or agents that can change files.
+const changed = await snapshot.hasChanges;
+```
+
+`getPwd(path)` returns a `WorkingDirectory` snapshot. Use
+`workingTreeHash(path)` to get the hash directly. Both functions use
+`process.cwd()` if you omit the path. Pass `f.cwd` to inspect the workflow's
+directory.
+
+The hash includes tracked changes, non-ignored untracked files, and the current
+committed tree. `hasChanges` compares this hash with the snapshot. It does not
+report whether the working tree is clean.
+
+These helpers remain available from `runling`. The runtime methods `f.getPwd()`
+and `f.workingTreeHash()` use `f.cwd` by default.
+
 ## Run a command
 
 Use `task` to give the workflow a name and TypeBox schemas. Runling checks
