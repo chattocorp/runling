@@ -58,7 +58,7 @@ test("streams ordered nested events and restores the completed run", async () =>
   const run = await original.start("test", parent, "hello", "web");
   await run.completion;
   unsubscribe();
-  const result = original.get(run.id)!;
+  const result = (await original.get(run.id))!;
   expect(result.status).toBe("completed");
   expect(result.output).toBe("HELLO");
   expect(records[0]?.type).toBe("started");
@@ -70,8 +70,8 @@ test("streams ordered nested events and restores the completed run", async () =>
   expect(timeline[0]?.children[0]?.logs).toContain("Inside nested workflow");
   const restored = new RunStore(original.directory, original.cwd);
   await restored.init();
-  expect(restored.get(run.id)).toEqual(JSON.parse(JSON.stringify(result)));
-  expect(restored.get("../../outside")).toBeUndefined();
+  expect(await restored.get(run.id)).toEqual(JSON.parse(JSON.stringify(result)));
+  expect(await restored.get("../../outside")).toBeUndefined();
 });
 
 test("records failures and keeps concurrent token totals separate", async () => {
@@ -101,10 +101,10 @@ test("records failures and keeps concurrent token totals separate", async () => 
   await second.completion;
   release.resolve();
   await first.completion;
-  expect(history.get(first.id)?.usage.input).toBe(30);
-  expect(history.get(second.id)?.usage.input).toBe(100);
-  expect(history.get(second.id)?.error).toBe("Expected failure");
-  expect(history.get(second.id)?.status).toBe("failed");
+  expect((await history.get(first.id))?.usage.input).toBe(30);
+  expect((await history.get(second.id))?.usage.input).toBe(100);
+  expect((await history.get(second.id))?.error).toBe("Expected failure");
+  expect((await history.get(second.id))?.status).toBe("failed");
 });
 
 test("recovers a truncated journal as interrupted and saves the recovery", async () => {
@@ -120,12 +120,36 @@ test("recovers a truncated journal as interrupted and saves the recovery", async
   await writeFile(path, `${lines.slice(0, -1).join("\n")}\n{"type":`);
   const recovered = new RunStore(history.directory, history.cwd);
   await recovered.init();
-  expect(recovered.get(run.id)?.status).toBe("interrupted");
+  expect((await recovered.get(run.id))?.status).toBe("interrupted");
   expect(
-    buildTimeline(recovered.get(run.id)!.events, "interrupted")[0]?.status,
+    buildTimeline((await recovered.get(run.id))!.events, "interrupted")[0]?.status,
   ).toBe("completed");
   const again = new RunStore(history.directory, history.cwd);
   await again.init();
-  expect(again.get(run.id)).toEqual(recovered.get(run.id));
+  expect(await again.get(run.id)).toEqual(await recovered.get(run.id));
   expect(await readdir(history.directory)).toEqual([`${run.id}.jsonl`]);
+});
+
+test("loads completed details on demand without retaining event arrays", async () => {
+  const history = await store();
+  const workflow = task(
+    { name: "Logs", input: Type.String(), output: Type.String() },
+    (f, input) => { f.log.info("A retained journal event"); return input; },
+  );
+  const started = await history.start("logs", workflow, "first output", "web");
+  await started.completion;
+  const journal = await readFile(resolve(history.directory, `${started.id}.jsonl`), "utf8");
+  const restored = new RunStore(history.directory, history.cwd);
+  await restored.init();
+  for (const reader of [history, restored]) {
+    expect(reader.list()[0]).not.toHaveProperty("events");
+    const first = (await reader.get(started.id))!;
+    expect(first.output).toBe("first output");
+    first.events.length = 0;
+    expect((await reader.get(started.id))!.events.length).toBeGreaterThan(0);
+    // Both a just-finished run and a restored run read the file on demand.
+    await rm(resolve(history.directory, `${started.id}.jsonl`));
+    await expect(reader.get(started.id)).rejects.toThrow();
+    await writeFile(resolve(history.directory, `${started.id}.jsonl`), journal);
+  }
 });

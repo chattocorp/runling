@@ -1,12 +1,12 @@
 import {
   mkdir,
   readdir,
-  readFile,
   appendFile,
   writeFile,
   truncate,
   stat,
 } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -18,7 +18,6 @@ import {
   type TSchema,
 } from "runling";
 import {
-  applyRecord,
   type RunDetail,
   type RunRecord,
   type RunSummary,
@@ -29,9 +28,41 @@ import { summarizeRunActivity } from "../run-activity.ts";
 const validId = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
 type Listener = (id: string, record: RunRecord) => void;
 
+function summary(run: RunDetail): RunSummary {
+  const { input: _, output: _o, error: _e, events: _v, ...value } = run;
+  return value;
+}
+
+// Server-owned event arrays can grow in place. Browser state uses applyRecord.
+function applyStoredRecord(run: RunDetail, record: RunRecord, includeDetails = true) {
+  if (record.type === "event") {
+    if (includeDetails) run.events.push(record.event);
+    if (record.event.type === "usage.updated") run.usage = record.event.usage;
+  } else if (record.type === "finished") {
+    const { type: _, output, error, ...result } = record;
+    Object.assign(run, result);
+    if (includeDetails) Object.assign(run, { output, error });
+  }
+}
+
+// Ignore an incomplete final line, but preserve its byte offset for recovery.
+async function* journalRecords(path: string) {
+  let buffer = "";
+  for await (const chunk of createReadStream(path, { encoding: "utf8" })) {
+    buffer += chunk;
+    let end: number;
+    while ((end = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, end);
+      buffer = buffer.slice(end + 1);
+      yield { record: line ? JSON.parse(line) as RunRecord : undefined, bytes: Buffer.byteLength(line) + 1 };
+    }
+  }
+}
+
 /** One server process owns this journal directory. */
 export class RunStore {
-  private runs = new Map<string, RunDetail>();
+  private runs = new Map<string, RunSummary>();
+  private details = new Map<string, RunDetail>();
   private pending = new Map<string, Promise<void>>();
   private listeners = new Set<Listener>();
 
@@ -46,33 +77,25 @@ export class RunStore {
       const id = file.replace(/\.jsonl$/, "");
       if (!file.endsWith(".jsonl") || !validId.test(id)) continue;
       const path = resolve(this.directory, file);
-      const content = await readFile(path, "utf8");
-      const end = content.lastIndexOf("\n") + 1;
       try {
-        const records = content
-          .slice(0, end)
-          .split("\n")
-          .filter(Boolean)
-          .map((line) => JSON.parse(line) as RunRecord);
-        const first = records[0];
-        if (first?.type !== "started" || first.run.id !== id) continue;
-        let run = first.run;
-        for (const record of records.slice(1)) run = applyRecord(run, record);
-        this.runs.set(id, run);
+        const { run, end, lastTimestamp } = await this.read(id, false);
+        if (!run) continue;
         if (run.status === "running") {
           // A crash can leave the final JSON line incomplete.
-          if (end < content.length)
-            await truncate(path, Buffer.byteLength(content.slice(0, end)));
-          await this.append(id, {
+          await truncate(path, end);
+          const record: RunRecord = {
             type: "finished",
             status: "interrupted",
             finishedAt: Date.now(),
-            durationMs: run.events.at(-1)?.timestamp ?? 0,
+            durationMs: lastTimestamp,
             output: null,
             usage: run.usage,
             error: "The server stopped before this run finished.",
-          });
+          };
+          await appendFile(path, `${JSON.stringify(record)}\n`);
+          applyStoredRecord(run, record, false);
         }
+        this.runs.set(id, summary(run));
       } catch (cause) {
         console.error(`Cannot restore run ${id}:`, cause);
       }
@@ -83,14 +106,36 @@ export class RunStore {
     return [...this.runs.values()]
       .sort((a, b) => b.startedAt - a.startedAt)
       .slice(0, 100)
-      .map((detail) => {
-        const { input: _, output: _o, error: _e, events: _v, ...run } = detail;
-        return { ...run, activity: summarizeRunActivity(detail) };
+      .map((run) => {
+        const detail = this.details.get(run.id);
+        return { ...run, activity: detail ? summarizeRunActivity(detail) : null };
       });
   }
 
-  get(id: string): RunDetail | undefined {
-    return validId.test(id) ? this.runs.get(id) : undefined;
+  async get(id: string): Promise<RunDetail | undefined> {
+    if (!validId.test(id) || !this.runs.has(id)) return undefined;
+    return this.details.get(id) ?? (await this.read(id, true)).run;
+  }
+
+  private async read(id: string, includeDetails: boolean) {
+    let run: RunDetail | undefined;
+    let end = 0;
+    let lastTimestamp = 0;
+    for await (const line of journalRecords(resolve(this.directory, `${id}.jsonl`))) {
+      end += line.bytes;
+      const record = line.record;
+      if (!record) continue;
+      if (!run) {
+        if (record.type !== "started" || record.run.id !== id) break;
+        run = includeDetails ? record.run : {
+          ...record.run, input: null, output: null, error: null, events: [],
+        };
+      } else {
+        applyStoredRecord(run, record, includeDetails);
+        if (record.type === "event") lastTimestamp = record.event.timestamp;
+      }
+    }
+    return { run, end, lastTimestamp };
   }
 
   subscribe(listener: Listener): () => void {
@@ -110,8 +155,11 @@ export class RunStore {
         resolve(this.directory, `${id}.jsonl`),
         `${JSON.stringify(record)}\n`,
       );
-      this.runs.set(id, applyRecord(this.runs.get(id)!, record));
+      const run = this.details.get(id)!;
+      applyStoredRecord(run, record);
+      this.runs.set(id, summary(run));
       this.publish(id, record);
+      if (record.type === "finished") this.details.delete(id);
     });
     this.pending.set(id, next);
     return next;
@@ -143,7 +191,8 @@ export class RunStore {
       `${JSON.stringify(started)}\n`,
       { flag: "wx", mode: 0o600 },
     );
-    this.runs.set(id, run);
+    this.runs.set(id, summary(run));
+    this.details.set(id, run);
     this.publish(id, started);
     const completion = this.execute(id, workflow, input);
     // Background runs must always have a rejection handler, even after the HTTP client leaves.
@@ -187,7 +236,9 @@ export class RunStore {
         output: null,
         error: `Cannot save run history: ${cause instanceof Error ? cause.message : String(cause)}`,
       };
-      this.runs.set(id, applyRecord(this.runs.get(id)!, record));
+      const run = this.details.get(id)!;
+      applyStoredRecord(run, record);
+      this.runs.set(id, summary(run));
       this.publish(id, record);
       throw new Error(record.error!);
     } finally {
