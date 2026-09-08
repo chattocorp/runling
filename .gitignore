@@ -6,7 +6,6 @@ out
 dist
 *.tgz
 .svelte-kit/
-apps/*/build
 
 # code coverage
 coverage

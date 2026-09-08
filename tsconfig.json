@@ -1,7 +1,8 @@
 {
+  "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
@@ -28,6 +29,6 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "include": ["workflows/**/*.ts", "test/**/*.ts"],
-  "exclude": ["apps", "packages"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "bin/**/*.ts", "extensions/**/*.ts", "workflows/**/*.ts", "test/**/*.ts", "*.ts", ".svelte-kit/ambient.d.ts", ".svelte-kit/non-ambient.d.ts"],
+  "exclude": ["node_modules", "dist"]
 }

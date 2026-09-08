@@ -7,13 +7,13 @@ export default defineConfig({
       {
         find: /^runling$/,
         replacement: fileURLToPath(
-          new URL("./packages/runling/src/index.ts", import.meta.url),
+          new URL("./src/runtime/index.ts", import.meta.url),
         ),
       },
       {
         find: /^runling\/web$/,
         replacement: fileURLToPath(
-          new URL("./packages/runling/src/web-config.ts", import.meta.url),
+          new URL("./src/runtime/web-config.ts", import.meta.url),
         ),
       },
     ],

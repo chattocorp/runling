@@ -10,7 +10,7 @@
       "extra-files": [
         {
           "type": "json",
-          "path": "packages/runling/package.json",
+          "path": "package.json",
           "jsonpath": "$.version"
         }
       ]

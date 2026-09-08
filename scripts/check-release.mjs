@@ -18,7 +18,7 @@ if (
 ) {
   const { version } = JSON.parse(
     await readFile(
-      new URL("../packages/runling/package.json", import.meta.url),
+      new URL("../package.json", import.meta.url),
       "utf8",
     ),
   );

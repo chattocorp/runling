@@ -74,12 +74,12 @@ test("publishes only tested tag artifacts with a dedicated OIDC permission", asy
   );
 });
 
-test("versions the whole product without versioning private workspace packages", async () => {
+test("versions the root package with the release manifest", async () => {
   const readJson = async (path: string) =>
     JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
   const config = await readJson("../release-please-config.json");
   const manifest = await readJson("../.release-please-manifest.json");
-  const pkg = await readJson("../packages/runling/package.json");
+  const pkg = await readJson("../package.json");
   expect(Object.keys(config.packages)).toEqual(["."]);
   expect(config.packages["."]).toMatchObject({
     "release-type": "simple",
@@ -89,7 +89,7 @@ test("versions the whole product without versioning private workspace packages",
     "extra-files": [
       {
         type: "json",
-        path: "packages/runling/package.json",
+        path: "package.json",
         jsonpath: "$.version",
       },
     ],

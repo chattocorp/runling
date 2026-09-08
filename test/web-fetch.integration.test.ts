@@ -1,4 +1,4 @@
-import { spawnProcess } from "../../../test/process.ts";
+import { spawnProcess } from "./process.ts";
 import { describe, expect, test } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

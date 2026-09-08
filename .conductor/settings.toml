@@ -6,6 +6,6 @@ run_mode = "concurrent"
 
 [scripts.run.dev]
 available_in = ["local"]
-command = 'mise exec -- pnpm dev:web --port "$CONDUCTOR_PORT"'
+command = 'mise exec -- pnpm dev --port "$CONDUCTOR_PORT"'
 default = true
 icon = "play"

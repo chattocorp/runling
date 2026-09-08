@@ -3,8 +3,8 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createServer } from "vite";
-import { parseRunlingWebArguments } from "../../../../packages/runling/src/web-server.ts";
-export { parseRunlingWebArguments } from "../../../../packages/runling/src/web-server.ts";
+import { parseRunlingWebArguments } from "../runtime/web-server.ts";
+export { parseRunlingWebArguments } from "../runtime/web-server.ts";
 
 const usage = `Usage: runling-web [options]
 
