@@ -33,11 +33,17 @@
       "default": "./dist/src/runtime/config-reloader.js"
     }
   },
+  "imports": {
+    "#runner": {
+      "runling-source": "./src/runtime/runner.ts",
+      "default": "./dist/src/runtime/runner.js"
+    }
+  },
   "files": ["dist", "bin/runling.js", "bin/workflow-loader.js"],
   "bin": { "runling": "bin/runling.js" },
   "scripts": {
     "prepare": "svelte-kit sync",
-    "runling": "node bin/runling.js",
+    "runling": "node --conditions=runling-source bin/runling.js",
     "dev": "tsx watch --conditions=runling-source src/bin/runling-web.ts",
     "dev:web": "pnpm dev",
     "build": "pnpm build:runtime && vite build",

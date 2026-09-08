@@ -17,7 +17,7 @@ try {
     const { runRunlingWeb } = await import("../dist/src/runtime/web-server.js");
     await runRunlingWeb(args[0] === "web" ? args.slice(1) : args);
   } else {
-    const { runRunling } = await import("../dist/src/runtime/runner.js");
+    const { runRunling } = await import("#runner");
     await runRunling(args);
   }
 } catch (error) {

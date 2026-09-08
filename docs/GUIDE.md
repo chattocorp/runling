@@ -129,6 +129,15 @@ Server restarts interrupt active runs. Vite handles UI changes, and the config
 loader reloads local workflows.
 Use `pnpm dev --port 6000` to select a port. `pnpm dev:web` is an alias.
 
+To develop the CLI or TUI, run a workflow directly:
+
+```bash
+pnpm runling workflows/joke.ts "TypeScript"
+```
+
+This command loads the runner and framework from TypeScript source. No build is
+required. Rerun the command after edits; active workflows do not restart.
+
 To build and start the packaged UI instead:
 
 ```bash
