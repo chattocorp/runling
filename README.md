@@ -1,19 +1,31 @@
 # Runling
 
-Write TypeScript workflows for coding agents. Run them from the command line
-or use the included web console to trigger runs, inspect activity, and track
-token use and estimated cost.
+Run and orchestrate TypeScript-based worklows of any size and kind.
 
-Requires Node.js 22.18 or later. The package includes the TypeScript loader
-and web UI; consumer projects do not need Bun, Vite, or SvelteKit.
+## Features
 
-## Install
+- Runs single workflows with a nice TUI visualization and/or logging
+- Listens to webhooks (and other triggers) to execute workflows
+- Workflows are simple functions, optionally decorated with input/output schemas
+- Embeds the Pi SDK for easy peasy agent/LLM integration
+- Automatic monitoring of token usage and cost
+
+## Non-Features
+
+Runling is defined more through what it does _not_ do. Here's some stuff that Runling does not and likely will never do:
+
+- User accounts/authentication (put it behind a reverse proxy instead)
+- Coordinating multiple replicas through a datastore (Runling is small and simple)
+- Visual editing of workflows (it's just JS/TS; your agent loves it!)
+- 3D graphics (what?!)
+
+## Install (into a project)
+
+Add the `runling` package to your project:
 
 ```sh
-npm install runling
+npm add runling
 ```
-
-Add `"runling": "runling"` to the `scripts` in your `package.json`.
 
 ## Write a workflow
 
@@ -48,13 +60,6 @@ Use the console to start a run or send a request:
 curl http://localhost:5173/api/webhooks/echo \
   -H 'content-type: application/json' -d '"hello"'
 ```
-
-Keep the console local: it does not provide authentication. Workflows can
-execute commands and modify files with the server's permissions. Configure
-model credentials before running workflows that use agents.
-
-See the [guide](https://github.com/chattocorp/runling/blob/main/docs/GUIDE.md)
-for agent sessions, configuration, and workflow examples.
 
 ## License
 
