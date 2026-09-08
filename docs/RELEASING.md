@@ -29,7 +29,7 @@ repository's Node 22.18.0 baseline. See [npm's trusted-publishing documentation]
 ## Test the setup without publishing
 
 In GitHub Actions, select **Release → Run workflow** on `main`. This runs the
-build, `pnpm test`, and packaging on Linux. The
+type checks, build, unit tests, and installed-package test on Linux. The
 `runling-package` artifact contains the release tarball. Manual runs never publish.
 This verifies packaging, not npm authentication; OIDC authentication happens
 only during publication.
@@ -56,20 +56,20 @@ The first release needs a new `fix:` or `feat:` commit.
 The whole repository is one release component. Thus, web-only changes can
 request a release. The `simple` release strategy updates root `version.txt`
 and `CHANGELOG.md`; a JSON updater changes the root `package.json`.
-The private workspace packages do not get separate releases.
 See the [release-please configuration documentation](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md).
 
 The workflow checks that the release tag matches the package version. It checks
 the npm registry for both published versions and historical timestamps. Registry
-failures stop publication. It then builds the package, runs `pnpm test`, and
-packs the release tarball. Publication waits for the package job.
+failures stop publication. It then checks types, builds the package, runs
+`pnpm test`, and tests the release tarball in a separate consumer project.
+Publication waits for the package job.
 It publishes that exact tarball with
 provenance and no package scripts.
 
-Regular CI runs only `pnpm test` after dependency setup, on Linux.
-That command builds the framework needed by the CLI tests, then runs Vitest.
-Type checks and the clean-install smoke test remain available as local commands
-(`pnpm check` and `pnpm test:package`), but are not CI gates.
+Regular CI runs `pnpm check`, `pnpm test`, `pnpm build`, and
+`pnpm test:package` after dependency setup, on Linux. These checks cover Svelte
+and TypeScript types, unit tests, the production web build, and installation
+of the package in a separate consumer project.
 
 The jobs use the `release_created` output, not a second tag-triggered workflow.
 Tags created with `GITHUB_TOKEN` do not trigger another workflow. For the same
