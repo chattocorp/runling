@@ -4,14 +4,15 @@ import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ params, request }) => {
   const store = await getRunStore();
-  if (!store.get(params.id))
+  const run = await store.get(params.id);
+  if (!run)
     return Response.json({ error: "Run not found." }, { status: 404 });
   return eventStream(request, (send) => {
     const unsubscribe = store.subscribe((id, record) => {
       if (id === params.id) send("record", record);
     });
     // A new snapshot on reconnect includes any events missed while disconnected.
-    send("snapshot", store.get(params.id));
+    send("snapshot", run);
     return unsubscribe;
   });
 };
