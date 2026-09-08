@@ -65,8 +65,11 @@ test("publishes only tested tag artifacts with a dedicated OIDC permission", asy
   expect(
     steps.some((s: { run?: string }) => s.run === "pnpm test"),
   ).toBe(true);
-  expect(steps.some((s: { run?: string }) => s.run === "pnpm check" || s.run === "pnpm test:package")).toBe(false);
-  expect(steps.some((s: { run?: string }) => s.run?.includes("npm pack --pack-destination"))).toBe(true);
+  for (const command of ["pnpm check", "pnpm build", "pnpm test:package"]) {
+    expect(steps.some((s: { run?: string }) => s.run === command)).toBe(true);
+  }
+  const consumerTest = steps.find((s: { run?: string }) => s.run === "pnpm test:package");
+  expect(consumerTest.env.RUNLING_RELEASE_DIR).toBe("${{ runner.temp }}/runling-release");
   expect(workflow.jobs.publish.steps.at(-1).run).toContain("packages=(./release/*.tgz)");
   expect(workflow.jobs.publish.steps.at(-1).run).toContain("--ignore-scripts");
   expect(workflow.jobs.publish.steps.at(-1).run).toContain(
