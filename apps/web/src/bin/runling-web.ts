@@ -35,6 +35,7 @@ export async function runRunlingWeb(
     root: appRoot,
     configFile: resolve(appRoot, "vite.config.ts"),
     clearScreen: false,
+    ssr: { resolve: { externalConditions: ["runling-source"] } },
     server: {
       host: options.host,
       open: options.open,

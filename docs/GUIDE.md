@@ -115,18 +115,29 @@ Install the tools and dependencies:
 ```bash
 mise install
 pnpm install
-pnpm build
 ```
 
-Start the packaged UI from the repository root:
+Start the development server from the repository root:
 
 ```bash
+pnpm dev:web
+```
+
+This command loads the framework from TypeScript source. No build is required.
+The command watches imported modules and restarts the server when they change.
+Server restarts interrupt active runs. Vite handles UI changes, and the config
+loader reloads local workflows.
+Use `pnpm dev:web --port 6000` to select a port.
+
+To build and start the packaged UI instead:
+
+```bash
+pnpm build
 pnpm runling
 ```
 
 Configure credentials for each model that a workflow uses.
-Use `pnpm dev:web` for the Vite development server when changing the UI.
-Rebuild the framework after changing its source. No global package link is required.
+No global package link is required.
 
 ## Run a workflow
 

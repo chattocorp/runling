@@ -22,14 +22,17 @@
   "types": "./dist/src/index.d.ts",
   "exports": {
     "./config-reloader": {
+      "runling-source": "./src/config-reloader.ts",
       "types": "./dist/src/config-reloader.d.ts",
       "default": "./dist/src/config-reloader.js"
     },
     ".": {
+      "runling-source": "./src/index.ts",
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
     },
     "./web": {
+      "runling-source": "./src/web-config.ts",
       "types": "./dist/src/web-config.d.ts",
       "default": "./dist/src/web-config.js"
     }

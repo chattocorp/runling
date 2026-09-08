@@ -11,6 +11,7 @@
     "sourceMap": true,
     "strict": true,
     "types": ["node"],
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "customConditions": ["runling-source"]
   }
 }
