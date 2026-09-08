@@ -1,6 +1,5 @@
-import { runWorkflow, type Task, type WorkflowExecution } from "runling";
-import type { WebConfig } from "runling/web";
-import { Check, Errors } from "typebox/value";
+import { runWorkflow, validateSchema, type Task, type WorkflowExecution } from "runling";
+import { describeTaskSchemas, type WebConfig } from "runling/web";
 
 type WebhookRunner = (
   workflow: Task,
@@ -29,10 +28,7 @@ export function describeWebhook(
   }
   const definition = config.webhooks[name]!;
 
-  return json({
-    input: definition.task.input,
-    output: definition.task.output,
-  });
+  return json(describeTaskSchemas(definition.task));
 }
 
 export async function handleWebhook(
@@ -71,20 +67,17 @@ export async function prepareWebhook(
     return json({ error: "The request body must be valid JSON." }, 400);
   }
 
-  if (!Check(definition.task.input, body)) {
+  const result = await validateSchema(definition.task.input, body);
+  if (result.issues) {
     return json(
       {
         error: "The request body does not match the workflow input schema.",
-        issues: Errors(definition.task.input, body).map(
-          ({ instancePath, message }) => ({
-            path: instancePath === "" ? "/" : instancePath,
-            message,
-          }),
-        ),
+        issues: result.issues,
       },
       400,
     );
   }
 
+  // Pass the original input. The task parses it when the run starts.
   return { task: definition.task, input: body };
 }

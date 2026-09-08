@@ -14,8 +14,8 @@ import {
   runWorkflow,
   type Task,
   type WorkflowExecution,
-  type Static,
-  type TSchema,
+  type SchemaInput,
+  type WorkflowSchema,
 } from "runling";
 import {
   type RunDetail,
@@ -162,10 +162,10 @@ export class RunStore {
     return next;
   }
 
-  async start<I extends TSchema, O extends TSchema>(
+  async start<I extends WorkflowSchema, O extends WorkflowSchema>(
     webhook: string,
     workflow: Task<I, O>,
-    input: Static<I>,
+    input: SchemaInput<I>,
     source: "webhook" | "web",
   ) {
     const id = randomUUID();
@@ -197,10 +197,10 @@ export class RunStore {
     return { id, completion };
   }
 
-  private async execute<I extends TSchema, O extends TSchema>(
+  private async execute<I extends WorkflowSchema, O extends WorkflowSchema>(
     id: string,
     workflow: Task<I, O>,
-    input: Static<I>,
+    input: SchemaInput<I>,
   ): Promise<WorkflowExecution> {
     const base = performance.now();
     const execution = await runWorkflow(workflow, {
