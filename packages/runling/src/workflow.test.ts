@@ -124,7 +124,7 @@ describe("task", () => {
         input: Type.String(),
         output: Type.Object({ result: Type.String() }),
       },
-      async () => ({ result: 42 }) as never,
+      async () => ({ result: 42 }),
     );
 
     await expect(broken(f, "input")).rejects.toThrow(

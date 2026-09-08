@@ -17,13 +17,6 @@ export type WorkflowFunction = (
   input: any,
 ) => unknown | Promise<unknown>;
 
-type WorkflowInput<
-  Run extends WorkflowFunction,
-  Fallback,
-> = Parameters<Run> extends [Runling, infer Input, ...unknown[]]
-  ? Input
-  : Fallback;
-
 export type Workflow<
   InputSchema extends TSchema = TSchema,
   OutputSchema extends TSchema = TSchema,
@@ -33,7 +26,7 @@ export type Workflow<
   ) => Static<OutputSchema> | Promise<Static<OutputSchema>>,
 > = ((
   f: Runling,
-  input: WorkflowInput<Run, Static<InputSchema>>,
+  input: Static<InputSchema>,
 ) => Promise<Awaited<ReturnType<Run>>>) &
   Readonly<WorkflowDefinition<InputSchema, OutputSchema>>;
 
@@ -57,13 +50,10 @@ const validationMessage = (
 export function task<
   const InputSchema extends TSchema,
   const OutputSchema extends TSchema,
-  const Run extends (
-    f: Runling,
-    input: Static<InputSchema>,
-  ) => Static<OutputSchema> | Promise<Static<OutputSchema>>,
+  const Run extends WorkflowFunction,
 >(
   definition: WorkflowDefinition<InputSchema, OutputSchema>,
-  run: Run,
+  run: Run & ((f: Runling, input: Static<InputSchema>) => unknown),
 ): Workflow<InputSchema, OutputSchema, Run> {
   for (const boundary of ["input", "output"] as const) {
     if (!isWorkflowSchema(definition[boundary])) {

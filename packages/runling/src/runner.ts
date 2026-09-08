@@ -17,7 +17,11 @@ import {
 } from "./runtime.ts";
 import type { Static, TSchema } from "typebox";
 import { TuiReporter } from "./tui.ts";
-import { isWorkflow, type Workflow } from "./workflow.ts";
+import {
+  isWorkflow,
+  type Workflow,
+  type WorkflowFunction,
+} from "./workflow.ts";
 import {
   formatTokenUsage,
   getRecordedTokenUsage,
@@ -165,8 +169,9 @@ export async function executeWorkflow(
 export async function runWorkflow<
   InputSchema extends TSchema,
   OutputSchema extends TSchema,
+  Run extends WorkflowFunction,
 >(
-  run: Workflow<InputSchema, OutputSchema>,
+  run: Workflow<InputSchema, OutputSchema, Run>,
   {
     cwd = process.cwd(),
     input,
@@ -174,7 +179,7 @@ export async function runWorkflow<
     onInput,
     onEvent = () => {},
   }: RunWorkflowOptions<Static<InputSchema>>,
-): Promise<WorkflowExecution<Static<OutputSchema>>> {
+): Promise<WorkflowExecution<Awaited<ReturnType<Run>>>> {
   const f = createRunling({
     cwd,
     prompt: typeof input === "string" ? input : "",

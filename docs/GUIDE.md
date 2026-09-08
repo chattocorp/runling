@@ -170,7 +170,7 @@ for object, array, or other JSON inputs.
 
 ## Run a command
 
-Use `workflow` to give the workflow a name and TypeBox schemas. Runling checks
+Use `task` to give the workflow a name and TypeBox schemas. Runling checks
 the input before the workflow starts and checks the output before it finishes.
 Use `f.exec` to run a program in the current working directory. Execa handles
 process execution without a shell. Interpolated strings and numbers become
