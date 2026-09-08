@@ -74,6 +74,21 @@ describe("workingTreeHash", () => {
     expect(await workingTreeHash(cwd)).toBe(clean);
   });
 
+  test("detects file changes that were committed after a snapshot", async () => {
+    const snapshot = await getPwd(cwd);
+    await writeFile(join(cwd, "tracked.txt"), "committed change\n");
+    await git(cwd, "-c", "user.name=Runling Test", "-c", "user.email=runling@example.com",
+      "commit", "--quiet", "-am", "Change tracked file");
+    expect(await snapshot.hasChanges).toBe(true);
+  });
+
+  test("ignores commits that do not change the tree", async () => {
+    const snapshot = await getPwd(cwd);
+    await git(cwd, "-c", "user.name=Runling Test", "-c", "user.email=runling@example.com",
+      "commit", "--quiet", "--allow-empty", "-m", "Metadata only");
+    expect(await snapshot.hasChanges).toBe(false);
+  });
+
   test("includes untracked file modes", async () => {
     const path = join(cwd, "script.sh");
     await writeFile(path, "#!/bin/sh\n");
