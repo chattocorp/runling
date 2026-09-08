@@ -12,22 +12,20 @@ Run and orchestrate TypeScript-based worklows of any size and kind.
 
 ## Non-Features
 
-Runling is defined more through what it does _not_ do. Here's some stuff that Runling does not and likely will never do:
+Runling is defined more through what it does _not_ do. Here's some stuff that's not in and also not planned:
 
 - User accounts/authentication (put it behind a reverse proxy instead)
 - Coordinating multiple replicas through a datastore (Runling is small and simple)
 - Visual editing of workflows (it's just JS/TS; your agent loves it!)
 - 3D graphics (what?!)
 
-## Install (into a project)
+## Getting Started
 
 Add the `runling` package to your project:
 
 ```sh
 npm add runling
 ```
-
-## Write a workflow
 
 Create `workflows/echo.ts`:
 
@@ -36,13 +34,13 @@ import { task, Type } from "runling";
 
 export default task(
   { name: "Echo", input: Type.String(), output: Type.String() },
-  (r, input) => r.step("Echo input", () => input),
+  (r, input) => { return input },
 );
 ```
 
-Run it with `npm run runling -- workflows/echo.ts "hello"`.
+Run it with `npm run runling -- workflows/echo.ts "hello"`. Yay!
 
-## Start the web console
+Much more exciting though is Runling's ability to spin up a long-running process that will automatically execute workflows in response to webhooks being sent to it.
 
 Create `runling.config.ts` in the project root:
 
@@ -50,16 +48,23 @@ Create `runling.config.ts` in the project root:
 import { defineWebConfig } from "runling/web";
 import echo from "./workflows/echo.ts";
 
-export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
+export default defineWebConfig({
+  webhooks: { 
+    echo: { workflow: echo } 
+  } 
+});
 ```
 
 Run `npm run runling`, then open `http://localhost:5173`.
+
 Use the console to start a run or send a request:
 
 ```sh
 curl http://localhost:5173/api/webhooks/echo \
   -H 'content-type: application/json' -d '"hello"'
 ```
+
+And off it goes!
 
 ## License
 
