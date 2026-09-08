@@ -8,10 +8,10 @@ export const load: PageServerLoad = async () => {
   const webhooks = Object.entries(config.webhooks).map(
     ([name, definition]) => ({
       name,
-      workflow: definition.workflow.name,
+      workflow: definition.task.name,
       path: `/api/webhooks/${encodeURIComponent(name)}`,
-      input: definition.workflow.input,
-      output: definition.workflow.output,
+      input: definition.task.input,
+      output: definition.task.output,
     }),
   );
   // Strip non-JSON TypeBox metadata before SvelteKit serializes the page data.

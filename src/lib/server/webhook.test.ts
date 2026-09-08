@@ -15,7 +15,7 @@ const joke = task(
 const config = defineWebConfig({
   webhooks: {
     joke: {
-      workflow: joke,
+      task: joke,
     },
   },
 });
@@ -37,20 +37,21 @@ const execution = (output: string): WorkflowExecution<string> => ({
 });
 
 describe("configured webhooks", () => {
-  test("preserves workflow types and hook names without a wrapper", () => {
-    expectTypeOf(config.webhooks.joke.workflow).toEqualTypeOf<typeof joke>();
+  test("preserves task types and hook names without a wrapper", () => {
+    expectTypeOf(config.webhooks.joke.task).toEqualTypeOf<typeof joke>();
     expectTypeOf<keyof typeof config.webhooks>().toEqualTypeOf<"joke">();
   });
   test("recognizes schemaful web configurations", () => {
     expect(isWebConfig(config)).toBe(true);
-    expect(isWebConfig({ webhooks: { joke: { workflow: joke } } })).toBe(true);
+    expect(isWebConfig({ webhooks: { joke: { task: joke } } })).toBe(true);
     expect(isWebConfig({ webhooks: { joke: {} } })).toBe(false);
+    expect(isWebConfig({ webhooks: { joke: { workflow: joke } } })).toBe(false);
   });
 
   test("rejects removed input mappings instead of silently ignoring them", () => {
     expect(
       isWebConfig({
-        webhooks: { joke: { workflow: joke, input: () => "mapped" } },
+        webhooks: { joke: { task: joke, input: () => "mapped" } },
       }),
     ).toBe(false);
   });
@@ -76,7 +77,7 @@ describe("configured webhooks", () => {
         (_f, input) => input,
       );
       const direct = defineWebConfig({
-        webhooks: { echo: { workflow: echo } },
+        webhooks: { echo: { task: echo } },
       });
       const response = await handleWebhook(
         "echo",
@@ -135,7 +136,7 @@ describe("configured webhooks", () => {
       });
       expect(
         isWebConfig({
-          webhooks: { joke: { ...config.webhooks.joke, workflow: invalid } },
+          webhooks: { joke: { ...config.webhooks.joke, task: invalid } },
         }),
       ).toBe(false);
     },
@@ -157,7 +158,7 @@ describe("configured webhooks", () => {
     const response = await handleWebhook("optional", request('"hello"'), {
       config: defineWebConfig({
         webhooks: {
-          optional: { workflow: optional },
+          optional: { task: optional },
         },
       }),
       log: (output) => logs.push(output),

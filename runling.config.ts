@@ -5,10 +5,10 @@ import makePullRequest from "./workflows/make-pr.ts";
 export default defineWebConfig({
   webhooks: {
     joke: {
-      workflow: joke,
+      task: joke,
     },
     "make-pr": {
-      workflow: makePullRequest,
+      task: makePullRequest,
     },
   },
 });

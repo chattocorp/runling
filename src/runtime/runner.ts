@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { cli } from "./cli.ts";
+import type { RunOptions } from "./cli.ts";
 import {
   observeRunlingEvents,
   type RunlingEventListener,
@@ -18,9 +18,9 @@ import {
 import type { Static, TSchema } from "typebox";
 import { TuiReporter } from "./tui.ts";
 import {
-  isWorkflow,
-  type Workflow,
-  type WorkflowFunction,
+  isTask,
+  type Task,
+  type TaskFunction,
 } from "./workflow.ts";
 import {
   formatTokenUsage,
@@ -169,9 +169,9 @@ export async function executeWorkflow(
 export async function runWorkflow<
   InputSchema extends TSchema,
   OutputSchema extends TSchema,
-  Run extends WorkflowFunction,
+  Run extends TaskFunction,
 >(
-  run: Workflow<InputSchema, OutputSchema, Run>,
+  run: Task<InputSchema, OutputSchema, Run>,
   {
     cwd = process.cwd(),
     input,
@@ -294,10 +294,10 @@ async function captureExecutionInContext<Output>(
   };
 }
 
-export async function loadWorkflow(path: string): Promise<Workflow> {
+export async function loadWorkflow(path: string): Promise<Task> {
   const resolvedPath = resolve(path);
   const module = await import(/* @vite-ignore */ pathToFileURL(resolvedPath).href);
-  if (!isWorkflow(module.default)) {
+  if (!isTask(module.default)) {
     throw new Error(
       `Workflow ${resolvedPath} must have a schemaful default workflow export`,
     );
@@ -305,25 +305,27 @@ export async function loadWorkflow(path: string): Promise<Workflow> {
   return module.default;
 }
 
-export async function runRunling(argv: readonly string[] = process.argv.slice(2)) {
-  const json = argv.includes("--json");
-  const presentation = shouldUseTui(argv) ? "tui" : "log";
-  const title =
-    argv.find((argument) => !argument.startsWith("-")) ?? "Workflow";
+export async function runRunling(
+  workflowPath: string,
+  prompt: string,
+  options: RunOptions,
+) {
+  const { json, verbose } = options;
+  const presentation = shouldUseTui(options) ? "tui" : "log";
+  log.level = verbose ? "debug" : "info";
   await reportExecution(
     async ({ handleInput }) => {
-      const { workflowPath, prompt, verbose } = cli(argv, "runling");
       const cwd = process.cwd();
       const run = await loadWorkflow(workflowPath);
       const f = createRunling({ cwd, prompt, verbose, handleInput });
       return log.indented(() => run(f, prompt));
     },
-    { json, presentation, title },
+    { json, presentation, title: workflowPath },
   );
 }
 
 export function shouldUseTui(
-  argv: readonly string[],
+  options: RunOptions,
   terminal: { stdinIsTTY?: boolean; stdoutIsTTY?: boolean } = {
     stdinIsTTY: process.stdin.isTTY,
     stdoutIsTTY: process.stdout.isTTY,
@@ -332,9 +334,8 @@ export function shouldUseTui(
   return (
     terminal.stdinIsTTY === true &&
     terminal.stdoutIsTTY === true &&
-    !argv.includes("--json") &&
-    !argv.includes("--log") &&
-    !argv.includes("--verbose") &&
-    !argv.includes("-v")
+    !options.json &&
+    !options.log &&
+    !options.verbose
   );
 }

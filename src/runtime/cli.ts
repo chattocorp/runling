@@ -1,64 +1,65 @@
-import { parseArgs } from "node:util";
-import { log } from "./log.ts";
-import { displayPath } from "./paths.ts";
+import { Command, InvalidArgumentError } from "commander";
 
-export interface CliArguments {
-  workflowPath: string;
-  prompt: string;
+export interface RunOptions {
   json: boolean;
-  logMode: boolean;
+  log: boolean;
   verbose: boolean;
 }
 
-function parseCliArguments(argv: readonly string[]) {
-  return parseArgs({
-    args: [...argv],
-    options: {
-      json: {
-        type: "boolean",
-        default: false,
-      },
-      log: {
-        type: "boolean",
-        default: false,
-      },
-      verbose: {
-        type: "boolean",
-        short: "v",
-        default: false,
-      },
-    },
-    allowPositionals: true,
-    strict: true,
-  });
+export interface ServeOptions {
+  config: string;
+  host: string;
+  port: number;
+  open: boolean;
 }
 
-export function cli(
-  argv: readonly string[] = process.argv.slice(2),
-  command = displayPath((process.argv[1] ?? "runling")),
-): CliArguments {
-  let parsed: ReturnType<typeof parseCliArguments>;
-
-  try {
-    parsed = parseCliArguments(argv);
-  } catch (error) {
-    throw error instanceof Error ? error : new Error(String(error));
+function parsePort(value: string): number {
+  const port = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new InvalidArgumentError("Port must be an integer from 1 through 65535");
   }
+  return port;
+}
 
-  const [workflowPath, prompt = "", ...extraPositionals] = parsed.positionals;
-  if (workflowPath === undefined) {
-    throw new Error(
-      `Usage: ${command} [-v|--verbose] [--log|--json] <workflow.ts> [prompt]`,
-    );
-  }
-  if (extraPositionals.length > 0) {
-    throw new Error("The prompt must be passed as a single quoted argument");
-  }
+/** Share server options between the installed CLI and the development server. */
+export function createServeCommand(): Command {
+  return new Command("serve")
+    .exitOverride()
+    .description("Start the web server")
+    .option("--config <path>", "Configuration file", "runling.config.ts")
+    .option("--host <host>", "Hostname to listen on", "localhost")
+    .option("--port <port>", "Port to listen on", parsePort, 5173)
+    .option("--open", "Open the app in a browser", false);
+}
 
-  const json = parsed.values.json ?? false;
-  const logMode = parsed.values.log ?? false;
-  const verbose = parsed.values.verbose ?? false;
-  log.level = verbose ? "debug" : "info";
+export interface CliActions {
+  run: (file: string, prompt: string, options: RunOptions) => Promise<void>;
+  serve: (options: ServeOptions) => Promise<void>;
+}
 
-  return { workflowPath, prompt, json, logMode, verbose };
+/** Parse commands without loading a workflow or starting a server for help. */
+export function createCli(version: string, actions: CliActions): Command {
+  const program = new Command("runling")
+    .description("Run TypeScript workflows and serve the web console")
+    .version(version)
+    .addHelpCommand()
+    .showHelpAfterError()
+    .exitOverride();
+
+  program.command("run")
+    .description("Run a workflow file")
+    .argument("<file>", "TypeScript workflow file")
+    .argument("[prompt]", "Input passed to the workflow", "")
+    .option("--json", "Write the result as JSON", false)
+    .option("--log", "Use append-only logs instead of the TUI", false)
+    .option("-v, --verbose", "Show debug logs", false)
+    .action(async (file: string, prompt: string, options: RunOptions) => {
+      await actions.run(file, prompt, options);
+    });
+
+  program.addCommand(createServeCommand().action(async (options: ServeOptions) => {
+    await actions.serve(options);
+  }));
+  program.action(() => { program.outputHelp(); });
+  return program;
 }

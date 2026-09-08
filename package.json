@@ -48,6 +48,10 @@
     "#runner": {
       "runling-source": "./src/runtime/runner.ts",
       "default": "./dist/src/runtime/runner.js"
+    },
+    "#cli": {
+      "runling-source": "./src/runtime/cli.ts",
+      "default": "./dist/src/runtime/cli.js"
     }
   },
   "files": [
@@ -76,6 +80,7 @@
     "ajv": "^8.20.0",
     "chokidar": "^5.0.0",
     "color-name": "^2.0.0",
+    "commander": "^15.0.0",
     "execa": "^10.0.1",
     "human-id": "4.2.1",
     "jiti": "^2.7.0",

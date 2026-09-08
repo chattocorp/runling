@@ -1,9 +1,9 @@
-import { runWorkflow, type Workflow, type WorkflowExecution } from "runling";
+import { runWorkflow, type Task, type WorkflowExecution } from "runling";
 import type { WebConfig } from "runling/web";
 import { Check, Errors } from "typebox/value";
 
 type WebhookRunner = (
-  workflow: Workflow,
+  workflow: Task,
   input: unknown,
 ) => Promise<WorkflowExecution>;
 
@@ -31,8 +31,8 @@ export function describeWebhook(
   const definition = config.webhooks[name]!;
 
   return json({
-    input: definition.workflow.input,
-    output: definition.workflow.output,
+    input: definition.task.input,
+    output: definition.task.output,
   });
 }
 
@@ -47,7 +47,7 @@ export async function handleWebhook(
 ): Promise<Response> {
   const prepared = await prepareWebhook(name, request, config);
   if (prepared instanceof Response) return prepared;
-  const execution = await run(prepared.workflow, prepared.input);
+  const execution = await run(prepared.task, prepared.input);
   if (!execution.ok) {
     return json({ error: execution.error ?? "The workflow failed." }, 500);
   }
@@ -59,7 +59,7 @@ export async function prepareWebhook(
   name: string,
   request: Request,
   config: WebConfig,
-): Promise<Response | { workflow: Workflow; input: unknown }> {
+): Promise<Response | { task: Task; input: unknown }> {
   if (!Object.hasOwn(config.webhooks, name)) {
     return json({ error: `Unknown webhook ${JSON.stringify(name)}.` }, 404);
   }
@@ -72,11 +72,11 @@ export async function prepareWebhook(
     return json({ error: "The request body must be valid JSON." }, 400);
   }
 
-  if (!Check(definition.workflow.input, body)) {
+  if (!Check(definition.task.input, body)) {
     return json(
       {
         error: "The request body does not match the workflow input schema.",
-        issues: Errors(definition.workflow.input, body).map(
+        issues: Errors(definition.task.input, body).map(
           ({ instancePath, message }) => ({
             path: instancePath === "" ? "/" : instancePath,
             message,
@@ -87,5 +87,5 @@ export async function prepareWebhook(
     );
   }
 
-  return { workflow: definition.workflow, input: body };
+  return { task: definition.task, input: body };
 }

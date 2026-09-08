@@ -13,7 +13,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
   const store = await getRunStore();
   const { id } = await store.start(
     params.name,
-    prepared.workflow,
+    prepared.task,
     prepared.input,
     "web",
   );
