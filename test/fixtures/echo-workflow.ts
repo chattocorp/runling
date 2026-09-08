@@ -9,11 +9,8 @@ export default task(
       outputs: Type.Object({ id: Type.String() }),
     }),
   },
-  function echo(f, input) {
+  function echo(input) {
     const id = randomId();
-    if (typeof f.step !== "function") {
-      throw new Error("The runling runtime was not injected");
-    }
     return {
       summary: input,
       outputs: { id },

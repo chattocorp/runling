@@ -1,25 +1,25 @@
-import { concat, task, Type } from "runling";
+import { input as askInput, runAgent, step, concat, task, Type } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 
 export const research = task(
   {
     name: "Research topic",
-    input: Type.String({ description: "The topic to research" }),
+    input: Type.Object({ directory: Type.String({ minLength: 1 }), prompt: Type.String({ description: "The topic to research" }) }),
     output: Type.Object({
       summary: Type.String(),
       details: Type.Optional(Type.String()),
       outputs: Type.Object({ research: Type.String() }),
     }),
   },
-  async (f, input) => {
+  async ({ directory, prompt: input }) => {
     const topic =
       input.trim() === ""
-        ? await f.input("What topic should I research?")
+        ? await askInput("What topic should I research?")
         : input;
 
-    const report = await f.step("Researching topic", () =>
-      f.runAgent(
+    const report = await step("Researching topic", () =>
+      runAgent(
         concat(
           "Research the following topic using the web_fetch tool:",
           topic,
@@ -28,6 +28,7 @@ export const research = task(
           "If you do not know suitable source URLs, begin by fetching a public search-results page.",
         ),
         {
+          cwd: directory,
           model,
           thinkingLevel: "medium",
           tools: ["web_fetch"],

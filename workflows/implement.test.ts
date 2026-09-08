@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { type Runling, type Exec } from "runling";
+import { type Exec } from "runling";
 import * as git from "runling/git";
 import { implement } from "./implement.ts";
 
@@ -74,10 +74,10 @@ function runtimeWith({
     ...contextValues,
     exec,
     agent: async function (
-      this: Runling,
+      this: { cwd: string },
       options: Record<string, unknown>,
     ) {
-      const resolvedOptions = { ...options, cwd: options.cwd ?? this.cwd };
+      const resolvedOptions = { ...options, cwd: options.cwd };
       agentOptions.push(resolvedOptions);
       let disposed = false;
       const dispose = () => {
@@ -99,7 +99,8 @@ function runtimeWith({
       messages.push(label);
       return work();
     },
-  } as unknown as Runling;
+  } as Record<string, any>;
+  mocks.current = runling;
 
   return {
     runling,
@@ -125,7 +126,7 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement(runling, "Make the change")).resolves.toBe("Implementation summary");
+    await expect(implement({ directory: runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Implementation summary");
     expect(prompts).toEqual(["Make the change"]);
     expect(git.getPwd).toHaveBeenCalledExactlyOnceWith(runling.cwd);
   });
@@ -133,7 +134,7 @@ describe("implement workflow", () => {
   test("runs agents on Sol with medium thinking", async () => {
     const setup = runtimeWith();
 
-    await expect(implement(setup.runling, "Make the change")).resolves.toBe("Made the change");
+    await expect(implement({ directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -170,7 +171,7 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.runling, "Make the change")).resolves.toBe("Repaired summary");
+    await expect(implement({ directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Repaired summary");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -193,12 +194,11 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement(runling, "Make the change")).resolves.toBe("Made the change");
+    await expect(implement({ directory: runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
 
     expect(checks).toBe(1);
     expect(tests).toBe(1);
     expect(messages).toEqual([
-      "Implement",
       "Implementing change",
       "Validate",
       "Run checks",
@@ -228,11 +228,10 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement(setup.runling, "Make the change")).resolves.toBe("Made the change");
+    await expect(implement({ directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
 
     expect(tests).toBe(2);
     expect(setup.messages).toEqual([
-      "Implement",
       "Implementing change",
       "Validate",
       "Run checks",
@@ -243,4 +242,24 @@ describe("implement workflow", () => {
       "Run tests",
     ]);
   });
+});
+
+const mocks = vi.hoisted(() => ({ current: {} as Record<string, any> }));
+vi.mock("runling", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("runling")>();
+  return {
+    ...actual,
+    agent: (options: unknown) => mocks.current.agent(options),
+    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    input: (...args: unknown[]) => mocks.current.input(...args),
+    step: (name: string, work: () => unknown) => mocks.current.step(name, work),
+    log: { info: (message: string) => mocks.current.log?.info(message) },
+    exec: (...args: unknown[]) => {
+      const command = mocks.current.exec(...args);
+      return Object.assign(command, { cwd: (directory: string) => {
+        expect(directory).toBe(mocks.current.cwd ?? "/project");
+        return command;
+      } });
+    },
+  };
 });

@@ -8,10 +8,11 @@ import { createServeCommand, type ServeOptions } from "../runtime/cli.ts";
 
 export async function runRunlingWeb(options: ServeOptions): Promise<void> {
   const appRoot = resolve(import.meta.dirname, "../..");
-  const workflowCwd = process.cwd();
-  const configPath = resolve(workflowCwd, options.config);
+  const configPath = resolve(options.config);
   process.env.RUNLING_WEB_CONFIG = configPath;
-  process.env.RUNLING_WEB_WORKFLOW_CWD = workflowCwd;
+
+  // SvelteKit resolves its app files from the process directory, even with Vite's
+  // root set. This is the tooling root; tasks still require explicit directories.
   process.chdir(appRoot);
 
   const server = await createServer({

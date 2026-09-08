@@ -64,13 +64,13 @@ try {
   await writeFile(resolve(project, "helper.ts"), 'export const suffix = "";\n');
   await writeFile(
     resolve(project, "workflow.ts"),
-    `import { task, Type } from "runling";
+    `import { task, Type, exec, step, log } from "runling";
 import { suffix } from "./helper.ts";
-export default task({ name: "Consumer echo", input: Type.Object({ topic: Type.String() }), output: Type.String() }, async (f, input) => {
-  return f.step("Echo input", async () => {
+export default task({ name: "Consumer echo", input: Type.Object({ topic: Type.String(), directory: Type.String() }), output: Type.String() }, async (input) => {
+  return step("Echo input", async () => {
     await new Promise(resolve => setTimeout(resolve, input.topic === "slow" ? 2000 : 250));
-    const cwd = await f.exec\`node -e \${"process.stdout.write(require('node:fs').readFileSync('message.txt', 'utf8'))"}\`.text();
-    f.log.info(input.topic);
+    const cwd = await exec\`node -e \${"process.stdout.write(require('node:fs').readFileSync('message.txt', 'utf8'))"}\`.cwd(input.directory).text();
+    log.info(input.topic);
     return input.topic + ": " + cwd + suffix;
   });
 });
@@ -78,9 +78,9 @@ export default task({ name: "Consumer echo", input: Type.Object({ topic: Type.St
   );
   await writeFile(
     resolve(project, "cli.ts"),
-    `import { task, Type } from "runling";
+    `import { task, Type, exec, step, log } from "runling";
 import * as git from "runling/git";
-export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, (_f, input) => {
+export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, (input) => {
   if (typeof git.getPwd !== "function" || typeof git.workingTreeHash !== "function" || typeof git.WorkingDirectory.create !== "function") throw new Error("Git helpers were not exported");
   if (process.env.RUNLING_PACKAGE_TEST_ENV !== "loaded") throw new Error("Project .env was not loaded");
   return input;
@@ -100,6 +100,12 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
     { cwd: project },
   );
   assert.equal(JSON.parse(cli.stdout).output, "explicit input");
+  const structured = await exec(
+    "npm",
+    ["run", "--silent", "runling", "--", "run", "workflow.ts", "--input", JSON.stringify({ directory: project, topic: "structured" }), "--json"],
+    { cwd: project },
+  );
+  assert.equal(JSON.parse(structured.stdout).output, "structured: consumer cwd");
   // A normal npm project need not declare itself an ESM package.
   await writeFile(
     resolve(project, "package.json"),
@@ -186,7 +192,7 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
     fetch(`${origin}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(typeof body === "object" ? { ...body, directory: project } : body),
     });
   assert.equal((await post("/api/webhooks/echo", "invalid")).status, 400);
   const webhook = await post("/api/webhooks/echo", { topic: "webhook" });

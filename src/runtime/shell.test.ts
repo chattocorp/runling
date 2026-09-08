@@ -11,9 +11,9 @@ describe("createShell", () => {
   test("quotes interpolations without executing shell expressions", async () => {
     const value =
       "it's $(printf injected) `printf injected` ; echo injected\n$HOME";
-    expect(await createShell()`printf %s ${value}`.text()).toBe(value);
+    expect(await createShell({ cwd: import.meta.dirname })`printf %s ${value}`.text()).toBe(value);
     expect(
-      await createShell()`printf '%s|' ${["one two", "three'four", ""]}`.text(),
+      await createShell({ cwd: import.meta.dirname })`printf '%s|' ${["one two", "three'four", ""]}`.text(),
     ).toBe("one two|three'four||");
   });
 
@@ -22,7 +22,7 @@ describe("createShell", () => {
     await observeRunlingEvents(
       (event) => events.push(event),
       async () => {
-        const command = createShell()`printf failure >&2; exit 7`;
+        const command = createShell({ cwd: import.meta.dirname })`printf failure >&2; exit 7`;
         await expect(command).rejects.toBeInstanceOf(ShellError);
         await expect(command).rejects.toMatchObject({
           exitCode: 7,
@@ -37,7 +37,7 @@ describe("createShell", () => {
   test("logs the escaped command it runs", async () => {
     const info = vi.spyOn(log, "info");
 
-    await createShell()`echo ${"hello world"}`;
+    await createShell({ cwd: import.meta.dirname })`echo ${"hello world"}`;
 
     expect(info).toHaveBeenCalledTimes(1);
     expect(info.mock.calls[0]?.[0]).toContain("Running");
@@ -48,7 +48,7 @@ describe("createShell", () => {
     const info = vi.spyOn(log, "info");
     const value = `${"x".repeat(500)}the-end`;
 
-    const output = await createShell()`printf %s ${value}`.text();
+    const output = await createShell({ cwd: import.meta.dirname })`printf %s ${value}`.text();
 
     const message = info.mock.calls[0]?.[0] ?? "";
     expect(output).toBe(value);
@@ -60,7 +60,7 @@ describe("createShell", () => {
   test("creates quiet commands by default", async () => {
     const quiet = vi.spyOn(ShellCommand.prototype, "quiet");
 
-    await createShell()`true`;
+    await createShell({ cwd: import.meta.dirname })`true`;
 
     expect(quiet).toHaveBeenCalledWith(true);
   });
@@ -68,7 +68,7 @@ describe("createShell", () => {
   test("creates streaming commands in verbose mode", async () => {
     const quiet = vi.spyOn(ShellCommand.prototype, "quiet");
 
-    await createShell({ verbose: true })`true`;
+    await createShell({ cwd: import.meta.dirname, verbose: true })`true`;
 
     expect(quiet).toHaveBeenCalledWith(false);
   });
@@ -78,7 +78,7 @@ describe("createShell", () => {
 
     await observeRunlingEvents(
       (event) => events.push(event),
-      () => createShell()`true`,
+      () => createShell({ cwd: import.meta.dirname })`true`,
     );
     await Promise.resolve();
 
@@ -102,7 +102,7 @@ describe("createShell", () => {
     await observeRunlingEvents(
       (event) => events.push(event),
       () =>
-        createShell()`${process.execPath} -e ${"console.log('stdout'); console.error('stderr'); process.exit(3)"}`.nothrow(),
+        createShell({ cwd: import.meta.dirname })`${process.execPath} -e ${"console.log('stdout'); console.error('stderr'); process.exit(3)"}`.nothrow(),
     );
     await Promise.resolve();
 
@@ -117,14 +117,17 @@ describe("createShell", () => {
     });
   });
 
-  test("uses the calling context's cwd by default", async () => {
-    const cwd = vi.spyOn(ShellCommand.prototype, "cwd");
-    const shell = createShell();
-    const context = { cwd: process.cwd(), shell };
+  test("does not inherit cwd from a calling object", async () => {
+    const context = { cwd: import.meta.dirname, shell: createShell() };
+    await expect(context.shell`true`).rejects.toThrow("An explicit directory is required");
+  });
 
-    await context.shell`true`;
-
-    expect(cwd).toHaveBeenCalledWith(process.cwd());
+  test("rejects an invalid factory directory before starting an activity", () => {
+    const events: RunlingEvent[] = [];
+    observeRunlingEvents(event => events.push(event), () => {
+      expect(() => createShell({ cwd: "" })`true`).toThrow("An explicit directory is required");
+    });
+    expect(events).toEqual([]);
   });
 
   test("allows an explicit default cwd", async () => {

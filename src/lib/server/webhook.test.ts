@@ -9,7 +9,7 @@ const joke = task(
     input: Type.String(),
     output: Type.String(),
   },
-  async (_f, topic) => `A joke about ${topic}`,
+  async (topic) => `A joke about ${topic}`,
 );
 
 const config = defineWebConfig({
@@ -74,7 +74,7 @@ describe("configured webhooks", () => {
     async ({ schema, value, invalid }) => {
       const echo = task(
         { name: "Echo", input: schema, output: schema },
-        (_f, input) => input,
+        (input) => input,
       );
       const direct = defineWebConfig({
         webhooks: { echo: { task: echo } },

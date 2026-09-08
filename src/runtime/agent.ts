@@ -1,3 +1,4 @@
+import { requireDirectory } from "./directory.ts";
 import { stripVTControlCharacters } from "node:util";
 import {
   createAgentSession,
@@ -120,7 +121,7 @@ export interface RunAgentOptions {
   /** Reasoning effort for the model. Defaults to pi's own settings default. */
   thinkingLevel?: ThinkingLevel;
   instructions?: readonly string[];
-  cwd?: string;
+  cwd: string;
   /** Built-in and extension tools to expose. `report_outcome` is always added. */
   tools?: readonly string[];
   resources?: AgentResourceOptions;
@@ -160,16 +161,16 @@ export class AgentOutcomeError extends Error {
   }
 }
 
-export function describeTool(name: string, args: Record<string, unknown>) {
+export function describeTool(name: string, args: Record<string, unknown>, directory?: string) {
   switch (name) {
     case "read":
-      return `Reading ${displayPath(String(args.path))}`;
+      return `Reading ${displayPath(String(args.path), directory)}`;
     case "edit":
-      return `Editing ${displayPath(String(args.path))}`;
+      return `Editing ${displayPath(String(args.path), directory)}`;
     case "write":
-      return `Writing ${displayPath(String(args.path))}`;
+      return `Writing ${displayPath(String(args.path), directory)}`;
     case "bash":
-      return `Running ${displayText(String(args.command).replaceAll("\n", " "))}`;
+      return `Running ${displayText(String(args.command).replaceAll("\n", " "), directory)}`;
     default:
       return `Using ${name}`;
   }
@@ -263,7 +264,7 @@ async function createRunlingAgent(
     },
   });
 
-  const cwd = options.cwd ?? process.cwd();
+  const cwd = requireDirectory(options.cwd);
   const agentDir = options.resources?.agentDir ?? getAgentDir();
   const modelRuntime = await ModelRuntime.create();
   const modelReference = parseModelReference(options.model);
@@ -425,7 +426,7 @@ async function createRunlingAgent(
         event.toolName !== "report_outcome"
       ) {
         toolStartedAt.set(event.toolCallId, performance.now());
-        const action = describeTool(event.toolName, event.args);
+        const action = describeTool(event.toolName, event.args, cwd);
         agentLog.info(
           highlightToolAction(
             event.toolName,

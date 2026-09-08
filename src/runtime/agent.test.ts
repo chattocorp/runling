@@ -170,7 +170,7 @@ test("streams bounded text previews, throttles deltas, and shows tools without d
     await reportOutcome({ outcome: "completed", summary: "Done" });
   };
   try {
-    await observeRunlingEvents(e => events.push(e), () => runAgent("Test", { model: "anthropic/claude-opus-4-5" }));
+    await observeRunlingEvents(e => events.push(e), () => runAgent("Test", { cwd: "/project", model: "anthropic/claude-opus-4-5" }));
     const previews = events.filter(e => e.type === "agent.progress").map(e => e.text);
     expect(previews).toContain("Looking at files");
     expect(previews).not.toContain("This update is throttled");
@@ -197,7 +197,7 @@ test("previews report-only output such as the joke workflow", async () => {
     }
     await sdk.runInAsyncScope(() => reportOutcome({ outcome: "completed", summary: "Joke written", details: "A joke\nwith a punchline." }));
   };
-  await observeRunlingEvents(e => events.push(e), () => runAgent("Write a joke", { model: "anthropic/claude-opus-4-5", tools: [] }));
+  await observeRunlingEvents(e => events.push(e), () => runAgent("Write a joke", { cwd: "/project", model: "anthropic/claude-opus-4-5", tools: [] }));
   const previews = events.filter(e => e.type === "agent.progress").map(e => e.text);
   expect(previews.filter(text => text === "Preparing result…")).toHaveLength(1);
   expect(previews.at(-1)).toBe("A joke with a punchline.");
@@ -236,13 +236,13 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the first thing", {
+      await runAgent("Do the first thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
       const firstAgentColors = withColor.mock.calls.map((call) => call[0]);
       withColor.mockClear();
 
-      await runAgent("Do the second thing", {
+      await runAgent("Do the second thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
 
@@ -272,7 +272,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+      await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
     } finally {
       console.log = originalLog;
     }
@@ -311,7 +311,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+      await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
     } finally {
       console.log = originalLog;
       console.error = originalError;
@@ -370,7 +370,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+      await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
     } finally {
       console.log = originalLog;
       console.error = originalError;
@@ -432,7 +432,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", {
+      await runAgent("Do the thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
     } finally {
@@ -458,7 +458,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", {
+    await runAgent("Do the thing", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
       onEvent: (event) => events.push(event.type),
     });
@@ -495,7 +495,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", {
+      await runAgent("Do the thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
     } finally {
@@ -549,7 +549,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "blocked",
       summary: "Need access",
@@ -563,7 +563,7 @@ describe("runAgent", () => {
     promptImplementation = async () => emitAssistantText("I could not finish");
 
     await expect(
-      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "failed",
       summary: "Agent finished without a valid outcome report",
@@ -582,7 +582,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "completed",
       summary: "Done",
@@ -613,7 +613,7 @@ describe("runAgent", () => {
 
     try {
       await expect(
-        runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+        runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
       ).resolves.toEqual({
         outcome: "completed",
         summary: "Done",
@@ -644,7 +644,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+    await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
 
     expect(getRecordedTokenUsage()).toEqual({
       input: 10,
@@ -679,7 +679,7 @@ describe("runAgent", () => {
     await expect(
       observeRunlingEvents(
         (e) => events.push(e),
-        () => runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+        () => runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
       ),
     ).rejects.toThrow("Provider unavailable");
     const snapshots = events.filter((e) => e.type === "agent.usage");
@@ -708,7 +708,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", {
+    await runAgent("Do the thing", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
   }));
@@ -727,7 +727,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "failed",
       summary: "Agent finished without a valid outcome report",
@@ -747,7 +747,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).rejects.toThrow("Provider unavailable");
     expect(disposed).toBe(true);
   });
@@ -764,7 +764,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" }),
+      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).rejects.toThrow("Provider unavailable");
     expect(getRecordedTokenUsage()).toEqual({
       input: 10,
@@ -779,7 +779,7 @@ describe("runAgent", () => {
     modelAvailable = false;
 
     await expect(
-      runAgent("Do the thing", { model: "anthropic/missing" }),
+      runAgent("Do the thing", { cwd: "/project", model: "anthropic/missing" }),
     ).rejects.toThrow("Model anthropic/missing is unavailable");
     expect(sessionOptions).toBeUndefined();
   });
@@ -789,7 +789,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", {
+    await runAgent("Do the thing", { cwd: "/project",
       model: "openai-codex/gpt-5.6-sol",
       thinkingLevel: "medium",
     });
@@ -802,7 +802,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", { model: "anthropic/claude-opus-4-5" });
+    await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
 
     expect(sessionOptions.thinkingLevel).toBeUndefined();
   });
@@ -812,7 +812,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Research the topic", {
+    await runAgent("Research the topic", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
 
@@ -841,7 +841,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Implement the change", {
+    await runAgent("Implement the change", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
       extensions: [localExtension],
       resources: { extensions: false },
@@ -896,7 +896,7 @@ describe("runAgent", () => {
     promptImplementation = async () => controller.abort("Stopped");
 
     await expect(
-      runAgent("Do the thing", {
+      runAgent("Do the thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
         signal: controller.signal,
       }),
@@ -908,7 +908,7 @@ describe("runAgent", () => {
 
 describe("agent", () => {
   test("forks the current conversation into an independent session", async () => {
-    const instance = await agent({
+    const instance = await agent({ cwd: "/project",
       model: "anthropic/claude-opus-4-5",
       tools: ["read"],
     });
@@ -939,7 +939,7 @@ describe("agent", () => {
   });
 
   test("keeps inherited summaries in Pi history across further compaction", async () => {
-    const instance = await agent({ model: "anthropic/claude-opus-4-5" });
+    const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
     createdSessions[0].agent.state.messages = [
       { role: "compactionSummary", summary: "Investigation found a race condition", tokensBefore: 5000, timestamp: 1 },
       { role: "user", content: "Review the race condition", timestamp: 2 },
@@ -970,7 +970,7 @@ describe("agent", () => {
       await expect(instance.fork()).rejects.toThrow("already running");
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
-    instance = await agent({ model: "anthropic/claude-opus-4-5" });
+    instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
 
     await instance.run("Work");
     instance.dispose();
@@ -982,7 +982,7 @@ describe("agent", () => {
     promptImplementation = async (prompt) => {
       await reportOutcome({ outcome: "completed", summary: prompt });
     };
-    const instance = await agent({
+    const instance = await agent({ cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
 
@@ -1015,7 +1015,7 @@ describe("agent", () => {
           : { outcome: "blocked", summary: "Second result" },
       );
     };
-    const instance = await agent({
+    const instance = await agent({ cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
 
@@ -1041,7 +1041,7 @@ describe("agent", () => {
       });
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
-    const instance = await agent({
+    const instance = await agent({ cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
 
@@ -1056,7 +1056,7 @@ describe("agent", () => {
   });
 
   test("rejects runs after disposal", async () => {
-    const instance = await agent({
+    const instance = await agent({ cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
     instance.dispose();
@@ -1067,7 +1067,7 @@ describe("agent", () => {
   test("can run again after an aborted turn", async () => {
     const controller = new AbortController();
     promptImplementation = async () => controller.abort("Stopped");
-    const instance = await agent({
+    const instance = await agent({ cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
 
@@ -1091,7 +1091,7 @@ describe("agent", () => {
 
   test("supports automatic disposal", async () => {
     {
-      await using instance = await agent({
+      await using instance = await agent({ cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
       expect(disposed).toBe(false);
@@ -1105,7 +1105,7 @@ describe("agent", () => {
     promptImplementation = async () => {
       await reportOutcome({ outcome: "blocked", summary: "Need input" });
     };
-    await using instance = await agent({
+    await using instance = await agent({ cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
 
@@ -1122,4 +1122,10 @@ describe("agent", () => {
       });
     }
   });
+});
+
+test("requires an explicit directory before creating an agent", async () => {
+  // @ts-expect-error Agents require an explicit directory.
+  await expect(agent({ model: "anthropic/claude-opus-4-5" })).rejects.toThrow("An explicit directory is required");
+  await expect(agent({ model: "anthropic/claude-opus-4-5", cwd: "" })).rejects.toThrow("An explicit directory is required");
 });

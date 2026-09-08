@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import type { Runling, RunlingAgent, Exec } from "runling";
+import { vi, describe, expect, test } from "vitest";
+import type { RunlingAgent, Exec } from "runling";
 import { review } from "./review.ts";
 
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -103,9 +103,10 @@ describe("review workflow", () => {
         steps.push(name);
         return run();
       },
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await expect(review(f, "Review the current change")).resolves.toEqual({
+    await expect(review({ directory: f.cwd ?? "/project", prompt: "Review the current change" })).resolves.toEqual({
       summary: "Found two issues",
       details: "## Findings\n\nTwo actionable issues.",
       outputs: { review: "## Findings\n\nTwo actionable issues." },
@@ -188,9 +189,10 @@ describe("review workflow", () => {
       prompt: "Review the current change",
       agent: async () => orchestrator,
       step: <T>(_name: string, run: () => T) => run(),
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await expect(review(f, "Review the current change")).rejects.toThrow("review failed");
+    await expect(review({ directory: f.cwd ?? "/project", prompt: "Review the current change" })).rejects.toThrow("review failed");
     expect(finishedReviews).toBe(2);
     expect(disposed).toBe(4);
   });
@@ -203,10 +205,31 @@ describe("review workflow", () => {
       agent: () => {
         throw new Error("agent should not be created");
       },
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await expect(review(f, "")).resolves.toEqual({
+    await expect(review({ directory: f.cwd ?? "/project", prompt: "" })).resolves.toEqual({
       summary: "No changes to review",
     });
   });
+});
+
+const mocks = vi.hoisted(() => ({ current: {} as Record<string, any> }));
+vi.mock("runling", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("runling")>();
+  return {
+    ...actual,
+    agent: (options: unknown) => mocks.current.agent(options),
+    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    input: (...args: unknown[]) => mocks.current.input(...args),
+    step: (name: string, work: () => unknown) => mocks.current.step(name, work),
+    log: { info: (message: string) => mocks.current.log?.info(message) },
+    exec: (...args: unknown[]) => {
+      const command = mocks.current.exec(...args);
+      return Object.assign(command, { cwd: (directory: string) => {
+        expect(directory).toBe(mocks.current.cwd ?? "/project");
+        return command;
+      } });
+    },
+  };
 });

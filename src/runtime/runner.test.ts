@@ -1,3 +1,4 @@
+import { log } from "./log.ts";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, describe, expect, expectTypeOf, test } from "vitest";
 import {
@@ -10,7 +11,7 @@ import {
 } from "./runner.ts";
 import type { RunlingEvent } from "./events.ts";
 import type { InputRequest } from "./input.ts";
-import { createRunling } from "./runtime.ts";
+import { input as askInput } from "./input.ts";
 import { recordTokenUsage } from "./usage.ts";
 import { Type } from "typebox";
 import { task } from "./workflow.ts";
@@ -22,22 +23,12 @@ afterEach(() => {
 });
 
 describe("executeWorkflow", () => {
-  const f = createRunling({
-    cwd: "/project",
-    prompt: "Make the change",
-    verbose: false,
-  });
-
-  test("passes one runling containing primitives and invocation values", async () => {
-    await executeWorkflow(async (receivedRunling) => {
-      expect(receivedRunling).toBe(f);
-      expect(receivedRunling.agent).toBeTypeOf("function");
-      expect(receivedRunling.shell).toBeTypeOf("function");
-      expect(receivedRunling.exec).toBeTypeOf("function");
-      expect(receivedRunling.step).toBeTypeOf("function");
-      expect(receivedRunling.cwd).toBe("/project");
-      expect(receivedRunling.prompt).toBe("Make the change");
-    }, f);
+  test("executes a plain function without injected arguments", async () => {
+    const execution = await executeWorkflow(function (...args) {
+      expect(args).toEqual([]);
+      return "done";
+    });
+    expect(execution.output).toBe("done");
   });
 
   test("logs a workflow summary", async () => {
@@ -46,7 +37,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => "Made the change", f);
+      await executeWorkflow(async () => "Made the change");
     } finally {
       console.log = originalLog;
     }
@@ -61,7 +52,6 @@ describe("executeWorkflow", () => {
         details: "## Summary\n\nImplemented the requested change.",
         outputs: { pullRequestUrl: "https://example.com/pull/1" },
       }),
-      f,
     );
 
     expect(execution.ok).toBe(true);
@@ -83,8 +73,7 @@ describe("executeWorkflow", () => {
           summary: "Review complete",
           details: "## Findings\n\nSomething worth reading.",
         }),
-        f,
-        { terminal: { isTTY: false, columns: 80 } },
+          { terminal: { isTTY: false, columns: 80 } },
       );
     } finally {
       console.log = originalLog;
@@ -104,8 +93,7 @@ describe("executeWorkflow", () => {
           summary: "Review complete",
           details: "## Findings\n\nSomething worth reading.",
         }),
-        f,
-        { terminal: { isTTY: true, columns: 80 } },
+          { terminal: { isTTY: true, columns: 80 } },
       );
     } finally {
       console.log = originalLog;
@@ -133,8 +121,7 @@ describe("executeWorkflow", () => {
           details: markdown,
           outputs: { count: 2 },
         }),
-        f,
-        { json: true, terminal: { isTTY: true, columns: 80 } },
+          { json: true, terminal: { isTTY: true, columns: 80 } },
       );
     } finally {
       console.log = originalLog;
@@ -158,10 +145,10 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async ({ log }) => {
+      await executeWorkflow(async () => {
         log.info("inside the workflow");
         return "Made the change";
-      }, f);
+      });
     } finally {
       console.log = originalLog;
     }
@@ -188,7 +175,7 @@ describe("executeWorkflow", () => {
     try {
       await executeWorkflow(async () => {
         throw "Tests failed";
-      }, f);
+      });
     } finally {
       console.error = originalError;
     }
@@ -203,7 +190,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => undefined, f);
+      await executeWorkflow(async () => undefined);
     } finally {
       console.log = originalLog;
     }
@@ -219,7 +206,7 @@ describe("executeWorkflow", () => {
     try {
       await executeWorkflow(async () => {
         throw "Tests failed";
-      }, f);
+      });
     } finally {
       console.log = originalLog;
     }
@@ -236,7 +223,7 @@ describe("executeWorkflow", () => {
       await executeWorkflow(async () => {
         recordTokenUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 });
         recordTokenUsage({ input: 50, output: 25, cacheRead: 550, cacheWrite: 15 });
-      }, f);
+      });
     } finally {
       console.log = originalLog;
     }
@@ -257,7 +244,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => undefined, f);
+      await executeWorkflow(async () => undefined);
     } finally {
       console.log = originalLog;
     }
@@ -274,7 +261,7 @@ describe("executeWorkflow", () => {
     try {
       await executeWorkflow(async () => {
         recordTokenUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
-      }, f);
+      });
     } finally {
       console.log = originalLog;
     }
@@ -303,12 +290,12 @@ describe("runWorkflow", () => {
     let started = false;
     const echo = task(
       { name: "Echo", input: Type.String(), output: Type.String() },
-      (_f, input) => { started = true; return input; },
+      (input) => { started = true; return input; },
     );
     // @ts-expect-error Callers must provide input, not a legacy prompt option.
     const execution = await runWorkflow(echo, { prompt: "Legacy fallback" });
     expect(execution.ok).toBe(false);
-    expect(execution.error).toContain('Workflow "Echo" input is invalid');
+    expect(execution.error).toContain('Task "Echo" input is invalid');
     expect(started).toBe(false);
     expect(await runWorkflow(echo, { input: "" })).toMatchObject({ ok: true, output: "" });
   });
@@ -322,18 +309,15 @@ describe("runWorkflow", () => {
         input: Type.String(),
         output: Type.String(),
       },
-      async (f, input) => {
-        expect(f.cwd).toBe("/project");
-        expect(f.prompt).toBe("Make me laugh");
+      async (input) => {
         expect(input).toBe("Make me laugh");
-        const topic = await f.input("What is the topic?");
+        const topic = await askInput("What is the topic?");
         return `A joke about ${topic}`;
       },
     );
     const running = runWorkflow(
       joke,
       {
-        cwd: "/project",
         input: "Make me laugh",
         onInput: (request) => {
           requested.resolve(request);

@@ -140,3 +140,10 @@ describe("workingTreeHash", () => {
     expect(await pwd.hasChanges).toBe(true);
   });
 });
+
+test("requires an explicit directory instead of inspecting the process directory", async () => {
+  // @ts-expect-error A directory is required.
+  await expect(workingTreeHash()).rejects.toThrow("An explicit directory is required");
+  // @ts-expect-error A directory is required.
+  await expect(getPwd()).rejects.toThrow("An explicit directory is required");
+});

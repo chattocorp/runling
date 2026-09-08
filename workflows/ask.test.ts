@@ -1,12 +1,12 @@
-import { describe, expect, test } from "vitest";
-import type { Runling } from "runling";
+import { vi, describe, expect, test } from "vitest";
+
 import { ask } from "./ask.ts";
 
 const completedReport = {
   outcome: "completed" as const,
-  summary: "Workflows receive a Runling object",
+  summary: "Tasks receive their declared inputs",
   details:
-    "Workflow entrypoints receive one `Runling` containing runtime primitives (`src/runtime.ts:82`).",
+    "Tasks receive explicit input; helpers are named imports (`src/runtime/index.ts`).",
   usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 };
 
@@ -16,7 +16,7 @@ describe("ask workflow", () => {
     const options: Record<string, unknown>[] = [];
     const steps: string[] = [];
     const f = {
-      prompt: "How do workflow entrypoints receive runtime primitives?",
+      prompt: "How do tasks use runtime helpers?",
       input: () => {
         throw new Error("input should not be requested");
       },
@@ -29,19 +29,19 @@ describe("ask workflow", () => {
         steps.push(name);
         return work();
       },
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await expect(ask(f, "How do workflow entrypoints receive runtime primitives?")).resolves.toEqual({
+    await expect(ask({ directory: f.cwd ?? "/project", prompt: "How do tasks use runtime helpers?" })).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { answer: completedReport.details },
     });
     expect(steps).toEqual([
-      "Answer repository question",
       "Investigating repository",
     ]);
     expect(prompts[0]).toContain(
-      "How do workflow entrypoints receive runtime primitives?",
+      "How do tasks use runtime helpers?",
     );
     expect(options[0]).toMatchObject({
       model: "openai-codex/gpt-5.6-sol",
@@ -64,13 +64,34 @@ describe("ask workflow", () => {
         return completedReport;
       },
       step: <T>(_name: string, work: () => T) => work(),
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await ask(f, "");
+    await ask({ directory: f.cwd ?? "/project", prompt: "" });
 
     expect(questions).toEqual([
       "What would you like to know about the repository?",
     ]);
     expect(prompts[0]).toContain("Where are agent tools configured?");
   });
+});
+
+const mocks = vi.hoisted(() => ({ current: {} as Record<string, any> }));
+vi.mock("runling", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("runling")>();
+  return {
+    ...actual,
+    agent: (options: unknown) => mocks.current.agent(options),
+    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    input: (...args: unknown[]) => mocks.current.input(...args),
+    step: (name: string, work: () => unknown) => mocks.current.step(name, work),
+    log: { info: (message: string) => mocks.current.log?.info(message) },
+    exec: (...args: unknown[]) => {
+      const command = mocks.current.exec(...args);
+      return Object.assign(command, { cwd: (directory: string) => {
+        expect(directory).toBe(mocks.current.cwd ?? "/project");
+        return command;
+      } });
+    },
+  };
 });

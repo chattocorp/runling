@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import type { Runling } from "runling";
+import { vi, describe, expect, test } from "vitest";
+
 import { chattoDocs } from "./chatto-docs.ts";
 
 const completedReport = {
@@ -29,15 +29,15 @@ describe("chatto-docs workflow", () => {
         steps.push(name);
         return work();
       },
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await expect(chattoDocs(f, "What is Chatto?")).resolves.toEqual({
+    await expect(chattoDocs({ directory: f.cwd ?? "/project", prompt: "What is Chatto?" })).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { answer: completedReport.details },
     });
     expect(steps).toEqual([
-      "Answer Chatto documentation question",
       "Consulting Chatto documentation",
     ]);
     expect(prompts[0]).toContain("What is Chatto?");
@@ -68,11 +68,32 @@ describe("chatto-docs workflow", () => {
         return completedReport;
       },
       step: <T>(_name: string, work: () => T) => work(),
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await chattoDocs(f, " ");
+    await chattoDocs({ directory: f.cwd ?? "/project", prompt: " " });
 
     expect(questions).toEqual(["What would you like to know about Chatto?"]);
     expect(prompts[0]).toContain("How do I get started?");
   });
+});
+
+const mocks = vi.hoisted(() => ({ current: {} as Record<string, any> }));
+vi.mock("runling", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("runling")>();
+  return {
+    ...actual,
+    agent: (options: unknown) => mocks.current.agent(options),
+    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    input: (...args: unknown[]) => mocks.current.input(...args),
+    step: (name: string, work: () => unknown) => mocks.current.step(name, work),
+    log: { info: (message: string) => mocks.current.log?.info(message) },
+    exec: (...args: unknown[]) => {
+      const command = mocks.current.exec(...args);
+      return Object.assign(command, { cwd: (directory: string) => {
+        expect(directory).toBe(mocks.current.cwd ?? "/project");
+        return command;
+      } });
+    },
+  };
 });

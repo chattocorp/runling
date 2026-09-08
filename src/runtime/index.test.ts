@@ -18,3 +18,10 @@ test("retains public helpers for working with returned usage", () => {
   expect(runling.formatTokenUsage(usage)).toContain("in 10, out 2");
   expect(usage.cost).toBe(0.01);
 });
+
+test("exports direct helpers without a task context factory", () => {
+  expect(runling).not.toHaveProperty("createRunling");
+  for (const name of ["exec", "shell", "input", "agent", "runAgent", "step"] as const) {
+    expect(runling[name]).toBeTypeOf("function");
+  }
+});

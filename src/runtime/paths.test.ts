@@ -22,8 +22,8 @@ describe("displayPath", () => {
     );
   });
 
-  test("defaults to process.cwd()", () => {
-    expect(displayPath(`${process.cwd()}/src/paths.ts`)).toBe("src/paths.ts");
+  test("keeps paths unchanged without an explicit base", () => {
+    expect(displayPath(`${process.cwd()}/src/paths.ts`)).toBe(`${process.cwd()}/src/paths.ts`);
   });
 });
 
@@ -48,7 +48,7 @@ describe("displayText", () => {
     ).toBe("cat a.ts b.ts");
   });
 
-  test("defaults to process.cwd()", () => {
-    expect(displayText(`cat ${process.cwd()}/index.ts`)).toBe("cat index.ts");
+  test("keeps paths unchanged without an explicit base", () => {
+    expect(displayText(`cat ${process.cwd()}/index.ts`)).toBe(`cat ${process.cwd()}/index.ts`);
   });
 });

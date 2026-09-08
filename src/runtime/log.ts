@@ -1,3 +1,4 @@
+import { executionServices } from "./execution.ts";
 import { ansiColor } from "./ansi.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { emitRunlingEvent } from "./events.ts";
@@ -91,8 +92,14 @@ export const withLogSource = <T>(source: LogSource, work: LoggedWork<T>): T =>
 /** A chunk of work whose log output is indented one level deeper. */
 export type LoggedWork<T> = () => T;
 
+let defaultLevel: LogLevel = "info";
+
 export const log = {
-  level: "info" as LogLevel,
+  get level(): LogLevel {
+    const services = executionServices();
+    return services ? (services.verbose ? "debug" : "info") : defaultLevel;
+  },
+  set level(value: LogLevel) { defaultLevel = value; },
   debug: (message: string) => {
     if (log.level === "debug") {
       write("debug", message, "gray");

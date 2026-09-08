@@ -1,4 +1,4 @@
-import { concat, task, Type, type Runling } from "runling";
+import { agent, exec, step, concat, task, Type } from "runling";
 import * as git from "runling/git";
 
 const model = "openai-codex/gpt-5.6-sol";
@@ -10,13 +10,13 @@ const agentInstructions = [
 const maxValidationAttempts = 3;
 const maxValidationFeedbackLength = 18_000;
 
-const validate = (f: Runling) =>
-  f.step("Validate", async () => {
-    const check = await f.step("Run checks", () =>
-      f.exec`pnpm run check`.nothrow(),
+const validate = (directory: string) =>
+  step("Validate", async () => {
+    const check = await step("Run checks", () =>
+      exec`pnpm run check`.cwd(directory).nothrow(),
     );
     return check.exitCode === 0
-      ? f.step("Run tests", () => f.exec`pnpm test`.nothrow())
+      ? step("Run tests", () => exec`pnpm test`.cwd(directory).nothrow())
       : check;
   });
 
@@ -38,19 +38,20 @@ const validationFailure = (validation: {
 export const implement = task(
   {
     name: "Implement",
-    input: Type.String({ description: "The requested code change" }),
+    input: Type.Object({ directory: Type.String({ minLength: 1 }), prompt: Type.String({ description: "The requested code change" }) }),
     output: Type.String({ description: "A summary of the implementation" }),
   },
-  async (f, input): Promise<string> => {
-    const pwd = await git.getPwd(f.cwd);
+  async ({ directory, prompt: input }): Promise<string> => {
+    const pwd = await git.getPwd(directory);
 
-    await using implementationAgent = await f.agent({
+    await using implementationAgent = await agent({
+      cwd: directory,
       model,
       thinkingLevel,
       instructions: agentInstructions,
     });
 
-    let implementationReport = await f.step("Implementing change", () =>
+    let implementationReport = await step("Implementing change", () =>
       implementationAgent.run(input),
     );
 
@@ -58,7 +59,7 @@ export const implement = task(
       throw new Error("Agent completed without changing the worktree");
     }
 
-    let validation = await validate(f);
+    let validation = await validate(directory);
     for (let attempt = 1; validation.exitCode !== 0; attempt++) {
       if (attempt === maxValidationAttempts) {
         throw new Error(
@@ -66,7 +67,7 @@ export const implement = task(
         );
       }
 
-      implementationReport = await f.step(
+      implementationReport = await step(
         `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
         () =>
           implementationAgent.run(
@@ -80,7 +81,7 @@ export const implement = task(
           ),
       );
 
-      validation = await validate(f);
+      validation = await validate(directory);
     }
 
     if (!(await pwd.hasChanges)) {

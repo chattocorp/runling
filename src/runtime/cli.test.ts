@@ -41,6 +41,22 @@ describe("CLI commands", () => {
     });
   });
 
+  test("passes JSON input without interpreting it as a prompt", async () => {
+    const h = harness();
+    const input = '{"directory":"/project","prompt":"change"}';
+    await h.parse(["run", "workflow.ts", "--input", input]);
+    expect(h.run).toHaveBeenCalledWith("workflow.ts", "", {
+      json: false, log: false, verbose: false, input,
+    });
+  });
+
+  test("rejects a prompt combined with JSON input", async () => {
+    const h = harness();
+    await expect(h.parse(["run", "workflow.ts", "prompt", "--input", "{}"])).rejects.toThrow("Use either a prompt or --input");
+    expect(h.run).not.toHaveBeenCalled();
+    expect(h.stderr()).toContain("Use either a prompt or --input");
+  });
+
   test("passes server defaults", async () => {
     const h = harness();
     await h.parse(["serve"]);

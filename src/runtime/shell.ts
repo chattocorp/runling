@@ -1,3 +1,5 @@
+import { requireDirectory } from "./directory.ts";
+import { executionServices } from "./execution.ts";
 import { emitRunlingEvent } from "./events.ts";
 import { log, logCommand } from "./log.ts";
 import {
@@ -38,7 +40,7 @@ export class Command implements PromiseLike<ShellOutput> {
     private readonly launch: (options: Options) => PromiseLike<ProcessResult>,
   ) {}
   cwd(path: string) {
-    this.directory = path;
+    this.directory = requireDirectory(path);
     return this;
   }
   quiet(value = true) {
@@ -66,7 +68,7 @@ export class Command implements PromiseLike<ShellOutput> {
     return (this.execution ??= Promise.resolve().then(async () => {
       try {
         const output = await this.launch({
-          cwd: this.directory,
+          cwd: requireDirectory(this.directory!),
           encoding: "buffer",
           stripFinalNewline: false,
           reject: this.throwOnError,
@@ -101,7 +103,7 @@ export interface CreateShellOptions {
 export { Command as ShellCommand };
 
 export function createShell(options: CreateShellOptions = {}) {
-  return function (this: { cwd?: string } | void, ...args: ShellArguments) {
+  return function (...args: ShellArguments) {
     const [strings, ...expressions] = args;
     const command = strings
       .map(
@@ -116,7 +118,6 @@ export function createShell(options: CreateShellOptions = {}) {
       new Command((config) => execa("sh", ["-c", command], config)),
       formatCommand(...args),
       options,
-      this?.cwd,
     );
   };
 }
@@ -124,7 +125,6 @@ export function createShell(options: CreateShellOptions = {}) {
 /** Execute a program directly. Execa parses the template without a shell. */
 export function createExec(options: CreateShellOptions = {}) {
   return function (
-    this: { cwd?: string } | void,
     strings: TemplateStringsArray,
     ...expressions: TemplateExpression[]
   ) {
@@ -141,7 +141,6 @@ export function createExec(options: CreateShellOptions = {}) {
       new Command((config) => execa(config)(strings, ...expressions)),
       truncateCommand(preview),
       options,
-      this?.cwd,
     );
   };
 }
@@ -152,8 +151,8 @@ function track(
   command: Command,
   formattedCommand: string,
   options: CreateShellOptions,
-  contextCwd?: string,
 ) {
+  const cwd = options.cwd === undefined ? undefined : requireDirectory(options.cwd);
   const id = crypto.randomUUID();
   const startedAt = performance.now();
   emitRunlingEvent({
@@ -165,8 +164,7 @@ function track(
     id,
     `${log.highlight("Running", COMMAND_COLOR)} ${formattedCommand}`,
   );
-  command.quiet(!(options.verbose ?? false));
-  const cwd = options.cwd ?? contextCwd;
+  command.quiet(!(options.verbose ?? executionServices()?.verbose ?? false));
   const configured = cwd === undefined ? command : command.cwd(cwd);
 
   queueMicrotask(() => {
@@ -252,3 +250,6 @@ function formatExpression(expression: ShellExpression): string {
   if (/^[a-zA-Z0-9_./:@%+=,-]+$/.test(value)) return value;
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
+
+export const exec = createExec();
+export const shell = createShell();

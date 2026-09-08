@@ -7,7 +7,7 @@ import {
   stat,
 } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   emptyTokenUsage,
@@ -66,10 +66,7 @@ export class RunStore {
   private pending = new Map<string, Promise<void>>();
   private listeners = new Set<Listener>();
 
-  constructor(
-    readonly directory: string,
-    readonly cwd: string,
-  ) {}
+  constructor(readonly directory: string) {}
 
   async init(): Promise<void> {
     await mkdir(this.directory, { recursive: true });
@@ -207,7 +204,6 @@ export class RunStore {
   ): Promise<WorkflowExecution> {
     const base = performance.now();
     const execution = await runWorkflow(workflow, {
-      cwd: this.cwd,
       input,
       onEvent: (event) => {
         void this.append(id, {
@@ -268,8 +264,10 @@ export async function historyDirectory(cwd: string): Promise<string> {
 
 export function getRunStore(): Promise<RunStore> {
   state.__runlingRunStore ??= (async () => {
-    const cwd = process.env.RUNLING_WEB_WORKFLOW_CWD ?? process.cwd();
-    const store = new RunStore(await historyDirectory(cwd), cwd);
+    const configPath = process.env.RUNLING_WEB_CONFIG;
+    if (!configPath) throw new Error("RUNLING_WEB_CONFIG is required for run history");
+    const cwd = dirname(configPath);
+    const store = new RunStore(await historyDirectory(cwd));
     await store.init();
     return store;
   })();

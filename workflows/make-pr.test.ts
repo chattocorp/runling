@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import type { Runling, Exec, WorkflowResult } from "runling";
+import { vi, describe, expect, test } from "vitest";
+import type { Exec, WorkflowResult } from "runling";
 import {
   createWorktree,
   describePullRequest,
@@ -18,10 +18,11 @@ describe("make-pr workflow", () => {
     const f = {
       exec,
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
     await createWorktree(
-      f,
+      f.cwd ?? "/project",
       "runling/bright-otters-2468",
       "/worktrees/bright-otters-2468",
     );
@@ -56,10 +57,10 @@ describe("make-pr workflow", () => {
     const f = {
       cwd: "/worktree",
       agent: async function (
-        this: Runling,
+        this: { cwd: string },
         options: Record<string, unknown>,
       ) {
-        agentOptions = { ...options, cwd: options.cwd ?? this.cwd };
+        agentOptions = { ...options, cwd: options.cwd };
         const dispose = () => {
           disposed = true;
         };
@@ -81,11 +82,12 @@ describe("make-pr workflow", () => {
         };
       },
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
     await expect(
       describePullRequest(
-        f,
+        f.cwd ?? "/project",
         "Changed the behavior to fix the bug",
         "commit abc123\n\ndiff --git a/foo.ts b/foo.ts",
       ),
@@ -116,13 +118,14 @@ describe("make-pr workflow", () => {
     const f = {
       exec,
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
     const result: WorkflowResult = {
       summary: "Found one issue",
       details: "## Findings\n\nFix the race.",
     };
 
-    await postReview(f, "https://github.com/example/project/pull/42", result);
+    await postReview(f.cwd ?? "/project", "https://github.com/example/project/pull/42", result);
 
     expect(command?.join("_argument_")).toBe(
       "gh pr comment _argument_ --body _argument_",
@@ -142,12 +145,33 @@ describe("make-pr workflow", () => {
     const f = {
       exec,
       step: <T>(_label: string, work: () => T) => work(),
-    } as unknown as Runling;
+    } as Record<string, any>;
+  mocks.current = f;
 
-    await postReview(f, "https://github.com/example/project/pull/42", {
+    await postReview(f.cwd ?? "/project", "https://github.com/example/project/pull/42", {
       summary: "No issues found",
     });
 
     expect(body).toBe("No issues found");
   });
+});
+
+const mocks = vi.hoisted(() => ({ current: {} as Record<string, any> }));
+vi.mock("runling", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("runling")>();
+  return {
+    ...actual,
+    agent: (options: unknown) => mocks.current.agent(options),
+    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    input: (...args: unknown[]) => mocks.current.input(...args),
+    step: (name: string, work: () => unknown) => mocks.current.step(name, work),
+    log: { info: (message: string) => mocks.current.log?.info(message) },
+    exec: (...args: unknown[]) => {
+      const command = mocks.current.exec(...args);
+      return Object.assign(command, { cwd: (directory: string) => {
+        expect(directory).toBe(mocks.current.cwd ?? "/project");
+        return command;
+      } });
+    },
+  };
 });

@@ -15,7 +15,6 @@ export interface WebhookDependencies {
 
 const runConfiguredWorkflow: WebhookRunner = (workflow, input) =>
   runWorkflow(workflow, {
-    cwd: process.env.RUNLING_WEB_WORKFLOW_CWD,
     input,
   });
 

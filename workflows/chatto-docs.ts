@@ -1,4 +1,4 @@
-import { concat, task, Type } from "runling";
+import { input as askInput, runAgent, step, concat, task, Type } from "runling";
 
 const model = "openrouter/z-ai/glm-5.3-flash";
 const documentationRoot =
@@ -7,21 +7,21 @@ const documentationRoot =
 export const chattoDocs = task(
   {
     name: "Answer Chatto documentation question",
-    input: Type.String({ description: "A question about Chatto" }),
+    input: Type.Object({ directory: Type.String({ minLength: 1 }), prompt: Type.String({ description: "A question about Chatto" }) }),
     output: Type.Object({
       summary: Type.String(),
       details: Type.Optional(Type.String()),
       outputs: Type.Object({ answer: Type.String() }),
     }),
   },
-  async (f, input) => {
+  async ({ directory, prompt: input }) => {
     const question =
       input.trim() === ""
-        ? await f.input("What would you like to know about Chatto?")
+        ? await askInput("What would you like to know about Chatto?")
         : input;
 
-    const report = await f.step("Consulting Chatto documentation", () =>
-      f.runAgent(
+    const report = await step("Consulting Chatto documentation", () =>
+      runAgent(
         concat(
           "Answer this question using the official Chatto documentation:",
           question,
@@ -30,6 +30,7 @@ export const chattoDocs = task(
           "Follow relevant documentation links from that page as needed before answering.",
         ),
         {
+          cwd: directory,
           model,
           thinkingLevel: "low",
           tools: ["web_fetch"],
