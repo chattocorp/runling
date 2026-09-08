@@ -1,8 +1,8 @@
-import { concat, Type, workflow } from "runling";
+import { concat, task, Type } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 
-export const research = workflow(
+export const research = task(
   {
     name: "Research topic",
     input: Type.String({ description: "The topic to research" }),

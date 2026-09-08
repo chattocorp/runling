@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { concat, randomId, Type, workflow, type Runling, type WorkflowResult } from "runling";
+import { concat, randomId, task, Type, type Runling, type WorkflowResult } from "runling";
 import { implement } from "./implement.ts";
 import { review } from "./review.ts";
 
@@ -68,7 +68,7 @@ export const createWorktree = (
     await f.exec`git worktree add -b ${branchName} ${worktreePath} origin/${baseBranch}`;
   });
 
-const makePullRequest = workflow(
+const makePullRequest = task(
   {
     name: "Make pull request",
     input: Type.String({ description: "The requested code change" }),

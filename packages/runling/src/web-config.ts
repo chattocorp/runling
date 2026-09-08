@@ -10,7 +10,7 @@ export interface WebhookDefinition<
 
 // Accept heterogeneous workflow signatures; defineWebConfig preserves each concrete type.
 type AnyWebhookDefinition = {
-  workflow: ((...args: any[]) => unknown) &
+  workflow: ((...args: any[]) => Promise<unknown>) &
     Pick<Workflow, "name" | "input" | "output">;
 };
 

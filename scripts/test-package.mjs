@@ -64,9 +64,9 @@ try {
   await writeFile(resolve(project, "helper.ts"), 'export const suffix = "";\n');
   await writeFile(
     resolve(project, "workflow.ts"),
-    `import { Type, workflow } from "runling";
+    `import { task, Type } from "runling";
 import { suffix } from "./helper.ts";
-export default workflow({ name: "Consumer echo", input: Type.Object({ topic: Type.String() }), output: Type.String() }, async (f, input) => {
+export default task({ name: "Consumer echo", input: Type.Object({ topic: Type.String() }), output: Type.String() }, async (f, input) => {
   return f.step("Echo input", async () => {
     await new Promise(resolve => setTimeout(resolve, input.topic === "slow" ? 2000 : 250));
     const cwd = await f.exec\`node -e \${"process.stdout.write(require('node:fs').readFileSync('message.txt', 'utf8'))"}\`.text();
@@ -78,8 +78,8 @@ export default workflow({ name: "Consumer echo", input: Type.Object({ topic: Typ
   );
   await writeFile(
     resolve(project, "cli.ts"),
-    `import { Type, workflow } from "runling";
-export default workflow({ name: "CLI echo", input: Type.String(), output: Type.String() }, (_f, input) => {
+    `import { task, Type } from "runling";
+export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, (_f, input) => {
   if (process.env.RUNLING_PACKAGE_TEST_ENV !== "loaded") throw new Error("Project .env was not loaded");
   return input;
 });

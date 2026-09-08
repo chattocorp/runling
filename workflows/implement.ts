@@ -1,4 +1,4 @@
-import { concat, Type, workflow, type Runling } from "runling";
+import { concat, task, Type, type Runling } from "runling";
 
 const model = "openai-codex/gpt-5.6-sol";
 const thinkingLevel = "medium";
@@ -34,7 +34,7 @@ const validationFailure = (validation: {
     : `${details.slice(0, maxValidationFeedbackLength)}\n\n[Validation output truncated]`;
 };
 
-export const implement = workflow(
+export const implement = task(
   {
     name: "Implement",
     input: Type.String({ description: "The requested code change" }),
