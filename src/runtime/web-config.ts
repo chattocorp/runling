@@ -1,17 +1,17 @@
-import { isWorkflow, type Workflow } from "./workflow.ts";
+import { isTask, type Task } from "./workflow.ts";
 import type { TSchema } from "typebox";
 
 export interface WebhookDefinition<
-  WorkflowInputSchema extends TSchema,
-  WorkflowOutputSchema extends TSchema,
+  InputSchema extends TSchema,
+  OutputSchema extends TSchema,
 > {
-  workflow: Workflow<WorkflowInputSchema, WorkflowOutputSchema>;
+  task: Task<InputSchema, OutputSchema>;
 }
 
-// Accept heterogeneous workflow signatures; defineWebConfig preserves each concrete type.
+// Accept heterogeneous task signatures; defineWebConfig preserves each concrete type.
 type AnyWebhookDefinition = {
-  workflow: ((...args: any[]) => Promise<unknown>) &
-    Pick<Workflow, "name" | "input" | "output">;
+  task: ((...args: any[]) => Promise<unknown>) &
+    Pick<Task, "name" | "input" | "output">;
 };
 
 export interface WebConfig<
@@ -47,8 +47,8 @@ export function isWebConfig(value: unknown): value is WebConfig {
     (definition) =>
       typeof definition === "object" &&
       definition !== null &&
-      "workflow" in definition &&
-      isWorkflow(definition.workflow) &&
+      "task" in definition &&
+      isTask(definition.task) &&
       !("body" in definition) &&
       !("input" in definition),
   );

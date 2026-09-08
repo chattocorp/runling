@@ -27,6 +27,8 @@ Add the `runling` package to your project:
 npm add runling
 ```
 
+Add `"runling": "runling"` to the `scripts` in your `package.json`.
+
 Create `workflows/echo.ts`:
 
 ```ts
@@ -50,7 +52,7 @@ import echo from "./workflows/echo.ts";
 
 export default defineWebConfig({
   webhooks: { 
-    echo: { workflow: echo } 
+    echo: { task: echo }
   } 
 });
 ```

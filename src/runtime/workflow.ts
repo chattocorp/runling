@@ -3,7 +3,7 @@ import { Check, Errors } from "typebox/value";
 import type { Runling } from "./runtime.ts";
 import { isWorkflowSchema } from "./schema.ts";
 
-export interface WorkflowDefinition<
+export interface TaskDefinition<
   InputSchema extends TSchema,
   OutputSchema extends TSchema,
 > {
@@ -12,15 +12,15 @@ export interface WorkflowDefinition<
   output: OutputSchema;
 }
 
-export type WorkflowFunction = (
+export type TaskFunction = (
   f: Runling,
   input: any,
 ) => unknown | Promise<unknown>;
 
-export type Workflow<
+export type Task<
   InputSchema extends TSchema = TSchema,
   OutputSchema extends TSchema = TSchema,
-  Run extends WorkflowFunction = (
+  Run extends TaskFunction = (
     f: Runling,
     input: Static<InputSchema>,
   ) => Static<OutputSchema> | Promise<Static<OutputSchema>>,
@@ -28,7 +28,7 @@ export type Workflow<
   f: Runling,
   input: Static<InputSchema>,
 ) => Promise<Awaited<ReturnType<Run>>>) &
-  Readonly<WorkflowDefinition<InputSchema, OutputSchema>>;
+  Readonly<TaskDefinition<InputSchema, OutputSchema>>;
 
 const validationMessage = (
   workflowName: string,
@@ -50,11 +50,11 @@ const validationMessage = (
 export function task<
   const InputSchema extends TSchema,
   const OutputSchema extends TSchema,
-  const Run extends WorkflowFunction,
+  const Run extends TaskFunction,
 >(
-  definition: WorkflowDefinition<InputSchema, OutputSchema>,
+  definition: TaskDefinition<InputSchema, OutputSchema>,
   run: Run & ((f: Runling, input: Static<InputSchema>) => unknown),
-): Workflow<InputSchema, OutputSchema, Run> {
+): Task<InputSchema, OutputSchema, Run> {
   for (const boundary of ["input", "output"] as const) {
     if (!isWorkflowSchema(definition[boundary])) {
       throw new TypeError(
@@ -83,7 +83,7 @@ export function task<
       }
       return output;
     });
-  }) as Workflow<InputSchema, OutputSchema, Run>;
+  }) as Task<InputSchema, OutputSchema, Run>;
 
   Object.defineProperties(defined, {
     name: { value: definition.name },
@@ -94,8 +94,8 @@ export function task<
   return defined;
 }
 
-export const isWorkflow = (value: unknown): value is Workflow =>
+export const isTask = (value: unknown): value is Task =>
   typeof value === "function" &&
-  typeof (value as Partial<Workflow>).name === "string" &&
-  isWorkflowSchema((value as Partial<Workflow>).input) &&
-  isWorkflowSchema((value as Partial<Workflow>).output);
+  typeof (value as Partial<Task>).name === "string" &&
+  isWorkflowSchema((value as Partial<Task>).input) &&
+  isWorkflowSchema((value as Partial<Task>).output);

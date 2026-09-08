@@ -18,9 +18,9 @@ import {
 import type { Static, TSchema } from "typebox";
 import { TuiReporter } from "./tui.ts";
 import {
-  isWorkflow,
-  type Workflow,
-  type WorkflowFunction,
+  isTask,
+  type Task,
+  type TaskFunction,
 } from "./workflow.ts";
 import {
   formatTokenUsage,
@@ -169,9 +169,9 @@ export async function executeWorkflow(
 export async function runWorkflow<
   InputSchema extends TSchema,
   OutputSchema extends TSchema,
-  Run extends WorkflowFunction,
+  Run extends TaskFunction,
 >(
-  run: Workflow<InputSchema, OutputSchema, Run>,
+  run: Task<InputSchema, OutputSchema, Run>,
   {
     cwd = process.cwd(),
     input,
@@ -294,10 +294,10 @@ async function captureExecutionInContext<Output>(
   };
 }
 
-export async function loadWorkflow(path: string): Promise<Workflow> {
+export async function loadWorkflow(path: string): Promise<Task> {
   const resolvedPath = resolve(path);
   const module = await import(/* @vite-ignore */ pathToFileURL(resolvedPath).href);
-  if (!isWorkflow(module.default)) {
+  if (!isTask(module.default)) {
     throw new Error(
       `Workflow ${resolvedPath} must have a schemaful default workflow export`,
     );

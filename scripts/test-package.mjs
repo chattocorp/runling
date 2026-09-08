@@ -91,7 +91,7 @@ export default task({ name: "CLI echo", input: Type.String(), output: Type.Strin
     resolve(project, "runling.config.ts"),
     `import { defineWebConfig } from "runling/web";
 import echo from "./workflow.ts";
-export default defineWebConfig({ webhooks: { echo: { workflow: echo } } });
+export default defineWebConfig({ webhooks: { echo: { task: echo } } });
 `,
   );
   const cli = await exec(

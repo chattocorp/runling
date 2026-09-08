@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import {
   emptyTokenUsage,
   runWorkflow,
-  type Workflow,
+  type Task,
   type WorkflowExecution,
   type Static,
   type TSchema,
@@ -167,7 +167,7 @@ export class RunStore {
 
   async start<I extends TSchema, O extends TSchema>(
     webhook: string,
-    workflow: Workflow<I, O>,
+    workflow: Task<I, O>,
     input: Static<I>,
     source: "webhook" | "web",
   ) {
@@ -202,7 +202,7 @@ export class RunStore {
 
   private async execute<I extends TSchema, O extends TSchema>(
     id: string,
-    workflow: Workflow<I, O>,
+    workflow: Task<I, O>,
     input: Static<I>,
   ): Promise<WorkflowExecution> {
     const base = performance.now();

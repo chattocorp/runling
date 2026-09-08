@@ -43,11 +43,11 @@ export {
 } from "./shell.ts";
 export { concat, type ConcatPart } from "./utils.ts";
 export {
-  isWorkflow,
+  isTask,
   task,
-  type Workflow,
-  type WorkflowDefinition,
-  type WorkflowFunction,
+  type Task,
+  type TaskDefinition,
+  type TaskFunction,
 } from "./workflow.ts";
 export { Type, type Static, type TSchema } from "typebox";
 export { isWorkflowSchema } from "./schema.ts";
