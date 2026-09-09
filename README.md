@@ -74,64 +74,15 @@ Run `pnpm runling --help` to list commands. Use `run --help` or
 
 ## Workflow context
 
-Every task receives a workflow context as its first argument. The runner creates
-a fresh context for each execution. Pass the same context to child tasks to share
-token and cost totals:
-
-```ts
-import { createWorkflowContext, runWorkflow, task } from "runling";
-
-const uppercase = task((ctx, text: string) => text.toUpperCase());
-const greet = task((ctx, name: string) => uppercase(ctx, `Hello, ${name}`));
-
-const execution = await runWorkflow(greet, { input: "Ada" });
-console.log(execution.output); // "HELLO, ADA"
-
-// For direct task calls, create and pass a context yourself.
-const ctx = createWorkflowContext();
-console.log(greet(ctx, "Ada"));
-console.log(ctx.usage);
-```
-
-`ctx.usage` returns a read-only snapshot with `input`, `output`, `cacheRead`,
-and `cacheWrite` token counts. It includes `cost` in US dollars when a price is
-reported, and `costIncomplete: true` when some recorded tokens have no price.
-Custom integrations can call `ctx.recordUsage(usage)` to add one usage increment
-with these fields.
-
-Pass context to each agent interaction, including calls on reusable agents:
-
-```ts
-import { agent, createWorkflowContext, runAgent } from "runling";
-
-const ctx = createWorkflowContext();
-const options = {
-  cwd: "/path/to/project",
-  model: "openai-codex/gpt-5.6-sol",
-};
-
-await runAgent(ctx, "Describe this project.", options);
-
-await using reviewer = await agent(options);
-await reviewer.run(ctx, "Review the current changes.");
-await reviewer.runOutcome(ctx, "Report any remaining blockers.");
-console.log(ctx.usage);
-```
-
-Built-in agents record usage automatically, including reported usage before a
-failure or cancellation. Do not add their returned usage to the context again.
-Agent creation and forks retain no workflow context; supply it on each
-`run()` or `runOutcome()` call.
-
-Directories remain explicit. The context has no current directory; continue to
-supply `cwd` for agents and `.cwd(directory)` for commands.
+Each workflow execution has a context that holds workflow data, including token
+usage and cost. Tasks receive it as their first argument and pass it to child
+tasks.
 
 ## Task schemas
 
 Tasks accept [Standard Schema](https://standardschema.dev/schema) validators
 such as Zod and Valibot. They validate input and output at runtime, use parsed
-values, and return a Promise. The context is separate from schema input and is
-not validated by the input schema. Existing TypeBox schemas remain supported.
+values, and return a Promise. Existing TypeBox schemas remain supported.
 
 Webhooks also require Standard JSON Schema export. Zod supports this directly;
 for Valibot, wrap schemas with `toStandardJsonSchema` from
