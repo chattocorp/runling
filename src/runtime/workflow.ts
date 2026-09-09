@@ -44,8 +44,11 @@ const validationMessage = (
 /** Track a function with an explicit context, preserving its return behavior. */
 export function task<Run extends (ctx: WorkflowContext, ...args: never[]) => unknown>(
   run: Run,
-): (this: ThisParameterType<Run>, ctx: WorkflowContext,
-  ...args: Parameters<Run> extends [unknown, ...infer Args] ? Args : []
+): Parameters<Run> extends [unknown, ...unknown[]] ? Run : (
+  this: ThisParameterType<Run>,
+  ctx: WorkflowContext,
+  ...args: Parameters<Run> extends [] ? []
+    : Parameters<Run> extends [unknown?, ...infer Args] ? Args : []
 ) => ReturnType<Run>;
 /** Track a function with TypeBox input and output, preserving synchronous results. */
 export function task<

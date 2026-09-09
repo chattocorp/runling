@@ -107,3 +107,10 @@ test("preserves optional task arguments", () => {
   expectTypeOf<Parameters<typeof run>>().toEqualTypeOf<[WorkflowContext, number?]>();
   expect(run(createWorkflowContext())).toBe(2);
 });
+
+test("preserves generic task signatures", () => {
+  const identity = task(<Value>(ctx: WorkflowContext, value: Value): Value => value);
+  const result = identity(createWorkflowContext(), { message: "hello" });
+  expectTypeOf(result).toEqualTypeOf<{ message: string }>();
+  expect(result).toEqual({ message: "hello" });
+});
