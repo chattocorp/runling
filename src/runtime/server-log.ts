@@ -11,10 +11,15 @@ export function serverLog(
   event: string,
   fields: Record<string, unknown> = {},
 ): void {
-  const line = JSON.stringify({ ...fields, time: new Date().toISOString(), level, event },
-    (_key, value) => value instanceof Error
-      ? { name: value.name, message: value.message, stack: value.stack }
-      : value);
+  let line: string;
+  try {
+    line = JSON.stringify({ ...fields, time: new Date().toISOString(), level, event },
+      (_key, value) => value instanceof Error
+        ? { name: value.name, message: value.message, stack: value.stack }
+        : value);
+  } catch {
+    line = JSON.stringify({ time: new Date().toISOString(), level, event, message: "Log details could not be serialized" });
+  }
   console[level](line);
   try {
     const path = serverLogPath();

@@ -48,3 +48,12 @@ describe("server logging", () => {
     expect(error).toHaveBeenCalledWith("Cannot write Runling server log:", expect.any(Error));
   });
 });
+
+it("does not replace the original server failure when error details are circular", () => {
+  setup();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const error: Record<string, unknown> = {};
+  error.self = error;
+  expect(() => serverLog("error", "http.error", { error })).not.toThrow();
+  expect(JSON.parse(readFileSync(serverLogPath(), "utf8"))).toMatchObject({ event: "http.error", message: "Log details could not be serialized" });
+});

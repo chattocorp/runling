@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { createWorkflowContext, emptyTokenUsage, type AgentRunOptions } from "runling";
+import { createWorkflowContext, createMessageChannel, emptyTokenUsage, type AgentRunOptions } from "runling";
 import { runAgentWithText } from "./agent-text.ts";
 
 const report = { outcome: "completed" as const, summary: "For the coordinator", usage: emptyTokenUsage() };
@@ -29,4 +29,19 @@ test("propagates delivery failure and tolerates an absent handler", async () => 
   const ctx = { ...createWorkflowContext(), onText: async () => { throw new Error("post failed"); } };
   await expect(runAgentWithText(ctx, { runOutcome }, "Go")).rejects.toThrow("post failed");
   expect(await runAgentWithText(createWorkflowContext(), { runOutcome }, "Go")).toBe(report);
+});
+
+test("releases its message receiver after the agent fails", async () => {
+  const messages = createMessageChannel();
+  const ctx = { ...createWorkflowContext(), messages };
+  let fail!: () => void;
+  const runOutcome = vi.fn(() => new Promise<typeof report>((_resolve, reject) => { fail = () => reject(new Error("agent failed")); }));
+  const steer = vi.fn(async () => true);
+  const run = runAgentWithText(ctx, { runOutcome, steer }, "Go");
+  const rejected = expect(run).rejects.toThrow("agent failed");
+  expect(await messages.send("pink")).toBe(true);
+  fail();
+  await rejected;
+  expect(await messages.send("later")).toBe(false);
+  expect(steer).toHaveBeenCalledExactlyOnceWith("pink");
 });
