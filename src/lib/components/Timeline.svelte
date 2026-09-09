@@ -37,6 +37,13 @@
     running: boolean;
   } = $props();
   let activityWidth = $state<number>();
+  let overview = $state(true);
+  function toggleOverview() {
+    overview = !overview;
+    try {
+      localStorage.setItem("runling-timeline-overview", String(overview));
+    } catch { /* Storage can be unavailable. */ }
+  }
   let board: HTMLDivElement;
   let ruler: HTMLDivElement;
   let scrollTop = $state(0);
@@ -134,6 +141,9 @@
   }
 
   onMount(() => {
+    try {
+      overview = localStorage.getItem("runling-timeline-overview") !== "false";
+    } catch { /* Use the default when storage is unavailable. */ }
     const observer = new ResizeObserver(() => {
       plotWidth = Math.max(1, ruler.clientWidth);
       visibleHeight = Math.max(1, board.clientHeight - ruler.offsetHeight);
@@ -288,10 +298,11 @@
 
 <section
   class={[
-    "border border-base-300 rounded-box bg-base-100 overflow-hidden",
+    "border border-base-300 rounded-box bg-base-100 overflow-hidden [--default-activity-width:clamp(125px,29%,235px)] max-sm:[--default-activity-width:120px]",
     expanded &&
       "fixed inset-2 z-50 flex flex-col shadow-2xl ring-32 ring-black/50 sm:inset-5",
   ]}
+  style:--activity-width={activityWidth === undefined ? "var(--default-activity-width)" : `min(${activityWidth}px, 65%)`}
   style:--row-height={`${rowHeight}px`}
   aria-label="Execution timeline"
   bind:this={panel}
@@ -333,6 +344,13 @@
         title="Fit full timeline (F)">Fit timeline</button
       >
       <button
+        class="btn btn-xs"
+        class:btn-active={overview}
+        aria-pressed={overview}
+        onclick={toggleOverview}
+        title={overview ? "Hide overview" : "Show overview"}
+      >Overview</button>
+      <button
         class="btn btn-xs btn-square"
         bind:this={expandButton}
         onclick={toggleExpanded}
@@ -359,8 +377,7 @@
       onscroll={() => (scrollTop = board.scrollTop)}
     >
       <div
-        class="relative grid grid-cols-[var(--activity-width)_minmax(0,1fr)] grid-rows-[35px] auto-rows-auto min-w-0 [--default-activity-width:clamp(125px,29%,235px)] max-sm:[--default-activity-width:120px]"
-        style:--activity-width={activityWidth === undefined ? "var(--default-activity-width)" : `min(${activityWidth}px, 65%)`}
+        class="relative grid grid-cols-[var(--activity-width)_minmax(0,1fr)] grid-rows-[35px] auto-rows-auto min-w-0"
       >
         <div
           class="sticky top-0 z-3 bg-base-200 border-b border-b-base-300 text-xs text-base-content/60 flex items-center justify-between py-0 px-3 border-r border-r-base-300"
@@ -573,20 +590,27 @@
         </div>
       </div>
     </div>
-    <TimelineMinimap
-      rows={miniRows}
-      vertical={{ start: scrollTop, span: visibleHeight, total: contentHeight }}
-      {view}
-      elapsed={extent}
-      {selected}
-      onzoomstart={(anchor) => beginMiddleZoom(anchor)}
-      onchange={(next, top) => {
-        manual = next;
-        board.scrollTop = top;
-      }}
-      onfit={fit}
-    />
   </div>
+  {#if overview}
+    <div class="shrink-0 border-t border-base-300 bg-base-200 overflow-y-auto [scrollbar-gutter:stable]">
+      <div class="grid grid-cols-[var(--activity-width)_minmax(0,1fr)]">
+        <div class="px-3 py-2 text-xs text-base-content/60">Overview</div>
+        <TimelineMinimap
+          rows={miniRows}
+          vertical={{ start: scrollTop, span: visibleHeight, total: contentHeight }}
+          {view}
+          elapsed={extent}
+          {selected}
+          onzoomstart={(anchor) => beginMiddleZoom(anchor)}
+          onchange={(next, top) => {
+            manual = next;
+            board.scrollTop = top;
+          }}
+          onfit={fit}
+        />
+      </div>
+    </div>
+  {/if}
   {#if expanded && inspected}
     <div class="py-3.5 px-5 border-t border-t-base-300 shrink-0">
       <strong class="text-xs">{inspected.label}</strong><small
