@@ -336,3 +336,46 @@ describe("configured webhooks", () => {
     expect(await response.json()).toEqual({ error: "Agent failed" });
   });
 });
+
+test("routes handled deliveries without starting or logging a workflow", async () => {
+  let runs = 0;
+  const config = defineWebConfig({ webhooks: { joke: {
+    task: joke,
+    route: async (_input, _start) => null,
+  } } });
+  const response = await handleWebhook("joke", request('"answer"'), {
+    config, run: async () => { runs++; return execution("unused"); },
+    log: () => { throw new Error("must not log a run"); },
+  });
+  expect(response.status).toBe(202);
+  expect(await response.json()).toEqual({ handled: true });
+  expect(runs).toBe(0);
+});
+
+test("validates before routing and routes raw input before schema transforms", async () => {
+  const seen: unknown[] = [];
+  const length = task({ name: "Length", input: z.string().transform(s => s.length), output: z.number() }, (ctx, value) => value);
+  const config = defineWebConfig({ webhooks: { length: { task: length, route: async (input, start) => {
+    seen.push(input);
+    return start();
+  } } } });
+  expect((await handleWebhook("length", request('{}'), { config })).status).toBe(400);
+  expect(seen).toEqual([]);
+  const response = await handleWebhook("length", request('"hello"'), { config, log: () => {} });
+  expect(await response.json()).toEqual({ output: 5 });
+  expect(seen).toEqual(["hello"]);
+});
+
+test("a route cannot start the same delivery twice", async () => {
+  let runs = 0;
+  const config = defineWebConfig({ webhooks: { joke: { task: joke, route: async (_input, start) => {
+    const [result] = await Promise.all([start(), start()]);
+    return result;
+  } } } });
+  await handleWebhook("joke", request('"hello"'), { config, log: () => {}, run: async () => { runs++; return execution("ok"); } });
+  expect(runs).toBe(1);
+});
+
+test("rejects non-function routes", () => {
+  expect(isWebConfig({ webhooks: { joke: { task: joke, route: true } } })).toBe(false);
+});

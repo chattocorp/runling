@@ -1,5 +1,5 @@
 import { runWorkflow, validateSchema, type Task, type WorkflowExecution } from "runling";
-import { describeTaskSchemas, type WebConfig } from "runling/web";
+import { describeTaskSchemas, type WebhookRouter, type WebConfig } from "runling/web";
 
 type WebhookRunner = (
   workflow: Task,
@@ -42,7 +42,8 @@ export async function handleWebhook(
 ): Promise<Response> {
   const prepared = await prepareWebhook(name, request, config);
   if (prepared instanceof Response) return prepared;
-  const execution = await run(prepared.task, prepared.input);
+  const execution = await routeWebhook(prepared, () => run(prepared.task, prepared.input));
+  if (execution === null) return json({ handled: true }, 202);
   if (!execution.ok) {
     return json({ error: execution.error ?? "The workflow failed." }, 500);
   }
@@ -54,7 +55,7 @@ export async function prepareWebhook(
   name: string,
   request: Request,
   config: WebConfig,
-): Promise<Response | { task: Task; input: unknown }> {
+): Promise<Response | { task: Task; input: unknown; route?: WebhookRouter<any> }> {
   if (!Object.hasOwn(config.webhooks, name)) {
     return json({ error: `Unknown webhook ${JSON.stringify(name)}.` }, 404);
   }
@@ -79,5 +80,22 @@ export async function prepareWebhook(
   }
 
   // Pass the original input. The task parses it when the run starts.
-  return { task: definition.task, input: body };
+  return { task: definition.task, input: body, route: definition.route };
+}
+
+/** A router may start at most one run for this delivery. */
+export async function routeWebhook<Result>(
+  prepared: { input: unknown; route?: WebhookRouter<any> },
+  start: () => Promise<Result>,
+): Promise<Result | null> {
+  let started: Promise<Result> | undefined;
+  const once = () => {
+    started ??= Promise.resolve().then(start);
+    // A misbehaving router must not create an unhandled start rejection.
+    void started.catch(() => {});
+    return started;
+  };
+  if (!prepared.route) return once();
+  const result = await prepared.route(prepared.input, once);
+  return started ?? result;
 }

@@ -21,7 +21,8 @@ pnpm dev
 
 In Chatto's bot settings, create an outbound webhook pointing to
 `http://localhost:5173/api/runs/start/chatto-input-demo` when both services run on the same
-machine. This endpoint returns `202` while the workflow continues.
+machine. This endpoint returns `202` while the workflow continues. Thread replies are routed
+to that run without creating separate runs.
 Send the bot a new root DM, then answer each question in the bot’s
 reply thread. Open Runling's console to inspect the waiting run and its events.
 

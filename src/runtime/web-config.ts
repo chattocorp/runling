@@ -1,15 +1,23 @@
 import { isSchemaTask, type Task } from "./workflow.ts";
-import { toJsonSchema, type WorkflowSchema } from "./schema.ts";
+import { toJsonSchema, type WorkflowSchema, type SchemaInput } from "./schema.ts";
+
+/** Route a validated raw payload before a run exists. Return null when handled. */
+export type WebhookRouter<Input = unknown> = <Result>(
+  input: Input,
+  start: () => Promise<Result>,
+) => Promise<Result | null>;
 
 export interface WebhookDefinition<
   InputSchema extends WorkflowSchema,
   OutputSchema extends WorkflowSchema,
 > {
   task: Task<InputSchema, OutputSchema>;
+  route?: WebhookRouter<SchemaInput<InputSchema>>;
 }
 
 // Accept heterogeneous task signatures; defineWebConfig preserves each concrete type.
 type AnyWebhookDefinition = {
+  route?: WebhookRouter<any>;
   task: ((...args: any[]) => unknown) &
     Pick<Task, "name" | "input" | "output">;
 };
@@ -29,6 +37,7 @@ export function defineWebConfig<
 >(config: WebConfig<Webhooks>): WebConfig<Webhooks> {
   for (const [name, definition] of Object.entries(config.webhooks)) {
     try {
+      if (definition.route !== undefined && typeof definition.route !== "function") throw new TypeError("route must be a function");
       describeTaskSchemas(definition.task);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
@@ -65,6 +74,7 @@ export function isWebConfig(value: unknown): value is WebConfig {
       definition !== null &&
       "task" in definition &&
       isSchemaTask(definition.task) &&
+      (!("route" in definition) || definition.route === undefined || typeof definition.route === "function") &&
       !("body" in definition) &&
       !("input" in definition),
   );
