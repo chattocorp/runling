@@ -6,7 +6,7 @@
   import TimelineMinimap from "./TimelineMinimap.svelte";
   import { middleDrag } from "$lib/middle-drag.ts";
   import { duration } from "$lib/runs.ts";
-  import { findActivity, isActivityActive, type Activity } from "$lib/timeline.ts";
+  import { findActivity, isActivityActive, activityStatus, type Activity } from "$lib/timeline.ts";
   import ActivityIndicator from "./ActivityIndicator.svelte";
   import {
     barPosition,
@@ -441,7 +441,7 @@
                 class="grid gap-1 min-w-0 flex-1 bg-transparent border-0 p-1 overflow-hidden text-left cursor-pointer text-base-content"
                 onclick={() => onselect(node.id)}
                 aria-pressed={selected === node.id}
-                title={`${node.label} (${node.kind}, ${node.status})`}
+                title={`${node.label} (${node.kind}, ${activityStatus(node)})`}
                 ><strong
                   class="leading-4 text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis"
                   >{node.label}</strong
@@ -455,7 +455,7 @@
                     class={[
                       "text-xs leading-3 text-base-content/60",
                       rowHeight < 32 && "hidden",
-                    ]}>{node.kind}</small
+                    ]}>{node.kind === "input" ? activityStatus(node) : node.kind}</small
                   >{/if}</button
               >
             </div>
@@ -505,10 +505,10 @@
                   data-kind={node.kind}
                   style:left={`${bar.left}%`}
                   style:width={`max(6px, ${bar.width}%)`}
-                  aria-label={`${node.label}, ${node.status}, starts at ${duration(node.startedAt)}, duration ${duration(end - node.startedAt)}`}
+                  aria-label={`${node.label}, ${activityStatus(node)}, starts at ${duration(node.startedAt)}, duration ${duration(end - node.startedAt)}`}
                   aria-pressed={selected === node.id}
                   onclick={() => onselect(node.id)}
-                  title={`${node.label}\n${node.status} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}${node.preview ? `\n${node.preview}` : ""}`}
+                  title={`${node.label}\n${activityStatus(node)} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}${node.preview ? `\n${node.preview}` : ""}`}
                 >
                   {#if isActivityActive(node)}
                     <span class="relative ml-2 flex shrink-0 items-center" title="Active task">

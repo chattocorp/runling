@@ -445,3 +445,14 @@ class FakeTerminal implements Terminal {
     this.onInput?.(data);
   }
 }
+
+test("renders timeout and cancellation reasons for questions", () => {
+  const dashboard = new RunlingDashboard("Questions", 0);
+  for (const reason of ["timeout", "cancelled"] as const) {
+    dashboard.handle(event({ type: "input.requested", id: reason, message: reason }));
+    dashboard.handle(event({ type: "input.finished", id: reason, status: "failed", reason, durationMs: 1000 }));
+  }
+  const text = stripVTControlCharacters(dashboard.render(100).join("\n"));
+  expect(text).toContain("timed out");
+  expect(text).toContain("cancelled");
+});

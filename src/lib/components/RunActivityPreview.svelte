@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { RunActivity } from "$lib/runs.ts";
   let { activity }: { activity?: RunActivity | null } = $props();
-  let label = $derived(activity?.waiting ? "Waiting for input" : activity?.step ?? activity?.label ?? "Waiting for activity…");
+  let label = $derived(activity?.waiting ? `${activity.pendingInputs ?? 1} ${(activity.pendingInputs ?? 1) === 1 ? "input" : "inputs"} pending` : activity?.step ?? activity?.label ?? "Waiting for activity…");
   let detail = $derived(activity?.preview ?? (activity?.label !== label ? activity?.label : undefined));
 </script>
 

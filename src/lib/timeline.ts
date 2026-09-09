@@ -8,6 +8,7 @@ export interface Activity {
   kind: "step" | "command" | "agent" | "input";
   parent?: string;
   status: string;
+  reason?: "timeout" | "cancelled";
   startedAt: number;
   durationMs?: number;
   logs: string[];
@@ -65,6 +66,7 @@ export function buildTimeline(
       if (node) {
         node.status = event.status === "answered" ? "completed" : event.status;
         node.durationMs = event.durationMs;
+        if (event.type === "input.finished" && event.status === "failed") node.reason = event.reason;
         if (event.type === "command.finished") {
           if (event.output.stdout) node.logs.push(event.output.stdout);
           if (event.output.stderr) node.logs.push(event.output.stderr);
@@ -148,4 +150,14 @@ export function findActivity(
     const child = findActivity(node.children, id);
     if (child) return child;
   }
+}
+
+/** Input waits are activities, not a paused workflow. */
+export function activityStatus(activity: Activity): string {
+  if (activity.kind !== "input") return activity.status;
+  if (activity.status === "running") return "waiting for input";
+  if (activity.status === "completed") return "answered";
+  if (activity.reason === "timeout") return "timed out";
+  if (activity.reason === "cancelled") return "cancelled";
+  return activity.status;
 }

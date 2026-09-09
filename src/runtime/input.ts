@@ -1,8 +1,11 @@
+import { createTimeout, TimeoutError } from "./timeout.ts";
 import type { WorkflowContext } from "./context.ts";
 import { bindRunlingContext, emitRunlingEvent } from "./events.ts";
 import { log, logInput } from "./log.ts";
 
 export interface InputOptions {
+  /** Maximum elapsed time in seconds. Omit for no deadline. */
+  timeout?: number;
   defaultValue?: string;
   signal?: AbortSignal;
 }
@@ -27,11 +30,13 @@ export class InputUnavailableError extends Error {
 
 export const createInput = (handleInput?: InputHandler): Input =>
   async (message, options = {}) => {
-    const signal = options.signal;
+    const deadline = createTimeout(options.timeout, "Input");
+    const signals = [options.signal, deadline.signal].filter((signal): signal is AbortSignal => !!signal);
+    const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
     let abort: (() => void) | undefined;
     const id = crypto.randomUUID();
     const startedAt = performance.now();
-    const request = { id, message, ...options };
+    const request = { id, message, ...options, signal };
     const emit = bindRunlingContext(emitRunlingEvent);
 
     emit({
@@ -75,11 +80,13 @@ export const createInput = (handleInput?: InputHandler): Input =>
         type: "input.finished",
         id,
         status: "failed",
+        ...(signal?.aborted ? { reason: signal.reason instanceof TimeoutError ? "timeout" as const : "cancelled" as const } : {}),
         durationMs: performance.now() - startedAt,
       });
       logInput(id, "error", `${log.highlight("Input failed", "crimson")} ${message}`);
       throw error;
     } finally {
+      deadline.dispose();
       if (abort) signal?.removeEventListener("abort", abort);
     }
   };

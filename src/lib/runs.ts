@@ -6,6 +6,7 @@ export interface RunActivity {
   step?: string;
   preview?: string;
   waiting: boolean;
+  pendingInputs: number;
   parallel: number;
 }
 export interface RunSummary {

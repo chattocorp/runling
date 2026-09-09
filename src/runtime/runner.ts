@@ -1,3 +1,4 @@
+import { createTimeout } from "./timeout.ts";
 import { createObservedWorkflowContext, type WorkflowContext } from "./context.ts";
 import { withExecutionServices } from "./execution.ts";
 import { resolve } from "node:path";
@@ -74,6 +75,8 @@ export interface ExecutionOptions {
 }
 
 export interface RunWorkflowOptions<Input = unknown> {
+  /** Maximum elapsed time in seconds, including input waits. Cancellation is cooperative. */
+  timeout?: number;
   input: Input;
   verbose?: boolean;
   onInput?: InputHandler;
@@ -165,12 +168,12 @@ export async function executeWorkflow(
 /** Run a workflow without assuming a terminal, printing, or changing process state. */
 export async function runWorkflow<Input, Output>(
   run: (ctx: WorkflowContext, input: Input) => Output,
-  { input, verbose = false, onInput, onEvent = () => {} }: RunWorkflowOptions<Input>,
+  { input, verbose = false, onInput, onEvent = () => {}, timeout }: RunWorkflowOptions<Input>,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
   return withExecutionServices({ verbose }, () =>
     observeRunlingEvents(onEvent, () =>
       log.withDestination("silent", () =>
-        captureExecution(ctx => log.indented(() => run(ctx, input)), onInput),
+        captureExecution(ctx => log.indented(() => run(ctx, input)), onInput, timeout),
       ),
     ),
   );
@@ -238,10 +241,12 @@ async function reportExecution(
 async function captureExecution<Output>(
   run: (ctx: WorkflowContext) => Promise<Output> | Output,
   onInput?: InputHandler,
+  timeout?: number,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
+  const deadline = createTimeout(timeout, "Workflow");
   const ctx = createObservedWorkflowContext(bindRunlingContext((usage: TokenUsage) =>
     emitRunlingEvent({ type: "usage.updated", usage }),
-  ));
+  ), deadline.signal);
   ctx.onInput = onInput;
   const start = performance.now();
   let result: WorkflowResult | null = null;
@@ -249,6 +254,7 @@ async function captureExecution<Output>(
   let error: string | null = null;
 
   try {
+    ctx.signal.throwIfAborted();
     const value = await run(ctx);
     ctx.signal.throwIfAborted();
     result = normalizeWorkflowResult(value);
@@ -256,6 +262,8 @@ async function captureExecution<Output>(
   } catch (cause) {
     const failure = ctx.signal.aborted ? ctx.signal.reason : cause;
     error = failure instanceof Error ? failure.message : String(failure);
+  } finally {
+    deadline.dispose();
   }
 
   const usage = { ...ctx.usage };
