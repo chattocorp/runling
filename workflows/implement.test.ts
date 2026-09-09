@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { type Exec } from "runling";
 import * as git from "runling/git";
@@ -87,7 +88,7 @@ function runtimeWith({
       };
       return {
         id: "test-agent-0000",
-        run: (prompt: string) => runAgent(prompt, resolvedOptions),
+        run: (_ctx: unknown, prompt: string) => runAgent(prompt, resolvedOptions),
         dispose,
         async [Symbol.asyncDispose]() {
           dispose();
@@ -126,7 +127,7 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement({ directory: runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Implementation summary");
+    await expect(implement(createWorkflowContext(), { directory: runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Implementation summary");
     expect(prompts).toEqual(["Make the change"]);
     expect(git.getPwd).toHaveBeenCalledExactlyOnceWith(runling.cwd);
   });
@@ -134,7 +135,7 @@ describe("implement workflow", () => {
   test("runs agents on Sol with medium thinking", async () => {
     const setup = runtimeWith();
 
-    await expect(implement({ directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
+    await expect(implement(createWorkflowContext(), { directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -171,7 +172,7 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement({ directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Repaired summary");
+    await expect(implement(createWorkflowContext(), { directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Repaired summary");
 
     expect(setup.agentOptions).toHaveLength(1);
     expect(setup.disposedAgents).toBe(1);
@@ -194,7 +195,7 @@ describe("implement workflow", () => {
       },
     });
 
-    await expect(implement({ directory: runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
+    await expect(implement(createWorkflowContext(), { directory: runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
 
     expect(checks).toBe(1);
     expect(tests).toBe(1);
@@ -228,7 +229,7 @@ describe("implement workflow", () => {
     });
     TestShellError = setup.TestShellError;
 
-    await expect(implement({ directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
+    await expect(implement(createWorkflowContext(), { directory: setup.runling.cwd ?? "/project", prompt: "Make the change" })).resolves.toBe("Made the change");
 
     expect(tests).toBe(2);
     expect(setup.messages).toEqual([
@@ -250,7 +251,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },

@@ -1,3 +1,4 @@
+import type { WorkflowContext } from "./context.ts";
 import { requireDirectory } from "./directory.ts";
 import { stripVTControlCharacters } from "node:util";
 import {
@@ -29,7 +30,6 @@ import {
   accumulateTokenUsage,
   emptyTokenUsage,
   formatTokenUsage,
-  recordTokenUsage,
   type TokenUsage,
 } from "./usage.ts";
 
@@ -144,9 +144,9 @@ export interface RunlingAgent extends AsyncDisposable {
   /** Human-friendly ID used to prefix this agent's log lines. */
   readonly id: string;
   /** Run one turn and require it to complete successfully. */
-  run(prompt: string, options?: AgentRunOptions): Promise<CompletedAgentReport>;
+  run(ctx: WorkflowContext, prompt: string, options?: AgentRunOptions): Promise<CompletedAgentReport>;
   /** Run one turn and return any reported outcome. */
-  runOutcome(prompt: string, options?: AgentRunOptions): Promise<AgentResult>;
+  runOutcome(ctx: WorkflowContext, prompt: string, options?: AgentRunOptions): Promise<AgentResult>;
   /** Create an independent in-memory agent with a copy of this conversation. */
   fork(): Promise<RunlingAgent>;
   /** Release the underlying in-memory session. */
@@ -185,6 +185,7 @@ function highlightToolAction(tool: string, description: string): string {
 }
 
 export async function runAgent(
+  ctx: WorkflowContext,
   prompt: string,
   options: RunAgentOptions,
 ): Promise<AgentResult> {
@@ -193,7 +194,7 @@ export async function runAgent(
   const instance = await agent(createOptions);
 
   try {
-    return await instance.runOutcome(prompt, { signal });
+    return await instance.runOutcome(ctx, prompt, { signal });
   } finally {
     instance.dispose();
   }
@@ -350,6 +351,7 @@ async function createRunlingAgent(
   };
 
   const runOutcome: RunlingAgent["runOutcome"] = async (
+    ctx,
     prompt,
     { signal } = {},
   ) => {
@@ -526,7 +528,7 @@ async function createRunlingAgent(
         if (finalText.trim()) agentLog.info(finalText);
 
         accumulateTokenUsage(usage, event.message.usage);
-        recordTokenUsage(event.message.usage);
+        ctx.recordUsage(event.message.usage);
         emitRunlingEvent({ type: "agent.usage", agentId, usage: { ...usage } });
         agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
       }
@@ -591,8 +593,8 @@ async function createRunlingAgent(
   return {
     id: agentId,
 
-    async run(prompt, runOptions) {
-      const report = await runOutcome(prompt, runOptions);
+    async run(ctx, prompt, runOptions) {
+      const report = await runOutcome(ctx, prompt, runOptions);
       if (report.outcome !== "completed") {
         throw new AgentOutcomeError(report);
       }

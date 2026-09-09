@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { vi, describe, expect, test } from "vitest";
 
 import { research } from "./research.ts";
@@ -32,7 +33,7 @@ describe("research workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await expect(research({ directory: f.cwd ?? "/project", prompt: "The Bun JavaScript runtime" })).resolves.toEqual({
+    await expect(research(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "The Bun JavaScript runtime" })).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { research: completedReport.details },
@@ -64,7 +65,7 @@ describe("research workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await research({ directory: f.cwd ?? "/project", prompt: "  " });
+    await research(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "  " });
 
     expect(questions).toEqual(["What topic should I research?"]);
     expect(prompts[0]).toContain("Agentic software factories");
@@ -77,7 +78,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },

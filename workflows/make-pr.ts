@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { agent, exec, log, step, concat, randomId, task, Type, type WorkflowResult } from "runling";
+import { agent, exec, log, step, concat, randomId, task, Type, type WorkflowContext, type WorkflowResult } from "runling";
 import { implement } from "./implement.ts";
 import { review } from "./review.ts";
 
@@ -10,6 +10,7 @@ const thinkingLevel = "medium";
 
 // Ground generated PR copy in both the agent's intent and the committed diff.
 export const describePullRequest = (
+  ctx: WorkflowContext,
   directory: string,
   implementationSummary: string,
   committedChange: string,
@@ -23,6 +24,7 @@ export const describePullRequest = (
     });
 
     const report = await writer.run(
+      ctx,
       concat(
         "Write the title and Markdown description for a pull request containing the current commit.",
         "Use the supplied commit and diff, inspecting repository files when useful.",
@@ -81,7 +83,7 @@ const makePullRequest = task(
       }),
     }),
   },
-  async ({ directory, prompt: input }) => {
+  async (ctx, { directory, prompt: input }) => {
     await exec`gh auth status`.cwd(directory);
 
     const worktreeId = randomId();
@@ -95,17 +97,18 @@ const makePullRequest = task(
     log.info(`Working in ${worktreePath}`);
 
     await exec`pnpm install --frozen-lockfile`.cwd(worktreePath);
-    const implementationSummary = await implement({ directory: worktreePath, prompt: input });
+    const implementationSummary = await implement(ctx, { directory: worktreePath, prompt: input });
 
     // Review the complete staged change before capturing it in a commit.
     await exec`git add --all`.cwd(worktreePath);
-    const reviewResult = await review({ directory: worktreePath, prompt: "" });
+    const reviewResult = await review(ctx, { directory: worktreePath, prompt: "" });
     await exec`git commit -m ${implementationSummary}`.cwd(worktreePath);
 
     // Describe exactly what will appear in the pull request.
     const committedChange =
       await exec`git show --format=fuller --stat --patch --no-ext-diff HEAD`.cwd(worktreePath).text();
     const pullRequest = await describePullRequest(
+      ctx,
       worktreePath,
       implementationSummary,
       committedChange,

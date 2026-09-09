@@ -6,7 +6,7 @@ export default task(
     input: Type.Object({ directory: Type.String(), prompt: Type.String() }),
     output: Type.Object({ directory: Type.String(), prompt: Type.String() }),
   },
-  async ({ directory, prompt }) => ({
+  async (ctx, { directory, prompt }) => ({
     directory: await exec`${process.execPath} -e ${"process.stdout.write(process.cwd())"}`.cwd(directory).text(),
     prompt,
   }),

@@ -12,7 +12,7 @@ export const research = task(
       outputs: Type.Object({ research: Type.String() }),
     }),
   },
-  async ({ directory, prompt: input }) => {
+  async (ctx, { directory, prompt: input }) => {
     const topic =
       input.trim() === ""
         ? await askInput("What topic should I research?")
@@ -20,6 +20,7 @@ export const research = task(
 
     const report = await step("Researching topic", () =>
       runAgent(
+        ctx,
         concat(
           "Research the following topic using the web_fetch tool:",
           topic,

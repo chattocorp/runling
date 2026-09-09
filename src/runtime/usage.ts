@@ -1,6 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import { emitRunlingEvent } from "./events.ts";
-
 export interface TokenUsage {
   /** Non-cached input tokens. */
   input: number;
@@ -16,7 +13,7 @@ export interface TokenUsage {
   costIncomplete?: boolean;
 }
 
-type TokenUsageInput = Omit<TokenUsage, "cost"> & {
+export type TokenUsageInput = Omit<TokenUsage, "cost"> & {
   cost?: number | { total?: number };
 };
 
@@ -81,7 +78,7 @@ export function isTokenUsage(value: unknown): value is TokenUsage {
   );
 }
 
-const hasValidTokenCounts = (value: unknown): value is TokenUsageInput => {
+export const hasValidTokenCounts = (value: unknown): value is TokenUsageInput => {
   if (typeof value !== "object" || value === null) return false;
 
   const usage = value as TokenUsageInput;
@@ -96,35 +93,3 @@ const readCost = (cost: TokenUsageInput["cost"]): number | undefined => {
     ? value
     : undefined;
 };
-
-const executionUsage = new AsyncLocalStorage<TokenUsage>();
-
-/** Keep token totals local to one execution, including its parallel agents. */
-export const withTokenUsage = <T>(work: () => T): T =>
-  executionUsage.run(emptyTokenUsage(), work);
-
-/** Add usage to the active run. Standalone agents retain only their own totals. */
-export function recordTokenUsage(usage: TokenUsageInput): void {
-  const current = executionUsage.getStore();
-  if (!current) return;
-  accumulateTokenUsage(current, usage);
-  emitRunlingEvent({
-    type: "usage.updated",
-    usage: getRecordedTokenUsage(),
-  });
-}
-
-/** Return a snapshot of the active run's totals, or zeroes outside a run. */
-export function getRecordedTokenUsage(): TokenUsage {
-  return { ...(executionUsage.getStore() ?? emptyTokenUsage()) };
-}
-
-/** Reset workflow-wide totals, e.g. at the start of a workflow execution. */
-export function resetTokenUsage(): void {
-  const current = executionUsage.getStore();
-  if (current) {
-    Object.assign(current, emptyTokenUsage());
-    delete current.cost;
-    delete current.costIncomplete;
-  }
-}

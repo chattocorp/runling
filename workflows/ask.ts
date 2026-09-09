@@ -12,7 +12,7 @@ export const ask = task(
       outputs: Type.Object({ answer: Type.String() }),
     }),
   },
-  async ({ directory, prompt: input }) => {
+  async (ctx, { directory, prompt: input }) => {
     const question =
       input.trim() === ""
         ? await askInput("What would you like to know about the repository?")
@@ -20,6 +20,7 @@ export const ask = task(
 
     const report = await step("Investigating repository", () =>
       runAgent(
+        ctx,
         concat(
           "Answer this question about the repository:",
           question,

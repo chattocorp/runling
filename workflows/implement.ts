@@ -41,7 +41,7 @@ export const implement = task(
     input: Type.Object({ directory: Type.String({ minLength: 1 }), prompt: Type.String({ description: "The requested code change" }) }),
     output: Type.String({ description: "A summary of the implementation" }),
   },
-  async ({ directory, prompt: input }): Promise<string> => {
+  async (ctx, { directory, prompt: input }): Promise<string> => {
     const pwd = await git.getPwd(directory);
 
     await using implementationAgent = await agent({
@@ -52,7 +52,7 @@ export const implement = task(
     });
 
     let implementationReport = await step("Implementing change", () =>
-      implementationAgent.run(input),
+      implementationAgent.run(ctx, input),
     );
 
     if (!(await pwd.hasChanges)) {
@@ -71,6 +71,7 @@ export const implement = task(
         `Repairing validation (attempt ${attempt}/${maxValidationAttempts})`,
         () =>
           implementationAgent.run(
+            ctx,
             concat(
               "Project validation failed. Fix the implementation and tests so that both `pnpm run check` and `pnpm test` pass.",
               "In your report, summarize the complete implementation, including this repair.",

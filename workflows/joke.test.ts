@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { vi, describe, expect, test } from "vitest";
 
 import { joke } from "./joke.ts";
@@ -30,7 +31,7 @@ describe("joke workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await expect(joke({ directory: f.cwd ?? "/project", prompt: "" })).resolves.toBe(
+    await expect(joke(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "" })).resolves.toBe(
       "# Joke\n\nTypeScript walked into a bar, but JavaScript let it in anyway.",
     );
     expect(questions).toEqual(["What should the joke be about?"]);
@@ -71,7 +72,7 @@ describe("joke workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await joke({ directory: f.cwd ?? "/project", prompt: "webhooks" });
+    await joke(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "webhooks" });
 
     expect(askedForInput).toBe(false);
     expect(prompts[0]).toContain('"webhooks"');
@@ -86,7 +87,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },

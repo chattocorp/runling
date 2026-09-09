@@ -10,7 +10,7 @@ describe("execution services", () => {
     const first = Promise.withResolvers<string>();
     const second = Promise.withResolvers<string>();
     const events: RunlingEvent[][] = [[], []];
-    const ask = task(async function ask(message: string) {
+    const ask = task(async function ask(ctx, message: string) {
       const answer = await input(message);
       log.debug(`debug:${answer}`);
       log.info(answer);

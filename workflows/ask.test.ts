@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { vi, describe, expect, test } from "vitest";
 
 import { ask } from "./ask.ts";
@@ -32,7 +33,7 @@ describe("ask workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await expect(ask({ directory: f.cwd ?? "/project", prompt: "How do tasks use runtime helpers?" })).resolves.toEqual({
+    await expect(ask(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "How do tasks use runtime helpers?" })).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { answer: completedReport.details },
@@ -67,7 +68,7 @@ describe("ask workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await ask({ directory: f.cwd ?? "/project", prompt: "" });
+    await ask(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "" });
 
     expect(questions).toEqual([
       "What would you like to know about the repository?",
@@ -82,7 +83,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },

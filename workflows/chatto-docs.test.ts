@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { vi, describe, expect, test } from "vitest";
 
 import { chattoDocs } from "./chatto-docs.ts";
@@ -32,7 +33,7 @@ describe("chatto-docs workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await expect(chattoDocs({ directory: f.cwd ?? "/project", prompt: "What is Chatto?" })).resolves.toEqual({
+    await expect(chattoDocs(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "What is Chatto?" })).resolves.toEqual({
       summary: completedReport.summary,
       details: completedReport.details,
       outputs: { answer: completedReport.details },
@@ -71,7 +72,7 @@ describe("chatto-docs workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await chattoDocs({ directory: f.cwd ?? "/project", prompt: " " });
+    await chattoDocs(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: " " });
 
     expect(questions).toEqual(["What would you like to know about Chatto?"]);
     expect(prompts[0]).toContain("How do I get started?");
@@ -84,7 +85,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },

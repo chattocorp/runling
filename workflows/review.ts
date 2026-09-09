@@ -30,7 +30,7 @@ export const review = task(
       outputs: Type.Optional(Type.Object({ review: Type.String() })),
     }),
   },
-  async ({ directory, prompt: input }) => {
+  async (ctx, { directory, prompt: input }) => {
     const status = await exec`git status --short`.cwd(directory).text();
     if (status.trim() === "") return { summary: "No changes to review" };
 
@@ -50,6 +50,7 @@ export const review = task(
 
     await step("Investigate change", () =>
       orchestrator.run(
+        ctx,
         concat(
           "Build a factual understanding of the current working-tree change for several focused reviewers.",
           "Do not modify the repository.",
@@ -67,7 +68,7 @@ export const review = task(
     const reviewResults = await Promise.allSettled(
       perspectives.map(async ({ name, prompt }) => {
         await using reviewer = await orchestrator.fork();
-        return await step(`Review ${name}`, () => reviewer.run(prompt));
+        return await step(`Review ${name}`, () => reviewer.run(ctx, prompt));
       }),
     );
 
@@ -88,6 +89,7 @@ export const review = task(
 
     const report = await step("Synthesize review", () =>
       orchestrator.run(
+        ctx,
         concat(
           "Synthesize the focused reports below into one concise code review.",
           "Report only concrete, actionable findings, ordered by severity. Say clearly when no issues were found.",

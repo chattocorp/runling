@@ -79,7 +79,7 @@ describe.each([
     expect(JSON.parse(stdout)).toMatchObject({ ok: false, output: null, error: expect.any(String) });
   });
 
-  test("loads a task file and passes only its input", async () => {
+  test("loads a task file and passes context and input", async () => {
     const child = spawnProcess(
       [process.execPath, ...flags, executable, "run", fixture, "A workflow result"],
       {

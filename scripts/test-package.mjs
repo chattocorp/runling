@@ -67,7 +67,7 @@ try {
     `import { task, exec, step, log } from "runling";
 import { z } from "zod";
 import { suffix } from "./helper.ts";
-export default task({ name: "Consumer echo", input: z.object({ topic: z.string(), directory: z.string() }), output: z.string() }, async (input) => {
+export default task({ name: "Consumer echo", input: z.object({ topic: z.string(), directory: z.string() }), output: z.string() }, async (ctx, input) => {
   return step("Echo input", async () => {
     await new Promise(resolve => setTimeout(resolve, input.topic === "slow" ? 2000 : 250));
     const cwd = await exec\`node -e \${"process.stdout.write(require('node:fs').readFileSync('message.txt', 'utf8'))"}\`.cwd(input.directory).text();
@@ -79,11 +79,13 @@ export default task({ name: "Consumer echo", input: z.object({ topic: z.string()
   );
   await writeFile(
     resolve(project, "cli.ts"),
-    `import { task, Type, exec, step, log } from "runling";
+    `import { task, Type, exec, step, log, createWorkflowContext } from "runling";
 import * as git from "runling/git";
-export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, (input) => {
+export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, (ctx, input) => {
   if (typeof git.getPwd !== "function" || typeof git.workingTreeHash !== "function" || typeof git.WorkingDirectory.create !== "function") throw new Error("Git helpers were not exported");
   if (process.env.RUNLING_PACKAGE_TEST_ENV !== "loaded") throw new Error("Project .env was not loaded");
+  if (createWorkflowContext().usage.input !== 0 || "cwd" in ctx) throw new Error("Invalid workflow context");
+  ctx.recordUsage({ input: 10, output: 2, cacheRead: 0, cacheWrite: 0, cost: 0.25 });
   return input;
 });
 `,
@@ -101,6 +103,9 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
     { cwd: project },
   );
   assert.equal(JSON.parse(cli.stdout).output, "explicit input");
+  assert.deepEqual(JSON.parse(cli.stdout).usage, {
+    input: 10, output: 2, cacheRead: 0, cacheWrite: 0, cost: 0.25,
+  });
   const structured = await exec(
     "npm",
     ["run", "--silent", "runling", "--", "run", "workflow.ts", "--input", JSON.stringify({ directory: project, topic: "structured" }), "--json"],

@@ -1,3 +1,4 @@
+import type { WorkflowContext } from "./context.ts";
 import type { TSchema } from "typebox";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import {
@@ -17,12 +18,12 @@ export interface TaskDefinition<InputSchema extends WorkflowSchema, OutputSchema
   output: OutputSchema;
 }
 
-export type TaskFunction = (...args: any[]) => any;
+export type TaskFunction = (ctx: WorkflowContext, ...args: any[]) => any;
 export type Task<
   InputSchema extends WorkflowSchema = WorkflowSchema,
   OutputSchema extends WorkflowSchema = WorkflowSchema,
-  Run extends TaskFunction = (input: SchemaOutput<InputSchema>) => SchemaInput<OutputSchema> | Promise<SchemaInput<OutputSchema>>,
-> = ((input: SchemaInput<InputSchema>) =>
+  Run extends TaskFunction = (ctx: WorkflowContext, input: SchemaOutput<InputSchema>) => SchemaInput<OutputSchema> | Promise<SchemaInput<OutputSchema>>,
+> = ((ctx: WorkflowContext, input: SchemaInput<InputSchema>) =>
   InputSchema extends StandardSchemaV1 ? Promise<SchemaOutput<OutputSchema>>
     : OutputSchema extends StandardSchemaV1 ? Promise<SchemaOutput<OutputSchema>> : ReturnType<Run>
 ) & Readonly<TaskDefinition<InputSchema, OutputSchema>>;
@@ -40,13 +41,20 @@ const validationMessage = (
   return `Task ${JSON.stringify(name)} ${boundary} is invalid${details === "" ? "" : `: ${details}`}`;
 };
 
-/** Track an ordinary function without changing its arguments or return behavior. */
-export function task<Run extends TaskFunction>(run: Run): Run;
+/** Track a function with an explicit context, preserving its return behavior. */
+export function task<Run extends (ctx: WorkflowContext, ...args: never[]) => unknown>(
+  run: Run,
+): Parameters<Run> extends [unknown, ...unknown[]] ? Run : (
+  this: ThisParameterType<Run>,
+  ctx: WorkflowContext,
+  ...args: Parameters<Run> extends [] ? []
+    : Parameters<Run> extends [unknown?, ...infer Args] ? Args : []
+) => ReturnType<Run>;
 /** Track a function with TypeBox input and output, preserving synchronous results. */
 export function task<
   const InputSchema extends TSchema & { "~standard"?: never },
   const OutputSchema extends TSchema & { "~standard"?: never },
-  const Run extends (input: SchemaOutput<InputSchema>) => unknown,
+  const Run extends (ctx: WorkflowContext, input: SchemaOutput<InputSchema>) => unknown,
 >(
   definition: TaskDefinition<InputSchema, OutputSchema>,
   run: Run,
@@ -55,7 +63,7 @@ export function task<
 export function task<
   const InputSchema extends WorkflowSchema,
   const OutputSchema extends WorkflowSchema,
-  const Run extends (input: SchemaOutput<InputSchema>) => SchemaInput<OutputSchema> | Promise<SchemaInput<OutputSchema>>,
+  const Run extends (ctx: WorkflowContext, input: SchemaOutput<InputSchema>) => SchemaInput<OutputSchema> | Promise<SchemaInput<OutputSchema>>,
 >(
   definition: TaskDefinition<InputSchema, OutputSchema>,
   run: Run,
@@ -84,15 +92,15 @@ export function task(
   };
   const standard = definition && (isStandardSchema(definition.input) || isStandardSchema(definition.output));
   const runStandard = async (receiver: unknown, args: unknown[]) => {
-    const input = await parse("input", args[0]);
+    const input = await parse("input", args[1]);
     return step(name, async () => {
-      const output = await Reflect.apply(run, receiver, [input, ...args.slice(1)]);
+      const output = await Reflect.apply(run, receiver, [args[0], input, ...args.slice(2)]);
       return parse("output", output);
     });
   };
   const defined = function (this: unknown, ...args: unknown[]) {
     if (standard) return runStandard(this, args);
-    if (definition) args[0] = parse("input", args[0]);
+    if (definition) args[1] = parse("input", args[1]);
     return step(name, () => {
       const output = Reflect.apply(run, this, args);
       if (!definition) return output;
