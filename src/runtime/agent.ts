@@ -136,6 +136,8 @@ export interface RunAgentOptions {
 export type AgentOptions = Omit<RunAgentOptions, "signal">;
 
 export interface AgentRunOptions {
+  /** Observe completed assistant text messages during this interaction (not reasoning or tool output). */
+  onText?: (text: string) => void;
   /** Abort this model turn without disposing the agent. */
   signal?: AbortSignal;
 }
@@ -147,6 +149,9 @@ export interface RunlingAgent extends AsyncDisposable {
   run(ctx: WorkflowContext, prompt: string, options?: AgentRunOptions): Promise<CompletedAgentReport>;
   /** Run one turn and return any reported outcome. */
   runOutcome(ctx: WorkflowContext, prompt: string, options?: AgentRunOptions): Promise<AgentResult>;
+  /** Deliver plain text during an interaction. Resolves true when inserted into its
+   * conversation, false if idle or the interaction ends before delivery. */
+  steer(text: string): Promise<boolean>;
   /** Create an independent in-memory agent with a copy of this conversation. */
   fork(): Promise<RunlingAgent>;
   /** Release the underlying in-memory session. */
@@ -344,9 +349,19 @@ async function createRunlingAgent(
 
   let disposed = false;
   let running = false;
+  let acceptingSteering = false;
+  let interactionSignal: AbortSignal | undefined;
+  const steering = new Map<object, (delivered: boolean) => void>();
+  const finishSteering = () => {
+    acceptingSteering = false;
+    if (steering.size) session.agent.clearSteeringQueue();
+    for (const resolve of steering.values()) resolve(false);
+    steering.clear();
+  };
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    finishSteering();
     if (running) abortSession(session, agentLog);
     session.dispose();
   };
@@ -354,7 +369,7 @@ async function createRunlingAgent(
   const runOutcome: RunlingAgent["runOutcome"] = async (
     ctx,
     prompt,
-    { signal: externalSignal } = {},
+    { signal: externalSignal, onText } = {},
   ) => {
     const signal = externalSignal
       ? AbortSignal.any([ctx.signal, externalSignal])
@@ -368,6 +383,8 @@ async function createRunlingAgent(
 
     signal?.throwIfAborted();
     running = true;
+    interactionSignal = signal;
+    acceptingSteering = true;
     activeReport = undefined;
     let finalText: string | undefined;
     const usage = emptyTokenUsage();
@@ -377,6 +394,16 @@ async function createRunlingAgent(
     const toolStartedAt = new Map<string, number>();
 
     const unsubscribe = session.subscribe(bindRunlingContext((event) => {
+      if (event.type === "agent_start") acceptingSteering = !disposed && !signal.aborted;
+      if (event.type === "agent_end") acceptingSteering = false;
+      if (event.type === "message_start" && steering.has(event.message)) {
+        const delivered = steering.get(event.message)!;
+        steering.delete(event.message);
+        activeReport = undefined;
+        finalText = undefined;
+        preparingReport = false;
+        delivered(true);
+      }
       options.onEvent?.(event);
 
       if (event.type === "message_update") {
@@ -535,6 +562,7 @@ async function createRunlingAgent(
         ctx.recordUsage(event.message.usage);
         emitRunlingEvent({ type: "agent.usage", agentId, usage: { ...usage } });
         agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
+        if (finalText.trim()) onText?.(finalText);
       }
     }));
 
@@ -556,6 +584,7 @@ async function createRunlingAgent(
               : "Retrying missing outcome report",
           );
           finalText = undefined;
+          acceptingSteering = true;
           await session.prompt(
             "Finish the original task by calling report_outcome with the truthful outcome. Use native tool calling; do not respond with plain text.",
           );
@@ -582,6 +611,8 @@ async function createRunlingAgent(
       return result;
     } finally {
       signal?.removeEventListener("abort", abort);
+      finishSteering();
+      interactionSignal = undefined;
       unsubscribe();
       running = false;
       writeAgentLog("info", `Token usage: ${formatTokenUsage(usage)}`, false);
@@ -606,6 +637,17 @@ async function createRunlingAgent(
     },
 
     runOutcome,
+
+    steer(text) {
+      if (disposed || !running || !acceptingSteering || interactionSignal?.aborted) return Promise.resolve(false);
+      // Use Pi's plain-message API: steering must not expand slash commands or templates.
+      const message = { role: "user" as const, content: [{ type: "text" as const, text }], timestamp: Date.now() };
+      return new Promise<boolean>((resolve, reject) => {
+        steering.set(message, resolve);
+        try { session.agent.steer(message); }
+        catch (error) { steering.delete(message); reject(error); }
+      });
+    },
 
     async fork() {
       if (disposed) {

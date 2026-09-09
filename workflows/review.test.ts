@@ -20,6 +20,7 @@ describe("review workflow", () => {
     });
 
     const branch = (): RunlingAgent => ({
+      steer: async () => false,
       id: `reviewer-${forks}`,
       async run(_ctx, prompt) {
         prompts.push(prompt);
@@ -52,6 +53,7 @@ describe("review workflow", () => {
 
     let orchestratorRuns = 0;
     const orchestrator: RunlingAgent = {
+      steer: async () => false,
       id: "orchestrator",
       async run(_ctx, prompt) {
         prompts.push(prompt);
@@ -134,6 +136,7 @@ describe("review workflow", () => {
     let disposed = 0;
 
     const orchestrator = {
+      steer: async () => false,
       id: "orchestrator",
       run: async () => ({
         outcome: "completed" as const,
@@ -146,6 +149,7 @@ describe("review workflow", () => {
       fork: async () => {
         const fork = forks++;
         return {
+          steer: async () => false,
           id: `reviewer-${fork}`,
           run: async () => {
             if (fork === 0) throw new Error("review failed");

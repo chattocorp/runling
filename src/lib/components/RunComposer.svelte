@@ -16,6 +16,7 @@
   let body = $state("");
   let pending = $state(false);
   let error = $state("");
+  let notice = $state("");
   let schemaTab = $state<"input" | "output">("input");
   let origin = $state("");
   let copied = $state(false);
@@ -28,6 +29,7 @@
     event.preventDefault();
     if (pending) return;
     error = "";
+    notice = "";
     try {
       JSON.parse(body);
     } catch {
@@ -55,6 +57,10 @@
             ),
           ].join("\n"),
         );
+      if (result.handled) {
+        notice = "Message handled. No new run was started.";
+        return;
+      }
       onstarted(result.id);
       dialog.close();
     } catch (cause) {
@@ -142,6 +148,7 @@
             )}</pre>
         </div>
       </details>
+      {#if notice}<p class="alert alert-info" role="status">{notice}</p>{/if}
       {#if error}<p id="request-error" class="alert alert-error" role="alert">
           {error}
         </p>{/if}

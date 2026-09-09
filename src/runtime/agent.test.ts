@@ -64,6 +64,8 @@ vi.doMock("@earendil-works/pi-coding-agent", async () => {
       const session = {
         sessionManager: sessionOptions.sessionManager,
         agent: {
+          steer: vi.fn(),
+          clearSteeringQueue: vi.fn(),
           state: {
             get messages() {
               return messages;
@@ -1250,4 +1252,84 @@ test("per-call cancellation leaves the workflow context usable", async () => {
     cwd: "/project", model: "anthropic/claude-opus-4-5", signal: external.signal,
   })).rejects.toBe("This call only");
   expect(ctx.signal.aborted).toBe(false);
+});
+
+
+test("steers an active interaction and invalidates its earlier report on delivery", async () => {
+  const gate = Promise.withResolvers<void>();
+  promptImplementation = async () => {
+    if (promptCalls === 1) {
+      await reportOutcome({ outcome: "completed", summary: "Old plan" });
+      await gate.promise;
+    } else {
+      await reportOutcome({ outcome: "completed", summary: "Revised plan" });
+    }
+  };
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  expect(await instance.steer("idle")).toBe(false);
+  const run = instance.runOutcome(createWorkflowContext(), "Plan");
+  await vi.waitFor(() => expect(promptCalls).toBe(1));
+  const delivery = instance.steer("Include tests");
+  const message = createdSessions[0].agent.steer.mock.calls[0][0];
+  expect(message.content).toEqual([{ type: "text", text: "Include tests" }]);
+  eventHandler?.({ type: "message_start", message });
+  expect(await delivery).toBe(true);
+  gate.resolve();
+  expect(await run).toMatchObject({ summary: "Revised plan" });
+  expect(promptCalls).toBe(2);
+  instance.dispose();
+  expect(await instance.steer("disposed")).toBe(false);
+});
+
+test("returns undelivered steering at completion and does not carry it to another context", async () => {
+  const gate = Promise.withResolvers<void>();
+  promptImplementation = async () => { await gate.promise; await reportOutcome({ outcome: "completed", summary: "Done" }); };
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  const run = instance.runOutcome(createWorkflowContext(), "First");
+  const queued = instance.steer("Late feedback");
+  eventHandler?.({ type: "agent_end", messages: [] });
+  expect(await instance.steer("Too late")).toBe(false);
+  gate.resolve();
+  await run;
+  expect(await queued).toBe(false);
+  expect(createdSessions[0].agent.clearSteeringQueue).toHaveBeenCalledOnce();
+  await instance.runOutcome(createWorkflowContext(), "Second");
+  expect(createdSessions[0].agent.steer).toHaveBeenCalledOnce();
+  instance.dispose();
+});
+
+test("settles pending steering on disposal and refuses steering after cancellation", async () => {
+  const gate = Promise.withResolvers<void>();
+  promptImplementation = () => gate.promise;
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  const ctx = createWorkflowContext();
+  const run = instance.runOutcome(ctx, "Plan");
+  const rejected = expect(run).rejects.toThrow("stop");
+  const pending = instance.steer("Feedback");
+  try { ctx.abort("stop"); } catch { /* expected */ }
+  expect(await instance.steer("after cancellation")).toBe(false);
+  instance.dispose();
+  expect(await pending).toBe(false);
+  gate.resolve();
+  await rejected;
+});
+
+test("forwards completed assistant text during the interaction, excluding reasoning and tools", async () => {
+  const gate = Promise.withResolvers<void>();
+  promptImplementation = async () => { await gate.promise; await reportOutcome({ outcome: "completed", summary: "Done" }); };
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  const onText = vi.fn();
+  const run = instance.runOutcome(createWorkflowContext(), "Plan", { onText });
+  eventHandler?.({ type: "message_end", message: { role: "assistant", content: [
+    { type: "thinking", thinking: "Private reasoning" },
+    { type: "text", text: "Here is the joke." },
+    { type: "toolCall", id: "tool", name: "read", arguments: {} },
+  ], usage: emptyUsage } });
+  eventHandler?.({ type: "message_end", message: { role: "toolResult", content: [{ type: "text", text: "file contents" }] } });
+  expect(onText.mock.calls).toEqual([["Here is the joke."]]);
+  gate.resolve();
+  await run;
+  await instance.runOutcome(createWorkflowContext(), "Next");
+  expect(onText).toHaveBeenCalledOnce();
+  instance.dispose();
 });

@@ -1,138 +1,29 @@
-import { input, task, Type, TimeoutError, type InputHandler } from "runling";
-
-const deliverySchema = Type.Object({
-  version: Type.Literal(1),
-  id: Type.String(),
-  type: Type.Literal("message.created"),
-  triggers: Type.Array(Type.String()),
-  occurred_at: Type.String(),
-  bot_id: Type.String(),
-  room_id: Type.String(),
-  thread_root_id: Type.Union([Type.String(), Type.Null()]),
-  message: Type.Object({ id: Type.String(), author_id: Type.String(), body: Type.String() }),
-});
-
-interface Destination {
-  roomId: string;
-  threadRootId: string;
-}
+import { input, Type } from "runling";
+import { createChattoWebhook, postToChatto, messageSignal, type ChattoPost } from "./chatto/webhook.ts";
+export { createChattoPoster } from "./chatto/webhook.ts";
 
 export interface DemoOptions {
-  post: (destination: Destination, body: string, signal: AbortSignal) => Promise<void>;
+  post: ChattoPost;
   /** Timeout for each question, in seconds. */
   timeout?: number;
 }
 
-/** Create once per server process so deliveries share pending questions. */
 export function createChattoInputDemo({ post, timeout = 30 }: DemoOptions) {
   const timeoutMs = Math.ceil(timeout * 1000);
   if (!Number.isFinite(timeout) || timeout < 0 || timeoutMs > 2_147_483_647) {
     throw new RangeError("timeout must be seconds between 0 and 2147483.647");
   }
-  const pending = new Map<string, (answer: string) => void>();
-  const active = new Set<string>();
-  const seen = new Map<string, number>();
-
-  return task({
+  return createChattoWebhook({
     name: "Chatto input demo",
-    input: deliverySchema,
-    output: Type.Union([
-      Type.String(),
-      Type.Object({ name: Type.String(), topic: Type.String() }),
-    ]),
-  }, async (ctx, delivery) => {
-    if (!delivery.triggers.includes("direct_message")) return "ignored";
-
-    const now = Date.now();
-    for (const [id, expires] of seen) if (expires <= now) seen.delete(id);
-    // The same message can be delivered again, including after an edit.
-    const deliveryKey = JSON.stringify([delivery.bot_id, delivery.message.id]);
-    if (seen.has(deliveryKey)) return "duplicate";
-    seen.set(deliveryKey, now + 86_400_000);
-
-    const threadRootId = delivery.thread_root_id ?? delivery.message.id;
-    const key = JSON.stringify([delivery.room_id, threadRootId, delivery.message.author_id]);
-    const answer = pending.get(key);
-    if (answer) {
-      pending.delete(key);
-      answer(delivery.message.body);
-      return "answered";
-    }
-    if (active.has(key) || delivery.thread_root_id !== null) return "ignored";
-    active.add(key);
-
-    const destination = { roomId: delivery.room_id, threadRootId };
-    const onInput: InputHandler = async (request) => {
-      const questionSignal = request.signal ?? ctx.signal;
-      questionSignal.throwIfAborted();
-      let resolveAnswer!: (answer: string) => void;
-      let rejectAnswer!: (error: unknown) => void;
-      const response = new Promise<string>((resolve, reject) => {
-        resolveAnswer = resolve;
-        rejectAnswer = reject;
-      });
-      // Attach a rejection handler while the question POST is in flight.
-      void response.catch(() => {});
-      const abort = () => rejectAnswer(questionSignal.reason);
-      pending.set(key, resolveAnswer);
-      questionSignal.addEventListener("abort", abort, { once: true });
-      try {
-        await post(destination, request.message, questionSignal);
-        return await response;
-      } finally {
-        pending.delete(key);
-        questionSignal.removeEventListener("abort", abort);
-      }
-    };
-
-    try {
-      const chat = { ...ctx, onInput };
-      const name = await input(chat, `What is your name? Please reply within ${timeout} seconds.`, { timeout });
-      const topic = await input(chat, `What would you like to work on? Please reply within ${timeout} seconds.`, { timeout });
-      await post(destination, `Thanks! Your name: ${name}\nYour topic: ${topic}`,
-        AbortSignal.any([ctx.signal, AbortSignal.timeout(10_000)]));
+    output: Type.Object({ name: Type.String(), topic: Type.String() }),
+    post,
+    async run(ctx, _delivery, destination) {
+      const name = await input(ctx, `What is your name? Please reply within ${timeout} seconds.`, { timeout });
+      const topic = await input(ctx, `What would you like to work on? Please reply within ${timeout} seconds.`, { timeout });
+      await post(destination, `Thanks! Your name: ${name}\nYour topic: ${topic}`, messageSignal(ctx));
       return { name, topic };
-    } catch (error) {
-      if (error instanceof TimeoutError && !ctx.signal.aborted) {
-        // The question signal has expired. Use a fresh, bounded signal for the notice.
-        await post(destination, "The question timed out. Send me a new DM to try again.",
-          AbortSignal.any([ctx.signal, AbortSignal.timeout(10_000)]),
-        ).catch(() => {}); // Preserve the original timeout if the notice cannot be delivered.
-      }
-      throw error;
-    } finally {
-      active.delete(key);
-    }
+    },
   });
 }
 
-/** ConnectRPC's JSON transport needs no generated client for this single call. */
-export function createChattoPoster(serverUrl: string, apiKey: string): DemoOptions["post"] {
-  const url = new URL("/api/connect/chatto.api.v1.MessageService/CreateMessage", serverUrl);
-  return async ({ roomId, threadRootId }, body, signal) => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Connect-Protocol-Version": "1",
-      },
-      body: JSON.stringify({ roomId, body, threadRootEventId: threadRootId }),
-      signal,
-    });
-    if (!response.ok) throw new Error(`Chatto message request failed (${response.status})`);
-  };
-}
-
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Set ${name} before running the Chatto demo`);
-  return value;
-}
-
-export default createChattoInputDemo({
-  post: (destination, body, signal) =>
-    createChattoPoster(required("CHATTO_URL"), required("CHATTO_API_KEY"))(
-      destination, body, signal,
-    ),
-});
+export default createChattoInputDemo({ post: postToChatto });
