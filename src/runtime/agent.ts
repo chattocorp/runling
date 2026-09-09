@@ -136,6 +136,8 @@ export interface RunAgentOptions {
 export type AgentOptions = Omit<RunAgentOptions, "signal">;
 
 export interface AgentRunOptions {
+  /** Observe completed assistant text messages during this interaction (not reasoning or tool output). */
+  onText?: (text: string) => void;
   /** Abort this model turn without disposing the agent. */
   signal?: AbortSignal;
 }
@@ -367,7 +369,7 @@ async function createRunlingAgent(
   const runOutcome: RunlingAgent["runOutcome"] = async (
     ctx,
     prompt,
-    { signal: externalSignal } = {},
+    { signal: externalSignal, onText } = {},
   ) => {
     const signal = externalSignal
       ? AbortSignal.any([ctx.signal, externalSignal])
@@ -560,6 +562,7 @@ async function createRunlingAgent(
         ctx.recordUsage(event.message.usage);
         emitRunlingEvent({ type: "agent.usage", agentId, usage: { ...usage } });
         agentLog.debug(`Tokens: ${formatTokenUsage(usage)}`);
+        if (finalText.trim()) onText?.(finalText);
       }
     }));
 

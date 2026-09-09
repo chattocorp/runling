@@ -207,3 +207,46 @@ test("forwards busy feedback before the active interaction completes", async () 
   await f.answer("/implement");
   expect(await run).toMatchObject({ status: "implementation-stub" });
 });
+
+test("posts mid-interaction text immediately and finishes posts before asking a question", async () => {
+  const f = setup([]);
+  const turn = Promise.withResolvers<AgentResult>();
+  const sent = Promise.withResolvers<void>();
+  let onText!: (text: string) => void;
+  f.planner.runOutcome.mockImplementationOnce(async (...args: unknown[]) => {
+    onText = (args[2] as { onText: (text: string) => void }).onText;
+    return turn.promise;
+  });
+  f.post.mockImplementation(async (_destination, body) => {
+    if (body === "Here is the joke.") await sent.promise;
+  });
+  const run = f.bot(createWorkflowContext(), delivery("Feature", "root"));
+  await vi.waitFor(() => expect(f.planner.runOutcome).toHaveBeenCalledOnce());
+  onText("Here is the joke.");
+  onText("I am still investigating.");
+  await f.waitQuestion("Here is the joke.");
+  expect(f.post.mock.calls.some(call => call[1] === "I am still investigating.")).toBe(false);
+  turn.resolve(report("completed", "Ready", "The final plan"));
+  await new Promise(resolve => setTimeout(resolve, 10));
+  expect(f.post.mock.calls.some(call => call[1].includes("The final plan"))).toBe(false);
+  sent.resolve();
+  await f.waitQuestion("The final plan");
+  const bodies = f.post.mock.calls.map(call => call[1]);
+  expect(bodies.indexOf("I am still investigating.")).toBeGreaterThan(bodies.indexOf("Here is the joke."));
+  await f.answer("/implement");
+  await run;
+});
+
+test("reports a failed intermediate post without presenting the final question", async () => {
+  const f = setup([]);
+  f.planner.runOutcome.mockImplementationOnce(async (...args: unknown[]) => {
+    (args[2] as { onText: (text: string) => void }).onText("Intermediate reply");
+    return report("completed", "Ready", "Unsent final plan");
+  });
+  f.post.mockImplementation(async (_destination, body) => {
+    if (body === "Intermediate reply") throw new Error("Chatto offline");
+  });
+  await expect(f.bot(createWorkflowContext(), delivery("Feature", "root"))).rejects.toThrow("Chatto offline");
+  expect(f.post.mock.calls.some(call => call[1].includes("Unsent final plan"))).toBe(false);
+  expect(f.planner.dispose).toHaveBeenCalledOnce();
+});

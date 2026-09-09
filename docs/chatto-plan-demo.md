@@ -34,7 +34,9 @@ Restart `pnpm dev` after changing `.env`. Send a new DM describing a change,
 answer the bot's questions in its thread, and review the plan before sending
 `/implement`. The Runling console shows checkout updates, agent turns, input waits,
 and the implementation stub. The bot refreshes a thread-scoped typing indicator
-while fetching or planning, and acknowledges feedback before its next turn.
+while fetching or planning. Completed assistant text messages are posted to the
+thread during the interaction, so replies to steering are visible before the
+final question or plan. Reasoning and tool output are not posted.
 Typing stops refreshing at an input prompt; Chatto clears it through its normal
 expiry. Typing failures do not fail the conversation.
 

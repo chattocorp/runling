@@ -27,3 +27,9 @@ after receiving steering. Token usage stays in the active interaction's context.
 The [Chatto plan demo](chatto-plan-demo.md) subscribes to its conversation inbox
 while an interaction runs. New chat messages become steering; input answers and
 approval commands remain separate.
+
+Use `runOutcome(ctx, prompt, { onText })` (or `run`) to observe completed assistant
+text messages while the interaction runs. This callback excludes reasoning and
+tool output. It is synchronous; callers that start asynchronous sends must handle
+and await those sends themselves. The Chatto demo posts these replies in order
+and finishes them before presenting its next input question.

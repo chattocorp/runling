@@ -82,7 +82,23 @@ export function createChattoPlanDemo({
             ctx.signal.throwIfAborted();
             const before = await feedback();
             if (before.length) message += `\n\nAdditional user messages:\n${before.join("\n\n")}`;
-            const report = await withChattoTyping(ctx, destination, typing, () => withChattoSteering(inbox, planner, () => planner.runOutcome(ctx, message)));
+            const report = await withChattoTyping(ctx, destination, typing, () => withChattoSteering(inbox, planner, async () => {
+              let replies = Promise.resolve();
+              try {
+                const result = await planner.runOutcome(ctx, message, {
+                  onText: text => {
+                    replies = replies.then(() => say(text));
+                    // The agent keeps working while Chatto sends the reply.
+                    void replies.catch(() => {});
+                  },
+                });
+                await replies;
+                return result;
+              } finally {
+                // Finish pending posts before presenting an input question or failure.
+                await replies.catch(() => {});
+              }
+            }));
             if (report.outcome === "failed") throw new Error(`Planning failed: ${report.summary}`);
             const during = await feedback();
             if (during.length) {

@@ -1313,3 +1313,23 @@ test("settles pending steering on disposal and refuses steering after cancellati
   gate.resolve();
   await rejected;
 });
+
+test("forwards completed assistant text during the interaction, excluding reasoning and tools", async () => {
+  const gate = Promise.withResolvers<void>();
+  promptImplementation = async () => { await gate.promise; await reportOutcome({ outcome: "completed", summary: "Done" }); };
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  const onText = vi.fn();
+  const run = instance.runOutcome(createWorkflowContext(), "Plan", { onText });
+  eventHandler?.({ type: "message_end", message: { role: "assistant", content: [
+    { type: "thinking", thinking: "Private reasoning" },
+    { type: "text", text: "Here is the joke." },
+    { type: "toolCall", id: "tool", name: "read", arguments: {} },
+  ], usage: emptyUsage } });
+  eventHandler?.({ type: "message_end", message: { role: "toolResult", content: [{ type: "text", text: "file contents" }] } });
+  expect(onText.mock.calls).toEqual([["Here is the joke."]]);
+  gate.resolve();
+  await run;
+  await instance.runOutcome(createWorkflowContext(), "Next");
+  expect(onText).toHaveBeenCalledOnce();
+  instance.dispose();
+});
