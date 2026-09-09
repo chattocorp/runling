@@ -130,3 +130,14 @@ test.each([-1, NaN, Infinity, 2_147_483.648])("invalid timeout %s rejects before
   await expect(input(ctx, "Question", { timeout })).rejects.toThrow(RangeError);
   expect(work).not.toHaveBeenCalled();
 });
+
+test("a throwing event listener cannot leave an input timer running", async () => {
+  vi.useFakeTimers();
+  const ctx = createWorkflowContext();
+  ctx.onInput = vi.fn(async () => "unused");
+  await expect(observeRunlingEvents(() => { throw new Error("listener failed"); }, () =>
+    input(ctx, "Question", { timeout: 60 }),
+  )).rejects.toThrow("listener failed");
+  expect(ctx.onInput).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+});

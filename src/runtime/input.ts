@@ -39,15 +39,14 @@ export const createInput = (handleInput?: InputHandler): Input =>
     const request = { id, message, ...options, signal };
     const emit = bindRunlingContext(emitRunlingEvent);
 
-    emit({
-      type: "input.requested",
-      id,
-      message,
-      defaultValue: options.defaultValue,
-    });
-    logInput(id, "info", `${log.highlight("Asking", "#f59f00")} ${message}`);
-
     try {
+      emit({
+        type: "input.requested",
+        id,
+        message,
+        defaultValue: options.defaultValue,
+      });
+      logInput(id, "info", `${log.highlight("Asking", "#f59f00")} ${message}`);
       signal?.throwIfAborted();
       if (handleInput === undefined) throw new InputUnavailableError(message);
 
