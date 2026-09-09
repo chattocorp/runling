@@ -1,4 +1,4 @@
-export { createWorkflowContext, type WorkflowContext } from "./context.ts";
+export { createWorkflowContext, WorkflowAbortError, type WorkflowContext } from "./context.ts";
 export {
   agent,
   type AgentExtension,

@@ -37,7 +37,7 @@ import { z } from "zod";
 
 export default task(
   { name: "Echo", input: z.string(), output: z.string() },
-  (input) => { return input },
+  (ctx, input) => input,
 );
 ```
 
@@ -71,6 +71,11 @@ And off it goes!
 
 Run `pnpm runling --help` to list commands. Use `run --help` or
 `serve --help` to see command options, and `--version` to print the version.
+
+## Aborting a workflow
+
+Tasks receive a workflow context as their first argument. Call
+`ctx.abort("Cannot continue")` to stop the run and report it as failed.
 
 ## Task schemas
 

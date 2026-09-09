@@ -115,3 +115,27 @@ describe("Standard Schema tasks", () => {
     task({ name: "Invalid", input: z.string(), output: z.string() }, (ctx) => 42);
   });
 });
+
+test("does not start a task aborted during asynchronous schema validation", async () => {
+  const ctx = createWorkflowContext();
+  const started = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const events: RunlingEvent[] = [];
+  let called = false;
+  const run = task({
+    name: "Validate", input: z.string().refine(async () => {
+      started.resolve();
+      await release.promise;
+      return true;
+    }), output: z.string(),
+  }, (_ctx, input) => { called = true; return input; });
+  await observeRunlingEvents(event => events.push(event), async () => {
+    const result = run(ctx, "hello");
+    await started.promise;
+    try { ctx.abort("Stop validation"); } catch {}
+    release.resolve();
+    await expect(result).rejects.toBe(ctx.signal.reason);
+  });
+  expect(called).toBe(false);
+  expect(events).toEqual([]);
+});

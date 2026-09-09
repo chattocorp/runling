@@ -64,3 +64,23 @@ describe("workflow context", () => {
     expect(second).toEqual({ ...emptyTokenUsage(), input: 200, cost: 0.5 });
   });
 });
+
+test("aborts once with a stable error and signal", () => {
+  const ctx = createWorkflowContext();
+  expect(ctx.signal.aborted).toBe(false);
+  expect(() => ctx.abort("Budget exceeded")).toThrow("Budget exceeded");
+  const reason = ctx.signal.reason;
+  expect(reason).toBeInstanceOf(Error);
+  expect(reason.name).toBe("WorkflowAbortError");
+  expect(ctx.signal.aborted).toBe(true);
+  expect(() => ctx.abort("Another reason")).toThrow(reason);
+  expect(ctx.signal.reason).toBe(reason);
+  expect(createWorkflowContext().signal.aborted).toBe(false);
+});
+
+test("supplies a default abort reason and retains usage", () => {
+  const ctx = createWorkflowContext();
+  ctx.recordUsage({ ...emptyTokenUsage(), input: 10, cost: 0.25 });
+  expect(() => ctx.abort()).toThrow("Workflow aborted");
+  expect(ctx.usage).toEqual({ ...emptyTokenUsage(), input: 10, cost: 0.25 });
+});

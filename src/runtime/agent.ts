@@ -190,6 +190,7 @@ export async function runAgent(
   options: RunAgentOptions,
 ): Promise<AgentResult> {
   const { signal, ...createOptions } = options;
+  ctx.signal.throwIfAborted();
   signal?.throwIfAborted();
   const instance = await agent(createOptions);
 
@@ -353,8 +354,11 @@ async function createRunlingAgent(
   const runOutcome: RunlingAgent["runOutcome"] = async (
     ctx,
     prompt,
-    { signal } = {},
+    { signal: externalSignal } = {},
   ) => {
+    const signal = externalSignal
+      ? AbortSignal.any([ctx.signal, externalSignal])
+      : ctx.signal;
     if (disposed) {
       throw new Error(`Agent ${agentId} has been disposed`);
     }
