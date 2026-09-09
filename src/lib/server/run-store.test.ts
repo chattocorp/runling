@@ -153,3 +153,40 @@ test("loads completed details on demand without retaining event arrays", async (
     await writeFile(resolve(history.directory, `${started.id}.jsonl`), journal);
   }
 });
+
+test("cancels only the selected run, keeps cleanup and usage, and restores cancellation", async () => {
+  const history = await store();
+  const ready = Promise.withResolvers<void>();
+  let cleaned = false;
+  const workflow = task(
+    { name: "Cancellable", input: Type.String(), output: Type.String() },
+    async (ctx) => {
+      ctx.recordUsage({ input: 10, output: 1, cacheRead: 0, cacheWrite: 0 });
+      try {
+        ready.resolve();
+        await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve(), { once: true }));
+        return "Caught cancellation";
+      } finally {
+        cleaned = true;
+      }
+    },
+  );
+  const first = await history.start("cancel", workflow, "", "web");
+  await ready.promise;
+  const other = await history.start("other", task(
+    { name: "Other", input: Type.String(), output: Type.String() },
+    (ctx) => { expect(ctx.signal.aborted).toBe(false); return "done"; },
+  ), "", "web");
+  expect(history.cancel("missing")).toBe(false);
+  expect(history.cancel(first.id)).toBe(true);
+  expect(history.cancel(first.id)).toBe(true);
+  expect(await first.completion).toMatchObject({ ok: false, output: null, error: "Workflow cancelled by user." });
+  await other.completion;
+  expect(cleaned).toBe(true);
+  expect(history.cancel(first.id)).toBe(false);
+  expect((await history.get(first.id))).toMatchObject({ status: "cancelled", usage: { input: 10 } });
+  expect((await history.get(other.id))?.status).toBe("completed");
+  const restored = new RunStore(history.directory);
+  await restored.init();
+  expect(await restored.get(first.id)).toEqual(await history.get(first.id));
+});

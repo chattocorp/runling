@@ -630,3 +630,13 @@ test("completed executions retain usage snapshots after the context changes", as
   expect(result.usage.cost).toBe(0.25);
   expect(contexts[0]!.usage.input).toBe(3);
 });
+
+test("does not start a workflow when the host signal is already aborted", async () => {
+  let called = false;
+  const execution = await runWorkflow(() => { called = true; }, {
+    input: undefined,
+    signal: AbortSignal.abort(new Error("Cancelled by host")),
+  });
+  expect(called).toBe(false);
+  expect(execution).toMatchObject({ ok: false, error: "Cancelled by host" });
+});
