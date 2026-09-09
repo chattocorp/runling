@@ -36,7 +36,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Editors
 .vscode/settings.json
-.runling/runs/
-.factory/runs/
+**/.runling/runs/
+**/.factory/runs/
 
 .context/
