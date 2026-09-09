@@ -2,7 +2,7 @@ import { realpath } from "node:fs/promises";
 import { agent, input, task, Type, TimeoutError, type RunlingAgent } from "runling";
 import { createChattoWebhook, messageSignal, postToChatto, type ChattoPost } from "./chatto/webhook.ts";
 import { withChattoTyping, sendChattoTyping, type ChattoTyping } from "./chatto/typing.ts";
-import { withChattoSteering } from "./chatto/steering.ts";
+import { runChattoAgent } from "./chatto/agent.ts";
 import { refreshCheckout } from "./chatto/checkout.ts";
 
 type Planner = Pick<RunlingAgent, "runOutcome" | "dispose" | "steer">;
@@ -82,23 +82,9 @@ export function createChattoPlanDemo({
             ctx.signal.throwIfAborted();
             const before = await feedback();
             if (before.length) message += `\n\nAdditional user messages:\n${before.join("\n\n")}`;
-            const report = await withChattoTyping(ctx, destination, typing, () => withChattoSteering(inbox, planner, async () => {
-              let replies = Promise.resolve();
-              try {
-                const result = await planner.runOutcome(ctx, message, {
-                  onText: text => {
-                    replies = replies.then(() => say(text));
-                    // The agent keeps working while Chatto sends the reply.
-                    void replies.catch(() => {});
-                  },
-                });
-                await replies;
-                return result;
-              } finally {
-                // Finish pending posts before presenting an input question or failure.
-                await replies.catch(() => {});
-              }
-            }));
+            const report = await runChattoAgent(ctx, planner, message, {
+              destination, inbox, post, typing, reservedCommands: ["/implement"],
+            });
             if (report.outcome === "failed") throw new Error(`Planning failed: ${report.summary}`);
             const during = await feedback();
             if (during.length) {

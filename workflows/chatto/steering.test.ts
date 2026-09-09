@@ -19,8 +19,8 @@ test("delivers while running, keeps commands separate and restores undelivered m
   const late = Promise.withResolvers<boolean>();
   const agent = { steer: vi.fn(async (text: string) => text === "late" ? late.promise : true) };
   inbox.push("initial");
-  const run = withChattoSteering(inbox, agent, () => work.promise);
-  inbox.push("/implement");
+  const run = withChattoSteering(inbox, agent, () => work.promise, ["/approve"]);
+  inbox.push("/approve");
   inbox.push("late");
   expect(agent.steer.mock.calls).toEqual([["initial"], ["late"]]);
   work.resolve("done");
@@ -28,7 +28,7 @@ test("delivers while running, keeps commands separate and restores undelivered m
   inbox.push("after completion");
   late.resolve(false);
   expect(await run).toBe("done");
-  expect(inbox.drain()).toEqual(["/implement", "late", "after completion"]);
+  expect(inbox.drain()).toEqual(["/approve", "late", "after completion"]);
 });
 
 test("restores rejected steering and unsubscribes when work fails", async () => {

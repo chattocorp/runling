@@ -6,12 +6,13 @@ export async function withChattoSteering<Result>(
   inbox: ChattoInbox,
   agent: Pick<RunlingAgent, "steer">,
   work: () => Promise<Result>,
+  reservedCommands: readonly string[] = [],
 ): Promise<Result> {
   const messages: { text: string; delivered: Promise<boolean> }[] = [];
   const flush = () => {
     for (const text of inbox.drain()) {
-      // Approval belongs to the workflow, never the model's steering queue.
-      const delivered = text.trim() === "/implement"
+      // Leave workflow commands in the inbox for the caller to handle.
+      const delivered = reservedCommands.includes(text.trim())
         ? Promise.resolve(false)
         : agent.steer(text).catch(() => false);
       messages.push({ text, delivered });

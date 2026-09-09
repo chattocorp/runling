@@ -83,8 +83,10 @@ that need steering. Draining returns and removes the queued messages in arrival
 order; it does not affect input answers. `subscribe(listener)` notifies a task
 when a message arrives and returns an unsubscribe function. `prepend(messages)`
 restores undelivered messages at the front without notifying listeners again.
-`withChattoSteering` connects this inbox to an active agent and restores messages
-that were not delivered. It keeps `/implement` for the workflow to handle.
+`runChattoAgent(ctx, agent, prompt, { destination, inbox, post, typing,
+reservedCommands })` handles typing, live steering, and ordered outgoing replies.
+It restores undelivered steering and waits for pending replies before returning.
+The planning workflow reserves `/implement` and handles approval itself.
 See [agent steering](agent-steering.md) for the delivery contract.
 The root config attaches each demo's `route` function. It delivers answers to
 pending questions before creating a run. Replies, duplicates, and unrelated
