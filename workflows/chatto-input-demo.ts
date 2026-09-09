@@ -19,11 +19,16 @@ interface Destination {
 
 export interface DemoOptions {
   post: (destination: Destination, body: string, signal: AbortSignal) => Promise<void>;
+  /** Conversation timeout in seconds. */
   timeout?: number;
 }
 
 /** Create once per server process so deliveries share pending questions. */
 export function createChattoInputDemo({ post, timeout = 300 }: DemoOptions) {
+  const timeoutMs = Math.ceil(timeout * 1000);
+  if (!Number.isFinite(timeout) || timeout < 0 || timeoutMs > 2_147_483_647) {
+    throw new RangeError("timeout must be seconds between 0 and 2147483.647");
+  }
   const pending = new Map<string, (answer: string) => void>();
   const active = new Set<string>();
   const seen = new Map<string, number>();
@@ -56,7 +61,7 @@ export function createChattoInputDemo({ post, timeout = 300 }: DemoOptions) {
     if (active.has(key) || delivery.thread_root_id !== null) return "ignored";
     active.add(key);
 
-    const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(timeout * 1000)]);
+    const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(timeoutMs)]);
     const destination = { roomId: delivery.room_id, threadRootId };
     const onInput: InputHandler = async (request) => {
       const questionSignal = request.signal

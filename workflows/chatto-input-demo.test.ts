@@ -12,6 +12,11 @@ function delivery(body: string, author = "alice", id: string = crypto.randomUUID
 }
 
 describe("Chatto input demo", () => {
+  it.each([-1, NaN, Infinity, 2_147_483.648])("rejects invalid timeout %s at creation", (timeout) => {
+    expect(() => createChattoInputDemo({ post: async () => {}, timeout }))
+      .toThrow(RangeError);
+  });
+
   it("starts from any root DM and resumes only in its thread", async () => {
     const post = vi.fn<Parameters<typeof createChattoInputDemo>[0]["post"]>(async () => {});
     const bot = createChattoInputDemo({ post });
