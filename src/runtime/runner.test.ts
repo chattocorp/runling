@@ -665,3 +665,13 @@ test("awaits text delivery and reports handler failures through normal task erro
   expect(failure.ok).toBe(false);
   expect(failure.error).toContain("delivery failed");
 });
+
+test("does not start a workflow when the host signal is already aborted", async () => {
+  let called = false;
+  const execution = await runWorkflow(() => { called = true; }, {
+    input: undefined,
+    signal: AbortSignal.abort(new Error("Cancelled by host")),
+  });
+  expect(called).toBe(false);
+  expect(execution).toMatchObject({ ok: false, error: "Cancelled by host" });
+});

@@ -11,6 +11,8 @@
         ? "icon-[lucide--loader-circle] text-info animate-spin motion-reduce:animate-none"
         : status === "failed"
           ? "icon-[lucide--circle-x] text-error"
+          : status === "cancelled"
+            ? "icon-[lucide--circle-stop] text-warning"
           : status === "interrupted"
             ? "icon-[lucide--circle-pause] text-warning"
             : status === "blocked"

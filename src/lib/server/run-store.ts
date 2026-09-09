@@ -65,6 +65,7 @@ export class RunStore {
   private runs = new Map<string, RunSummary>();
   private details = new Map<string, RunDetail>();
   private pending = new Map<string, Promise<void>>();
+  private controllers = new Map<string, AbortController>();
   private listeners = new Set<Listener>();
 
   constructor(readonly directory: string) {}
@@ -114,6 +115,13 @@ export class RunStore {
   async get(id: string): Promise<RunDetail | undefined> {
     if (!validId.test(id) || !this.runs.has(id)) return undefined;
     return this.details.get(id) ?? (await this.read(id, true)).run;
+  }
+
+  cancel(id: string): boolean {
+    const controller = this.controllers.get(id);
+    if (!controller) return false;
+    controller.abort(new Error("Workflow cancelled by user."));
+    return true;
   }
 
   private async read(id: string, includeDetails: boolean) {
@@ -192,9 +200,11 @@ export class RunStore {
     );
     this.runs.set(id, summary(run));
     this.details.set(id, run);
+    const controller = new AbortController();
+    this.controllers.set(id, controller);
     this.publish(id, started);
     serverLog("info", "run.started", { runId: id, webhook, workflow: workflow.name, source });
-    const completion = this.execute(id, workflow, input);
+    const completion = this.execute(id, workflow, input, controller.signal);
     // Background runs must always have a rejection handler, even after the HTTP client leaves.
     void completion.catch((cause) => serverLog("error", "run.error", { runId: id, error: cause }));
     return { id, completion };
@@ -204,10 +214,12 @@ export class RunStore {
     id: string,
     workflow: Task<I, O>,
     input: SchemaInput<I>,
+    signal: AbortSignal,
   ): Promise<WorkflowExecution> {
     const base = performance.now();
     const execution = await runWorkflow(workflow, {
       input,
+      signal,
       onEvent: (event) => {
         void this.append(id, {
           type: "event",
@@ -215,10 +227,11 @@ export class RunStore {
         }).catch(() => {}); // The same write failure is handled when completion flushes the queue.
       },
     });
+    this.controllers.delete(id);
     try {
       await this.append(id, {
         type: "finished",
-        status: execution.ok ? "completed" : "failed",
+        status: signal.aborted ? "cancelled" : execution.ok ? "completed" : "failed",
         finishedAt: Date.now(),
         durationMs: execution.durationMs,
         usage: execution.usage,
