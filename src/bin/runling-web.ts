@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createServer } from "vite";
@@ -7,6 +8,7 @@ import { CommanderError } from "commander";
 import { createServeCommand, type ServeOptions } from "../runtime/cli.ts";
 
 export async function runRunlingWeb(options: ServeOptions): Promise<void> {
+  if (existsSync(".env")) process.loadEnvFile(".env");
   const appRoot = resolve(import.meta.dirname, "../..");
   const configPath = resolve(options.config);
   process.env.RUNLING_WEB_CONFIG = configPath;

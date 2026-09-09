@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "./context.ts";
 import { describe, expect, test } from "vitest";
 import { runWorkflow } from "./runner.ts";
 import { task } from "./workflow.ts";
@@ -11,7 +12,7 @@ describe("execution services", () => {
     const second = Promise.withResolvers<string>();
     const events: RunlingEvent[][] = [[], []];
     const ask = task(async function ask(ctx, message: string) {
-      const answer = await input(message);
+      const answer = await input(ctx, message);
       log.debug(`debug:${answer}`);
       log.info(answer);
       return answer;
@@ -24,6 +25,6 @@ describe("execution services", () => {
     expect((await two).output).toBe("second answer");
     expect(events[0]!.filter(e => e.type === "log").filter(e => e.source === undefined).map(e => e.message)).toEqual(["debug:first answer", "first answer"]);
     expect(events[1]!.filter(e => e.type === "log").filter(e => e.source === undefined).map(e => e.message)).toEqual(["second answer"]);
-    await expect(input("outside a run")).rejects.toThrow("this host cannot provide it");
+    await expect(input(createWorkflowContext(), "outside a run")).rejects.toThrow("this host cannot provide it");
   });
 });

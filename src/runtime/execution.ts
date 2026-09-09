@@ -1,9 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { InputHandler } from "./input.ts";
 
 interface ExecutionServices {
   verbose: boolean;
-  handleInput?: InputHandler;
 }
 
 const services = new AsyncLocalStorage<ExecutionServices>();

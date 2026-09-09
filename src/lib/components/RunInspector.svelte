@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { RunDetail } from "$lib/runs.ts";
+  import { summarizeRunActivity } from "$lib/run-activity.ts";
   import { duration } from "$lib/runs.ts";
   import { buildTimeline, findActivity } from "$lib/timeline.ts";
   import StatusBadge from "./StatusBadge.svelte";
@@ -13,6 +14,7 @@
   let now = $state(Date.now());
   let selected = $state("");
   let tab = $state<"timeline" | "input" | "output" | "logs">("timeline");
+  let waiting = $derived(summarizeRunActivity(run)?.waiting ?? false);
   let nodes = $derived(buildTimeline(run.events, run.status));
   let activity = $derived(findActivity(nodes, selected));
   let elapsed = $derived(run.durationMs ?? Math.max(0, now - run.startedAt));
@@ -34,7 +36,7 @@
         >{run.source === "web"
           ? "Started from web"
           : `Webhook /${run.webhook}`}</span
-      ><StatusBadge status={run.status} />
+      ><StatusBadge status={run.status} {waiting} />
     </div>
     <h1 class="text-3xl tracking-tight font-medium my-3.5 mx-0 wrap-anywhere">
       {run.workflow}
@@ -111,7 +113,7 @@
         >
           {run.status === "running"
             ? "Waiting for the first workflow event…"
-            : "This run did not start any steps."}
+            : "No activity events were recorded for this run."}
         </div>{/if}
       {#if activity}
         <ActivityInspector {activity} onclose={() => (selected = "")} />

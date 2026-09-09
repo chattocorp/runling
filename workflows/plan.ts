@@ -16,7 +16,7 @@ export const plan = task(
   async (ctx, { directory, prompt: input }) => {
     const request =
       input.trim() === ""
-        ? await askInput("What would you like to build or change?")
+        ? await askInput(ctx, "What would you like to build or change?")
         : input;
 
     await using planner = await agent({
@@ -59,7 +59,7 @@ export const plan = task(
         throw new Error(`Planning failed: ${report.summary}`);
       }
 
-      const answer = await askInput(report.summary);
+      const answer = await askInput(ctx, report.summary);
       message = concat(
         "The human answered your question:",
         answer,

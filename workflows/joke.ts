@@ -9,7 +9,7 @@ export const joke = task(
     output: Type.String({ description: "The generated joke in Markdown" }),
   },
   async (ctx, { directory, prompt: input }): Promise<string> => {
-    const topic = input || (await askInput("What should the joke be about?"));
+    const topic = input || (await askInput(ctx, "What should the joke be about?"));
 
     const result = await step("Write joke", () =>
       runAgent(

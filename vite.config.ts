@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
-  ssr: { external: ["runling"] },
+  ssr: { external: ["runling", "runling/web", "runling/config-reloader"] },
   // Config files and the server must share one Runling event runtime.
   build: {
     rollupOptions: {

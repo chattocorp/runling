@@ -3,15 +3,15 @@ import { createObservedWorkflowContext, createWorkflowContext } from "./context.
 import { emptyTokenUsage, type TokenUsage } from "./usage.ts";
 
 describe("workflow context", () => {
-  test("returns independent read-only snapshots", () => {
+  test("exposes a stable read-only usage view with explicit snapshots", () => {
     const ctx = createWorkflowContext();
     expectTypeOf(ctx.usage).toEqualTypeOf<Readonly<TokenUsage>>();
-    const before = ctx.usage;
+    const before = { ...ctx.usage };
     ctx.recordUsage({ ...emptyTokenUsage(), input: 10, cost: 0.25 });
     expect(before).toEqual(emptyTokenUsage());
-    expect(ctx.usage).not.toBe(ctx.usage);
+    expect(ctx.usage).toBe(ctx.usage);
     // A caller that bypasses readonly typing still cannot change the totals.
-    (ctx.usage as TokenUsage).input = 999;
+    expect(() => { (ctx.usage as TokenUsage).input = 999; }).toThrow(TypeError);
     expect(ctx.usage).toEqual({ ...emptyTokenUsage(), input: 10, cost: 0.25 });
     expect(ctx).not.toHaveProperty("cwd");
   });
@@ -83,4 +83,20 @@ test("supplies a default abort reason and retains usage", () => {
   ctx.recordUsage({ ...emptyTokenUsage(), input: 10, cost: 0.25 });
   expect(() => ctx.abort()).toThrow("Workflow aborted");
   expect(ctx.usage).toEqual({ ...emptyTokenUsage(), input: 10, cost: 0.25 });
+});
+
+
+test("spread contexts share live usage and cancellation but have separate handlers", async () => {
+  const parent = createWorkflowContext();
+  parent.onInput = async () => "parent";
+  const child = { ...parent, onInput: async () => "child" };
+  expect(child.usage).toBe(parent.usage);
+  expect(child.signal).toBe(parent.signal);
+  child.recordUsage({ ...emptyTokenUsage(), input: 10, cost: 0.25 });
+  parent.recordUsage({ ...emptyTokenUsage(), output: 2, cost: 0.5 });
+  expect(child.usage).toEqual({ ...emptyTokenUsage(), input: 10, output: 2, cost: 0.75 });
+  expect(await parent.onInput({ id: "1", message: "Question" })).toBe("parent");
+  expect(await child.onInput()).toBe("child");
+  expect(() => child.abort("Stop both")).toThrow("Stop both");
+  expect(parent.signal.aborted).toBe(true);
 });

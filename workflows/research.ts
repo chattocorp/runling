@@ -15,7 +15,7 @@ export const research = task(
   async (ctx, { directory, prompt: input }) => {
     const topic =
       input.trim() === ""
-        ? await askInput("What topic should I research?")
+        ? await askInput(ctx, "What topic should I research?")
         : input;
 
     const report = await step("Researching topic", () =>

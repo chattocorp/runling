@@ -158,7 +158,7 @@ vi.mock("runling", async (importOriginal) => {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
     runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
-    input: (...args: unknown[]) => mocks.current.input(...args),
+    input: (_ctx: unknown, ...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },
     exec: (...args: unknown[]) => {

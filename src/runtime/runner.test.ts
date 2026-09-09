@@ -313,7 +313,7 @@ describe("runWorkflow", () => {
       },
       async (ctx, input) => {
         expect(input).toBe("Make me laugh");
-        const topic = await askInput("What is the topic?");
+        const topic = await askInput(ctx, "What is the topic?");
         return `A joke about ${topic}`;
       },
     );
@@ -593,4 +593,40 @@ test("cancels cooperative parallel work without cancelling another run", async (
   expect(cleanedUp).toBe(true);
   expect(aborted).toMatchObject({ ok: false, error: "Stop siblings" });
   expect(successful).toMatchObject({ ok: true, output: "done" });
+});
+
+
+test("host handlers can be overridden by child contexts without changing the parent", async () => {
+  const child = task(async (ctx) => {
+    ctx.recordUsage({ input: 3, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.25 });
+    return askInput(ctx, "child question");
+  });
+  const workflow = task(async (ctx) => {
+    const override = { ...ctx, onInput: async () => "child answer" };
+    const answers = await Promise.all([
+      child(override),
+      askInput(ctx, "parent question"),
+    ]);
+    expect(override.usage).toBe(ctx.usage);
+    return answers;
+  });
+  const result = await runWorkflow(workflow, {
+    input: undefined,
+    onInput: async () => "host answer",
+  });
+  expect(result.output).toEqual(["child answer", "host answer"]);
+  expect(result.usage.input).toBe(3);
+});
+
+test("completed executions retain usage snapshots after the context changes", async () => {
+  const contexts: ReturnType<typeof createWorkflowContext>[] = [];
+  const result = await runWorkflow(task((ctx) => {
+    contexts.push(ctx);
+    ctx.recordUsage({ input: 1, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.25 });
+    return "done";
+  }), { input: undefined });
+  contexts[0]!.recordUsage({ input: 2, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.5 });
+  expect(result.usage.input).toBe(1);
+  expect(result.usage.cost).toBe(0.25);
+  expect(contexts[0]!.usage.input).toBe(3);
 });

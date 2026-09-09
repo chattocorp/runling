@@ -1,8 +1,11 @@
 <script lang="ts">
-  let { status }: { status: string } = $props();
-  let label = $derived(status.charAt(0).toUpperCase() + status.slice(1));
+  let { status, waiting = false }: { status: string; waiting?: boolean } = $props();
+  let waitingForInput = $derived(status === "running" && waiting);
+  let label = $derived(waitingForInput ? "Waiting for input" : status.charAt(0).toUpperCase() + status.slice(1));
   let icon = $derived(
-    status === "completed"
+    waitingForInput
+      ? "icon-[lucide--message-circle-question] text-warning"
+      : status === "completed"
       ? "icon-[lucide--circle-check] text-success"
       : status === "running"
         ? "icon-[lucide--loader-circle] text-info animate-spin motion-reduce:animate-none"

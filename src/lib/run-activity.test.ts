@@ -50,3 +50,25 @@ test("moves on after an activity finishes and limits long messages", () => {
   expect(result?.parallel).toBe(0);
   expect(result?.preview).toHaveLength(500);
 });
+
+
+test("waits until every pending input finishes, including failed inputs", () => {
+  const history: RunlingEvent[] = [
+    ...events,
+    { type: "input.requested", id: "first", message: "First?", timestamp: 40 },
+    { type: "input.requested", id: "second", message: "Second?", timestamp: 50 },
+  ];
+  expect(summarizeRunActivity(run(history))?.waiting).toBe(true);
+  history.push({ type: "input.finished", id: "first", status: "answered", value: "Yes", durationMs: 20, timestamp: 60 });
+  expect(summarizeRunActivity(run(history))?.waiting).toBe(true);
+  history.push({ type: "input.finished", id: "second", status: "failed", durationMs: 20, timestamp: 70 });
+  expect(summarizeRunActivity(run(history))?.waiting).toBe(false);
+});
+
+test("terminal runs never show a pending input as waiting", () => {
+  const waiting = run([{ type: "input.requested", id: "question", message: "Continue?", timestamp: 0 }]);
+  expect(summarizeRunActivity(waiting)?.waiting).toBe(true);
+  for (const status of ["completed", "failed", "interrupted"] as const) {
+    expect(summarizeRunActivity({ ...waiting, status })).toBeNull();
+  }
+});
