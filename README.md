@@ -37,7 +37,7 @@ import { z } from "zod";
 
 export default task(
   { name: "Echo", input: z.string(), output: z.string() },
-  (ctx, input) => input,
+  (input) => { return input },
 );
 ```
 
@@ -71,12 +71,6 @@ And off it goes!
 
 Run `pnpm runling --help` to list commands. Use `run --help` or
 `serve --help` to see command options, and `--version` to print the version.
-
-## Workflow context
-
-Each workflow execution has a context that holds workflow data, including token
-usage and cost. Tasks receive it as their first argument and pass it to child
-tasks.
 
 ## Task schemas
 
