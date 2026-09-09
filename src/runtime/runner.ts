@@ -6,6 +6,7 @@ import type { RunOptions } from "./cli.ts";
 import {
   observeRunlingEvents,
   emitRunlingEvent,
+  bindRunlingContext,
   type RunlingEventListener,
 } from "./events.ts";
 import type { InputHandler } from "./input.ts";
@@ -243,9 +244,9 @@ interface ExecutionHost {
 async function captureExecution<Output>(
   run: (ctx: WorkflowContext) => Promise<Output> | Output,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
-  const ctx = createObservedWorkflowContext(usage =>
+  const ctx = createObservedWorkflowContext(bindRunlingContext((usage: TokenUsage) =>
     emitRunlingEvent({ type: "usage.updated", usage }),
-  );
+  ));
   const start = performance.now();
   let result: WorkflowResult | null = null;
   let output: Awaited<Output> | null = null;

@@ -515,3 +515,22 @@ test("keeps parent accounting independent of a failed nested workflow execution"
   expect(result.error).toBe("Parent failed");
   expect(result.usage.input).toBe(10);
 });
+
+test("emits context usage updates from callbacks created outside the run", async () => {
+  const { AsyncResource } = await import("node:async_hooks");
+  const resource = new AsyncResource("external-usage");
+  const events: RunlingEvent[] = [];
+  try {
+    const execution = await runWorkflow(task((ctx) => {
+      resource.runInAsyncScope(() => {
+        ctx.recordUsage({ input: 10, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.25 });
+      });
+      return "done";
+    }), { input: undefined, onEvent: event => events.push(event) });
+    expect(execution.usage.input).toBe(10);
+    expect(events.filter(event => event.type === "usage.updated").map(event => event.usage))
+      .toEqual([execution.usage]);
+  } finally {
+    resource.emitDestroy();
+  }
+});
