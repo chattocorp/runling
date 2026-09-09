@@ -53,7 +53,10 @@ for this checkout.
 
 Questions are sequential and each allows 15 minutes for an answer. While the bot
 works, messages from the original sender go into a steering inbox. The planner
-consumes them between agent turns, before posting its next question or plan.
+forwards them into the active agent interaction as steering. The agent receives
+steering after the current assistant turn finishes its tool calls, before the
+next model call. It cannot change a response that is already being generated.
+Messages that miss this delivery window remain in the inbox for the next interaction.
 Once a question opens, the next new message answers it. Earlier inbox messages
 never become answers. Only the original sender can steer or answer in that thread.
 
@@ -75,7 +78,12 @@ thread routing, input handler, and ConnectRPC message sender used by both demos.
 context with `onInput`; the conversation calls `input(ctx, ...)` as usual.
 The fourth `run` argument is an inbox with `drain(): string[]`. Pass it to tasks
 that need steering. Draining returns and removes the queued messages in arrival
-order; it does not affect input answers.
+order; it does not affect input answers. `subscribe(listener)` notifies a task
+when a message arrives and returns an unsubscribe function. `prepend(messages)`
+restores undelivered messages at the front without notifying listeners again.
+`withChattoSteering` connects this inbox to an active agent and restores messages
+that were not delivered. It keeps `/implement` for the workflow to handle.
+See [agent steering](agent-steering.md) for the delivery contract.
 The root config attaches each demo's `route` function. It delivers answers to
 pending questions before creating a run. Replies, duplicates, and unrelated
 messages return `202 { "handled": true }` without adding run history. Only a new

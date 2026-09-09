@@ -24,10 +24,13 @@ export type Delivery = Static<typeof deliverySchema>;
 /** Unsolicited messages, consumed explicitly by the workflow or its tasks. */
 export interface ChattoInbox {
   drain(): string[];
+  prepend(messages: string[]): void;
+  subscribe(listener: () => void): () => void;
 }
 
 interface Conversation {
   messages: string[];
+  listeners: Set<() => void>;
   answer?: (answer: string) => void;
   ctx?: WorkflowContext;
   cancelled: boolean;
@@ -73,10 +76,11 @@ export function createChattoWebhook<Output extends TSchema>({ name, output, post
         return "answered";
       }
       conversation.messages.push(delivery.message.body);
+      for (const listener of conversation.listeners) listener();
       return "queued";
     }
     if (delivery.thread_root_id !== null) return "ignored";
-    conversations.set(key, { messages: [], cancelled: false });
+    conversations.set(key, { messages: [], listeners: new Set(), cancelled: false });
     return "start";
   };
   const route: WebhookRouter<Delivery> = async (delivery, start) => {
@@ -110,7 +114,14 @@ export function createChattoWebhook<Output extends TSchema>({ name, output, post
     const key = conversationKey(delivery);
     const conversation = conversations.get(key)!;
     conversation.ctx = ctx;
-    const inbox: ChattoInbox = { drain: () => conversation.messages.splice(0) };
+    const inbox: ChattoInbox = {
+      drain: () => conversation.messages.splice(0),
+      prepend: messages => { conversation.messages.unshift(...messages); },
+      subscribe: listener => {
+        conversation.listeners.add(listener);
+        return () => { conversation.listeners.delete(listener); };
+      },
+    };
     const destination = { roomId: delivery.room_id, threadRootId };
     const closed = new AbortController();
     let previous: Promise<unknown> = Promise.resolve();
@@ -161,6 +172,7 @@ export function createChattoWebhook<Output extends TSchema>({ name, output, post
       throw error;
     } finally {
       closed.abort(new Error("Chatto conversation ended"));
+      conversation.listeners.clear();
       conversations.delete(key);
     }
   });

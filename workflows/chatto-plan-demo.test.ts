@@ -21,7 +21,7 @@ function setup(reports: AgentResult[], options: { timeout?: number; typing?: Cha
     const next = reports.shift();
     if (!next) throw new Error("No prepared report");
     return next;
-  }), dispose: vi.fn() };
+  }), steer: vi.fn(async (_text: string) => false), dispose: vi.fn() };
   const refresh = vi.fn(async () => "abc123");
   const createPlanner = vi.fn(async () => planner);
   const bot = createChattoPlanDemo({ directory: process.cwd(), post, refresh, createPlanner, ...options });
@@ -186,4 +186,24 @@ test("includes feedback received while sending a rejected-approval notice", asyn
   expect(f.planner.runOutcome.mock.calls[1]).toEqual(expect.arrayContaining([expect.stringContaining("Use the existing API")]));
   await f.answer("/implement");
   await run;
+});
+
+
+test("forwards busy feedback before the active interaction completes", async () => {
+  const f = setup([]);
+  const turn = Promise.withResolvers<AgentResult>();
+  f.planner.runOutcome.mockImplementationOnce(() => turn.promise);
+  f.planner.steer.mockResolvedValue(true);
+  const run = f.bot(createWorkflowContext(), delivery("Feature", "root"));
+  await vi.waitFor(() => expect(f.planner.runOutcome).toHaveBeenCalledOnce());
+  await f.answer("Include accessibility tests");
+  expect(f.planner.steer).toHaveBeenCalledWith("Include accessibility tests");
+  expect(f.planner.runOutcome).toHaveBeenCalledOnce();
+  await f.answer("/implement");
+  expect(f.planner.steer).toHaveBeenCalledOnce();
+  turn.resolve(report("completed", "Ready", "Plan with accessibility tests"));
+  await f.waitQuestion("Plan with accessibility tests");
+  expect(f.planner.runOutcome).toHaveBeenCalledOnce();
+  await f.answer("/implement");
+  expect(await run).toMatchObject({ status: "implementation-stub" });
 });

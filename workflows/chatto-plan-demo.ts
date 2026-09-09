@@ -2,9 +2,10 @@ import { realpath } from "node:fs/promises";
 import { agent, input, task, Type, TimeoutError, type RunlingAgent } from "runling";
 import { createChattoWebhook, messageSignal, postToChatto, type ChattoPost } from "./chatto/webhook.ts";
 import { withChattoTyping, sendChattoTyping, type ChattoTyping } from "./chatto/typing.ts";
+import { withChattoSteering } from "./chatto/steering.ts";
 import { refreshCheckout } from "./chatto/checkout.ts";
 
-type Planner = Pick<RunlingAgent, "runOutcome" | "dispose">;
+type Planner = Pick<RunlingAgent, "runOutcome" | "dispose" | "steer">;
 export interface PlanDemoOptions {
   directory: string;
   post: ChattoPost;
@@ -81,7 +82,7 @@ export function createChattoPlanDemo({
             ctx.signal.throwIfAborted();
             const before = await feedback();
             if (before.length) message += `\n\nAdditional user messages:\n${before.join("\n\n")}`;
-            const report = await withChattoTyping(ctx, destination, typing, () => planner.runOutcome(ctx, message));
+            const report = await withChattoTyping(ctx, destination, typing, () => withChattoSteering(inbox, planner, () => planner.runOutcome(ctx, message)));
             if (report.outcome === "failed") throw new Error(`Planning failed: ${report.summary}`);
             const during = await feedback();
             if (during.length) {
