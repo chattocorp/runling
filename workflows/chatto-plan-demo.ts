@@ -68,11 +68,14 @@ export function createChattoPlanDemo({
         try {
           let message = `Plan this Chatto change at revision ${revision}:\n\n${delivery.message.body}`;
           const feedback = async () => {
-            const messages = inbox.drain();
-            if (messages.some(value => value.trim() === "/implement")) {
+            const feedback: string[] = [];
+            while (true) {
+              const messages = inbox.drain();
+              feedback.push(...messages.filter(value => value.trim() !== "/implement"));
+              if (!messages.some(value => value.trim() === "/implement")) return feedback;
               await say("Please wait for a completed plan, then send /implement to accept it. That command was not saved as approval.");
+              // Messages can arrive while the notice is sent. Include those too.
             }
-            return messages.filter(value => value.trim() !== "/implement");
           };
           while (true) {
             ctx.signal.throwIfAborted();
@@ -96,7 +99,8 @@ export function createChattoPlanDemo({
               if (answer.trim() !== "/implement" || plan) break;
               await say("There is no completed plan to accept yet. Please answer the planning question first.");
             }
-            const extra = await feedback();
+            // Do not yield between checking pending feedback and accepting a plan.
+            const extra = inbox.drain().filter(value => value.trim() !== "/implement");
             if (answer.trim() === "/implement" && extra.length) {
               await say("I’ll review your additional feedback first. Please approve the updated plan when it is ready.");
             }

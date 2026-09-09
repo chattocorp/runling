@@ -164,3 +164,26 @@ test("cancel interrupts an active agent turn and releases the checkout", async (
   expect(ctx.signal.aborted).toBe(true);
   expect(f.planner.dispose).toHaveBeenCalledOnce();
 });
+
+
+test("includes feedback received while sending a rejected-approval notice", async () => {
+  const f = setup([report("completed", "Updated", "Updated after notice")]);
+  const turn = Promise.withResolvers<AgentResult>();
+  const notice = Promise.withResolvers<void>();
+  f.planner.runOutcome.mockImplementationOnce(() => turn.promise);
+  f.post.mockImplementation(async (_destination, body) => {
+    if (body.includes("not saved as approval")) await notice.promise;
+  });
+  const run = f.bot(createWorkflowContext(), delivery("Feature", "root"));
+  await vi.waitFor(() => expect(f.planner.runOutcome).toHaveBeenCalledOnce());
+  await f.answer("/implement");
+  turn.resolve(report("completed", "Stale", "Stale before notice"));
+  await f.waitQuestion("not saved as approval");
+  await f.answer("Use the existing API");
+  notice.resolve();
+  await f.waitQuestion("Updated after notice");
+  expect(f.post.mock.calls.some(call => call[1].includes("Stale before notice"))).toBe(false);
+  expect(f.planner.runOutcome.mock.calls[1]).toEqual(expect.arrayContaining([expect.stringContaining("Use the existing API")]));
+  await f.answer("/implement");
+  await run;
+});
