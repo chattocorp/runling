@@ -1,6 +1,6 @@
 import type { RunlingEvent, TokenUsage } from "runling";
 
-export type RunStatus = "running" | "completed" | "failed" | "interrupted";
+export type RunStatus = "running" | "completed" | "failed" | "interrupted" | "cancelled";
 export interface RunActivity {
   label: string;
   step?: string;

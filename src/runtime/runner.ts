@@ -77,6 +77,7 @@ export interface ExecutionOptions {
 export interface RunWorkflowOptions<Input = unknown> {
   /** Maximum elapsed time in seconds, including input waits. Cancellation is cooperative. */
   timeout?: number;
+  signal?: AbortSignal;
   input: Input;
   verbose?: boolean;
   onInput?: InputHandler;
@@ -168,12 +169,12 @@ export async function executeWorkflow(
 /** Run a workflow without assuming a terminal, printing, or changing process state. */
 export async function runWorkflow<Input, Output>(
   run: (ctx: WorkflowContext, input: Input) => Output,
-  { input, verbose = false, onInput, onEvent = () => {}, timeout }: RunWorkflowOptions<Input>,
+  { input, verbose = false, onInput, onEvent = () => {}, timeout, signal }: RunWorkflowOptions<Input>,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
   return withExecutionServices({ verbose }, () =>
     observeRunlingEvents(onEvent, () =>
       log.withDestination("silent", () =>
-        captureExecution(ctx => log.indented(() => run(ctx, input)), onInput, timeout),
+        captureExecution(ctx => log.indented(() => run(ctx, input)), onInput, timeout, signal),
       ),
     ),
   );
@@ -242,11 +243,12 @@ async function captureExecution<Output>(
   run: (ctx: WorkflowContext) => Promise<Output> | Output,
   onInput?: InputHandler,
   timeout?: number,
+  signal?: AbortSignal,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
   const deadline = createTimeout(timeout, "Workflow");
   const ctx = createObservedWorkflowContext(bindRunlingContext((usage: TokenUsage) =>
     emitRunlingEvent({ type: "usage.updated", usage }),
-  ), deadline.signal);
+  ), signal && deadline.signal ? AbortSignal.any([signal, deadline.signal]) : signal ?? deadline.signal);
   ctx.onInput = onInput;
   const start = performance.now();
   let result: WorkflowResult | null = null;

@@ -11,6 +11,25 @@
   import RunOutput from "./RunOutput.svelte";
   import ActivityInspector from "./ActivityInspector.svelte";
   let { run, connection }: { run: RunDetail; connection: string } = $props();
+  let cancelling = $state(false);
+  let cancelError = $state("");
+
+  async function cancelRun() {
+    if (cancelling) return;
+    cancelling = true;
+    cancelError = "";
+    try {
+      const response = await fetch(`/api/runs/${run.id}/cancel`, { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error ?? "Cannot cancel this run.");
+      }
+    } catch (cause) {
+      cancelError = cause instanceof Error ? cause.message : "Cannot cancel this run.";
+      cancelling = false;
+    }
+  }
+
   let now = $state(Date.now());
   let selected = $state("");
   let tab = $state<"timeline" | "input" | "output" | "logs">("timeline");
@@ -31,12 +50,31 @@
 
 <section class="min-w-0" aria-label="Run details">
   <header class="px-8 pt-8 pb-4 max-sm:p-5">
-    <div class="flex justify-between gap-2.5">
-      <span class="text-base-content/60 text-xs"
+    <div class="flex min-h-8 items-center justify-between gap-3">
+      <span class="min-w-0 wrap-anywhere text-base-content/60 text-xs"
         >{run.source === "web"
           ? "Started from web"
           : `Webhook /${run.webhook}`}</span
-      ><StatusBadge status={run.status} waiting={pendingInputs > 0} />
+      >
+      <div class="flex shrink-0 items-center gap-2">
+        <StatusBadge status={run.status} waiting={pendingInputs > 0} />
+        {#if run.status === "running"}
+          <button
+            class="btn btn-ghost btn-sm min-w-28 gap-1.5 px-2 text-xs font-medium text-base-content/60 hover:bg-error/10 hover:text-error focus-visible:outline-error focus-visible:text-error"
+            disabled={cancelling}
+            onclick={cancelRun}
+          >
+            <span
+              class={cancelling
+                ? "icon-[lucide--loader-circle] size-3.5 animate-spin motion-reduce:animate-none"
+                : "icon-[lucide--square] size-3.5"}
+              aria-hidden="true"
+            ></span>
+            {cancelling ? "Cancelling…" : "Cancel run"}
+          </button>
+          <span class="sr-only" role="status">{cancelling ? "Waiting for the workflow to stop." : ""}</span>
+        {/if}
+      </div>
     </div>
     <h1 class="text-3xl tracking-tight font-medium my-3.5 mx-0 wrap-anywhere">
       {run.workflow}
@@ -49,6 +87,9 @@
       >
     </div>
     {#if pendingInputs}<p class="mt-3 text-sm text-warning">{pendingInputs} {pendingInputs === 1 ? "input" : "inputs"} pending</p>{/if}
+    {#if run.status === "running" && cancelError}
+      <p class="mt-3 text-sm text-error" role="alert">{cancelError}</p>
+    {/if}
     <Usage usage={run.usage} detail />
     <p
       class="text-base-content/60 text-xs flex justify-between mt-5 mr-0 mb-0 ml-0"
@@ -56,7 +97,12 @@
       Run {run.id.slice(0, 8)} <span>{connection}</span>
     </p>
   </header>
-  {#if run.error}<div
+  {#if run.status === "cancelled"}
+    <p class="mx-8 mb-2.5 flex items-center gap-2 text-sm text-base-content/60 max-sm:mx-5" role="status">
+      <span class="icon-[lucide--circle-stop] size-4 shrink-0" aria-hidden="true"></span>
+      Run cancelled
+    </p>
+  {:else if run.error}<div
       class="alert alert-error mt-0 mr-8 mb-2.5 ml-8 max-sm:mx-5"
       role="alert"
     >
