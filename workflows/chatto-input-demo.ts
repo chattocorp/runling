@@ -1,4 +1,4 @@
-import { input, task, Type, type InputHandler } from "runling";
+import { input, task, Type, TimeoutError, type InputHandler } from "runling";
 
 const deliverySchema = Type.Object({
   version: Type.Literal(1),
@@ -19,12 +19,12 @@ interface Destination {
 
 export interface DemoOptions {
   post: (destination: Destination, body: string, signal: AbortSignal) => Promise<void>;
-  /** Conversation timeout in seconds. */
+  /** Timeout for each question, in seconds. */
   timeout?: number;
 }
 
 /** Create once per server process so deliveries share pending questions. */
-export function createChattoInputDemo({ post, timeout = 300 }: DemoOptions) {
+export function createChattoInputDemo({ post, timeout = 30 }: DemoOptions) {
   const timeoutMs = Math.ceil(timeout * 1000);
   if (!Number.isFinite(timeout) || timeout < 0 || timeoutMs > 2_147_483_647) {
     throw new RangeError("timeout must be seconds between 0 and 2147483.647");
@@ -61,11 +61,9 @@ export function createChattoInputDemo({ post, timeout = 300 }: DemoOptions) {
     if (active.has(key) || delivery.thread_root_id !== null) return "ignored";
     active.add(key);
 
-    const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(timeoutMs)]);
     const destination = { roomId: delivery.room_id, threadRootId };
     const onInput: InputHandler = async (request) => {
-      const questionSignal = request.signal
-        ? AbortSignal.any([signal, request.signal]) : signal;
+      const questionSignal = request.signal ?? ctx.signal;
       questionSignal.throwIfAborted();
       let resolveAnswer!: (answer: string) => void;
       let rejectAnswer!: (error: unknown) => void;
@@ -89,10 +87,19 @@ export function createChattoInputDemo({ post, timeout = 300 }: DemoOptions) {
 
     try {
       const chat = { ...ctx, onInput };
-      const name = await input(chat, "What is your name?");
-      const topic = await input(chat, "What would you like to work on?");
-      await post(destination, `Thanks! Your name: ${name}\nYour topic: ${topic}`, signal);
+      const name = await input(chat, `What is your name? Please reply within ${timeout} seconds.`, { timeout });
+      const topic = await input(chat, `What would you like to work on? Please reply within ${timeout} seconds.`, { timeout });
+      await post(destination, `Thanks! Your name: ${name}\nYour topic: ${topic}`,
+        AbortSignal.any([ctx.signal, AbortSignal.timeout(10_000)]));
       return { name, topic };
+    } catch (error) {
+      if (error instanceof TimeoutError && !ctx.signal.aborted) {
+        // The question signal has expired. Use a fresh, bounded signal for the notice.
+        await post(destination, "The question timed out. Send me a new DM to try again.",
+          AbortSignal.any([ctx.signal, AbortSignal.timeout(10_000)]),
+        ).catch(() => {}); // Preserve the original timeout if the notice cannot be delivered.
+      }
+      throw error;
     } finally {
       active.delete(key);
     }
