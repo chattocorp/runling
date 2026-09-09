@@ -254,10 +254,12 @@ async function captureExecution<Output>(
 
   try {
     const value = await run(ctx);
+    ctx.signal.throwIfAborted();
     result = normalizeWorkflowResult(value);
     output = value ?? null;
   } catch (cause) {
-    error = cause instanceof Error ? cause.message : String(cause);
+    const failure = ctx.signal.aborted ? ctx.signal.reason : cause;
+    error = failure instanceof Error ? failure.message : String(failure);
   }
 
   const usage = ctx.usage;

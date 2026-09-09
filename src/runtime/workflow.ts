@@ -91,15 +91,18 @@ export function task(
     return result instanceof Promise ? result.then(check) : check(result);
   };
   const standard = definition && (isStandardSchema(definition.input) || isStandardSchema(definition.output));
-  const runStandard = async (receiver: unknown, args: unknown[]) => {
+  const runStandard = async (receiver: unknown, args: [WorkflowContext, ...unknown[]]) => {
+    args[0].signal.throwIfAborted();
     const input = await parse("input", args[1]);
+    args[0].signal.throwIfAborted();
     return step(name, async () => {
       const output = await Reflect.apply(run, receiver, [args[0], input, ...args.slice(2)]);
       return parse("output", output);
     });
   };
-  const defined = function (this: unknown, ...args: unknown[]) {
+  const defined = function (this: unknown, ...args: [WorkflowContext, ...unknown[]]) {
     if (standard) return runStandard(this, args);
+    args[0].signal.throwIfAborted();
     if (definition) args[1] = parse("input", args[1]);
     return step(name, () => {
       const output = Reflect.apply(run, this, args);

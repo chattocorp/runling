@@ -1195,3 +1195,59 @@ test("retains usage recorded before cancellation without counting it again", asy
   })).rejects.toBe("Stopped");
   expect(ctx.usage).toEqual({ ...emptyUsage, input: 10, cost: 0.25 });
 });
+
+test("context abort stops an active agent even with a separate call signal", async () => {
+  const ctx = createWorkflowContext();
+  const external = new AbortController();
+  promptImplementation = async () => {
+    emitAssistantUsage({ ...emptyUsage, input: 10, cost: { total: 0.25 } });
+    // Catch the task's throw to check that the agent also observes the signal.
+    try { ctx.abort("Budget exceeded"); } catch {}
+  };
+  await expect(runAgent(ctx, "Work", {
+    cwd: "/project", model: "anthropic/claude-opus-4-5", signal: external.signal,
+  })).rejects.toThrow("Budget exceeded");
+  expect(abortCalls).toBe(1);
+  expect(disposed).toBe(true);
+  expect(external.signal.aborted).toBe(false);
+  expect(ctx.usage).toEqual({ ...emptyUsage, input: 10, cost: 0.25 });
+});
+
+test("does not create an agent for an aborted context", async () => {
+  const ctx = createWorkflowContext();
+  try { ctx.abort("Already stopped"); } catch {}
+  await expect(runAgent(ctx, "Work", {
+    cwd: "/project", model: "anthropic/claude-opus-4-5",
+  })).rejects.toBe(ctx.signal.reason);
+  expect(sessionCreations).toBe(0);
+});
+
+test("reusable agents reject an aborted context but accept a fresh context", async () => {
+  const stopped = createWorkflowContext();
+  const fresh = createWorkflowContext();
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  try {
+    promptImplementation = async () => {
+      try { stopped.abort("Stop"); } catch {}
+    };
+    await expect(instance.run(stopped, "First")).rejects.toBe(stopped.signal.reason);
+    expect(disposed).toBe(false);
+    await expect(instance.runOutcome(stopped, "Again")).rejects.toBe(stopped.signal.reason);
+    expect(promptCalls).toBe(1);
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Done" });
+    };
+    await expect(instance.run(fresh, "Next")).resolves.toMatchObject({ summary: "Done" });
+    expect(fresh.signal.aborted).toBe(false);
+  } finally { instance.dispose(); }
+});
+
+test("per-call cancellation leaves the workflow context usable", async () => {
+  const ctx = createWorkflowContext();
+  const external = new AbortController();
+  promptImplementation = async () => { external.abort("This call only"); };
+  await expect(runAgent(ctx, "Work", {
+    cwd: "/project", model: "anthropic/claude-opus-4-5", signal: external.signal,
+  })).rejects.toBe("This call only");
+  expect(ctx.signal.aborted).toBe(false);
+});

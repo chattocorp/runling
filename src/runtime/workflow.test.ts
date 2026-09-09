@@ -114,3 +114,16 @@ test("preserves generic task signatures", () => {
   expectTypeOf(result).toEqualTypeOf<{ message: string }>();
   expect(result).toEqual({ message: "hello" });
 });
+
+test("rejects new tasks on an aborted context without starting an activity", () => {
+  const ctx = createWorkflowContext();
+  const events: RunlingEvent[] = [];
+  let called = false;
+  const run = task(() => { called = true; });
+  try { ctx.abort("Stop"); } catch {}
+  observeRunlingEvents(event => events.push(event), () => {
+    expect(() => run(ctx)).toThrow(ctx.signal.reason);
+  });
+  expect(called).toBe(false);
+  expect(events).toEqual([]);
+});

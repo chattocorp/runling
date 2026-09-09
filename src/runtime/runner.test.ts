@@ -534,3 +534,63 @@ test("emits context usage updates from callbacks created outside the run", async
     resource.emitDestroy();
   }
 });
+
+test("aborts nested tasks, runs cleanup, and preserves recorded usage", async () => {
+  const calls: string[] = [];
+  const child = task((ctx) => {
+    ctx.recordUsage({ input: 10, output: 2, cacheRead: 0, cacheWrite: 0, cost: 0.25 });
+    ctx.abort("Budget exceeded");
+    calls.push("unreachable");
+  });
+  const parent = task(async (ctx) => {
+    try {
+      child(ctx);
+      calls.push("continued");
+    } finally {
+      calls.push("cleanup");
+    }
+  });
+  const execution = await runWorkflow(parent, { input: undefined });
+  expect(calls).toEqual(["cleanup"]);
+  expect(execution).toMatchObject({
+    ok: false, error: "Budget exceeded", output: null, result: null,
+    usage: { input: 10, output: 2, cost: 0.25 },
+  });
+});
+
+test("cannot turn a caught abort into a successful run", async () => {
+  const run = task((ctx) => {
+    try { ctx.abort("Stop"); } catch {}
+    return "success";
+  });
+  const execution = await runWorkflow(run, { input: undefined });
+  expect(execution).toMatchObject({ ok: false, error: "Stop", output: null, result: null });
+});
+
+test("cancels cooperative parallel work without cancelling another run", async () => {
+  const started = Promise.withResolvers<void>();
+  let cleanedUp = false;
+  const waiting = task(async (ctx) => {
+    try {
+      await new Promise<void>(resolve => {
+        ctx.signal.addEventListener("abort", () => resolve(), { once: true });
+        started.resolve();
+      });
+    } finally { cleanedUp = true; }
+  });
+  const parent = task(async (ctx) => {
+    const pending = waiting(ctx);
+    await started.promise;
+    try { ctx.abort("Stop siblings"); } finally { await pending; }
+  });
+  const [aborted, successful] = await Promise.all([
+    runWorkflow(parent, { input: undefined }),
+    runWorkflow(task((ctx) => {
+      expect(ctx.signal.aborted).toBe(false);
+      return "done";
+    }), { input: undefined }),
+  ]);
+  expect(cleanedUp).toBe(true);
+  expect(aborted).toMatchObject({ ok: false, error: "Stop siblings" });
+  expect(successful).toMatchObject({ ok: true, output: "done" });
+});
