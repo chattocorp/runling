@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "./context.ts";
 import { log } from "./log.ts";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, describe, expect, expectTypeOf, test } from "vitest";
@@ -12,7 +13,6 @@ import {
 import type { RunlingEvent } from "./events.ts";
 import type { InputRequest } from "./input.ts";
 import { input as askInput } from "./input.ts";
-import { recordTokenUsage } from "./usage.ts";
 import { Type } from "typebox";
 import { task } from "./workflow.ts";
 
@@ -23,9 +23,11 @@ afterEach(() => {
 });
 
 describe("executeWorkflow", () => {
-  test("executes a plain function without injected arguments", async () => {
+  test("supplies an explicit context to the workflow", async () => {
     const execution = await executeWorkflow(function (...args) {
-      expect(args).toEqual([]);
+      expect(args).toHaveLength(1);
+      expect(args[0]?.usage).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+      expect(args[0]?.recordUsage).toBeTypeOf("function");
       return "done";
     });
     expect(execution.output).toBe("done");
@@ -37,7 +39,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => "Made the change");
+      await executeWorkflow(async (ctx) => "Made the change");
     } finally {
       console.log = originalLog;
     }
@@ -145,7 +147,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => {
+      await executeWorkflow(async (ctx) => {
         log.info("inside the workflow");
         return "Made the change";
       });
@@ -173,7 +175,7 @@ describe("executeWorkflow", () => {
     console.error = (message: string) => errors.push(message);
 
     try {
-      await executeWorkflow(async () => {
+      await executeWorkflow(async (ctx) => {
         throw "Tests failed";
       });
     } finally {
@@ -190,7 +192,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => undefined);
+      await executeWorkflow(async (ctx) => undefined);
     } finally {
       console.log = originalLog;
     }
@@ -204,7 +206,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => {
+      await executeWorkflow(async (ctx) => {
         throw "Tests failed";
       });
     } finally {
@@ -220,9 +222,9 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => {
-        recordTokenUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 });
-        recordTokenUsage({ input: 50, output: 25, cacheRead: 550, cacheWrite: 15 });
+      await executeWorkflow(async (ctx) => {
+        ctx.recordUsage({ input: 100, output: 20, cacheRead: 500, cacheWrite: 10 });
+        ctx.recordUsage({ input: 50, output: 25, cacheRead: 550, cacheWrite: 15 });
       });
     } finally {
       console.log = originalLog;
@@ -244,7 +246,7 @@ describe("executeWorkflow", () => {
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => undefined);
+      await executeWorkflow(async (ctx) => undefined);
     } finally {
       console.log = originalLog;
     }
@@ -253,14 +255,14 @@ describe("executeWorkflow", () => {
   });
 
   test("resets token usage totals between executions", async () => {
-    recordTokenUsage({ input: 999, output: 999, cacheRead: 999, cacheWrite: 999 });
+    createWorkflowContext().recordUsage({ input: 999, output: 999, cacheRead: 999, cacheWrite: 999 });
     const logs: string[] = [];
     const originalLog = console.log;
     console.log = (message: string) => logs.push(message);
 
     try {
-      await executeWorkflow(async () => {
-        recordTokenUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
+      await executeWorkflow(async (ctx) => {
+        ctx.recordUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
       });
     } finally {
       console.log = originalLog;
@@ -279,7 +281,7 @@ describe("runWorkflow", () => {
   test("preserves the task's resolved output type", async () => {
     const done = task(
       { name: "Done", input: Type.String(), output: Type.String() },
-      () => "done" as const,
+      (ctx) => "done" as const,
     );
     const execution = await runWorkflow(done, { input: "input" });
 
@@ -290,7 +292,7 @@ describe("runWorkflow", () => {
     let started = false;
     const echo = task(
       { name: "Echo", input: Type.String(), output: Type.String() },
-      (input) => { started = true; return input; },
+      (ctx, input) => { started = true; return input; },
     );
     // @ts-expect-error Callers must provide input, not a legacy prompt option.
     const execution = await runWorkflow(echo, { prompt: "Legacy fallback" });
@@ -309,7 +311,7 @@ describe("runWorkflow", () => {
         input: Type.String(),
         output: Type.String(),
       },
-      async (input) => {
+      async (ctx, input) => {
         expect(input).toBe("Make me laugh");
         const topic = await askInput("What is the topic?");
         return `A joke about ${topic}`;
@@ -350,7 +352,7 @@ describe("runWorkflow", () => {
     const exitCode = process.exitCode;
     const failing = task(
       { name: "Fail", input: Type.String(), output: Type.String() },
-      async () => {
+      async (ctx) => {
         throw new Error("Nope");
       },
     );
@@ -471,4 +473,45 @@ describe("formatDuration", () => {
     expect(formatDuration(3_661_000)).toBe("1h1m1s");
     expect(formatDuration(7_385_000)).toBe("2h3m5s");
   });
+});
+
+test("isolates workflow contexts and usage events across concurrent executions", async () => {
+  const seen: unknown[] = [];
+  const events: RunlingEvent[][] = [[], []];
+  const run = task(async (ctx, count: number) => {
+    seen.push(ctx);
+    await Promise.all([1, 2].map(async () => {
+      await Promise.resolve();
+      ctx.recordUsage({ input: count, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.5 });
+    }));
+    return count;
+  });
+  const [first, second] = await Promise.all([
+    runWorkflow(run, { input: 10, onEvent: event => events[0]!.push(event) }),
+    runWorkflow(run, { input: 100, onEvent: event => events[1]!.push(event) }),
+  ]);
+  expect(seen[0]).not.toBe(seen[1]);
+  expect(first.usage.input).toBe(20);
+  expect(second.usage.input).toBe(200);
+  expect(first.usage.cost).toBe(1);
+  expect(events.map(list => list.filter(e => e.type === "usage.updated").map(e => e.usage.input)))
+    .toEqual([[10, 20], [100, 200]]);
+});
+
+test("keeps parent accounting independent of a failed nested workflow execution", async () => {
+  const parent = task(async (ctx) => {
+    ctx.recordUsage({ input: 10, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.5 });
+    const child = await runWorkflow(task((inner) => {
+      expect(inner).not.toBe(ctx);
+      inner.recordUsage({ input: 100, output: 0, cacheRead: 0, cacheWrite: 0, cost: 5 });
+      throw new Error("Child failed");
+    }), { input: undefined });
+    expect(child.ok).toBe(false);
+    expect(child.usage.input).toBe(100);
+    expect(ctx.usage.input).toBe(10);
+    throw new Error("Parent failed");
+  });
+  const result = await runWorkflow(parent, { input: undefined });
+  expect(result.error).toBe("Parent failed");
+  expect(result.usage.input).toBe(10);
 });

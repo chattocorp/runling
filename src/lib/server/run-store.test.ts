@@ -11,7 +11,6 @@ import {
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { task, Type } from "runling";
-import { recordTokenUsage } from "../../runtime/usage.ts";
 import { historyDirectory, RunStore } from "./run-store.ts";
 import { buildTimeline } from "../timeline.ts";
 import type { RunRecord } from "../runs.ts";
@@ -47,14 +46,14 @@ test("streams ordered nested events and restores the completed run", async () =>
   const unsubscribe = original.subscribe((_id, record) => records.push(record));
   const nested = task(
     { name: "Nested", input: Type.String(), output: Type.String() },
-    async (input) => {
+    async (ctx, input) => {
       log.info("Inside nested workflow");
       return input.toUpperCase();
     },
   );
   const parent = task(
     { name: "Parent", input: Type.String(), output: Type.String() },
-    (input) => nested(input),
+    (ctx, input) => nested(ctx, input),
   );
   const run = await original.start("test", parent, "hello", "web");
   await run.completion;
@@ -81,18 +80,18 @@ test("records failures and keeps concurrent token totals separate", async () => 
   const release = Promise.withResolvers<void>();
   const slow = task(
     { name: "Slow", input: Type.String(), output: Type.String() },
-    async () => {
-      recordTokenUsage({ input: 10, output: 1, cacheRead: 0, cacheWrite: 0 });
+    async (ctx) => {
+      ctx.recordUsage({ input: 10, output: 1, cacheRead: 0, cacheWrite: 0 });
       ready.resolve();
       await release.promise;
-      recordTokenUsage({ input: 20, output: 2, cacheRead: 0, cacheWrite: 0 });
+      ctx.recordUsage({ input: 20, output: 2, cacheRead: 0, cacheWrite: 0 });
       return "Slow done";
     },
   );
   const fast = task(
     { name: "Fast", input: Type.String(), output: Type.String() },
-    () => {
-      recordTokenUsage({ input: 100, output: 5, cacheRead: 0, cacheWrite: 0 });
+    (ctx) => {
+      ctx.recordUsage({ input: 100, output: 5, cacheRead: 0, cacheWrite: 0 });
       throw new Error("Expected failure");
     },
   );
@@ -112,7 +111,7 @@ test("recovers a truncated journal as interrupted and saves the recovery", async
   const history = await store();
   const quick = task(
     { name: "Quick", input: Type.String(), output: Type.String() },
-    () => "done",
+    (ctx) => "done",
   );
   const run = await history.start("quick", quick, "", "web");
   await run.completion;
@@ -135,7 +134,7 @@ test("loads completed details on demand without retaining event arrays", async (
   const history = await store();
   const workflow = task(
     { name: "Logs", input: Type.String(), output: Type.String() },
-    (input) => { log.info("A retained journal event"); return input; },
+    (ctx, input) => { log.info("A retained journal event"); return input; },
   );
   const started = await history.start("logs", workflow, "first output", "web");
   await started.completion;

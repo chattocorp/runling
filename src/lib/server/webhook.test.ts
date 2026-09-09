@@ -1,3 +1,4 @@
+import { createWorkflowContext, type WorkflowContext } from "../../runtime/context.ts";
 import { describe, expect, expectTypeOf, test } from "vitest";
 import { task, Type, type WorkflowExecution } from "runling";
 import { defineWebConfig, isWebConfig } from "runling/web";
@@ -12,7 +13,7 @@ const joke = task(
     input: Type.String(),
     output: Type.String(),
   },
-  async (topic) => `A joke about ${topic}`,
+  async (ctx, topic) => `A joke about ${topic}`,
 );
 
 const config = defineWebConfig({
@@ -43,7 +44,7 @@ describe("configured webhooks", () => {
   test("runs Zod webhooks with parsed values and exports the correct schema sides", async () => {
     const input = z.object({ count: z.number().default(1) });
     const output = z.object({ count: z.number().default(2) });
-    const echo = task({ name: "Zod", input, output }, value => value);
+    const echo = task({ name: "Zod", input, output }, (ctx, value) => value);
     const config = defineWebConfig({ webhooks: { echo: { task: echo } } });
     expect(isWebConfig(config)).toBe(true);
     const response = await handleWebhook("echo", request("{}"), { config, log: () => {} });
@@ -60,7 +61,7 @@ describe("configured webhooks", () => {
       name: "Refined",
       input: z.object({ topic: z.string().refine(async value => value === "ok", "Expected ok") }),
       output: z.string(),
-    }, value => value.topic);
+    }, (ctx, value) => value.topic);
     const config = defineWebConfig({ webhooks: { echo: { task: echo } } });
     const response = await handleWebhook("echo", request('{"topic":"bad"}'), {
       config,
@@ -75,7 +76,7 @@ describe("configured webhooks", () => {
       name: "Length",
       input: z.string().transform(value => value.length),
       output: z.number(),
-    }, value => value);
+    }, (ctx, value) => value);
     const config = defineWebConfig({ webhooks: { length: { task: length } } });
     const response = await handleWebhook("length", request('"hello"'), { config, log: () => {} });
     expect(response.status).toBe(200);
@@ -84,8 +85,8 @@ describe("configured webhooks", () => {
 
   test("accepts Valibot's Standard JSON Schema adapter", async () => {
     const schema = toStandardJsonSchema(v.string());
-    const echo = task({ name: "Valibot", input: schema, output: schema }, value => value);
-    expectTypeOf<Parameters<typeof echo>>().toEqualTypeOf<[string]>();
+    const echo = task({ name: "Valibot", input: schema, output: schema }, (ctx, value) => value);
+    expectTypeOf<Parameters<typeof echo>>().toEqualTypeOf<[WorkflowContext, string]>();
     expectTypeOf<ReturnType<typeof echo>>().toEqualTypeOf<Promise<string>>();
     const config = defineWebConfig({ webhooks: { echo: { task: echo } } });
     expect(isWebConfig(config)).toBe(true);
@@ -95,15 +96,15 @@ describe("configured webhooks", () => {
   });
 
   test("permits validation-only tasks but requires export for webhooks", async () => {
-    const echo = task({ name: "Local", input: v.string(), output: v.string() }, value => value);
-    await expect(echo("hello")).resolves.toBe("hello");
+    const echo = task({ name: "Local", input: v.string(), output: v.string() }, (ctx, value) => value);
+    await expect(echo(createWorkflowContext(), "hello")).resolves.toBe("hello");
     const config = { webhooks: { echo: { task: echo } } };
     expect(isWebConfig(config)).toBe(false);
     expect(() => defineWebConfig(config)).toThrow('Webhook "echo" cannot export task schemas');
   });
 
   test("rejects output schemas that cannot be exported", () => {
-    const echo = task({ name: "Local", input: z.string(), output: z.string().transform(value => value.length) }, value => value);
+    const echo = task({ name: "Local", input: z.string(), output: z.string().transform(value => value.length) }, (ctx, value) => value);
     const config = { webhooks: { echo: { task: echo } } };
     expect(isWebConfig(config)).toBe(false);
     expect(() => defineWebConfig(config)).toThrow("cannot export task schemas");
@@ -146,7 +147,7 @@ describe("configured webhooks", () => {
     async ({ schema, value, invalid }) => {
       const echo = task(
         { name: "Echo", input: schema, output: schema },
-        (input) => input,
+        (ctx, input) => input,
       );
       const direct = defineWebConfig({
         webhooks: { echo: { task: echo } },
@@ -224,7 +225,7 @@ describe("configured webhooks", () => {
           nested: Type.Object({ detail: Type.Optional(Type.String()) }),
         }),
       },
-      () => ({ answer: undefined, nested: { detail: undefined } }),
+      (ctx) => ({ answer: undefined, nested: { detail: undefined } }),
     );
     const logs: unknown[] = [];
     const response = await handleWebhook("optional", request('"hello"'), {

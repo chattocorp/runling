@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "./context.ts";
 import { ansiColor } from "./ansi.ts";
 import { AsyncResource } from "node:async_hooks";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -98,7 +99,7 @@ vi.doMock("@earendil-works/pi-coding-agent", async () => {
 
 const { agent, AgentOutcomeError, describeTool, runAgent } =
   await import("./agent.ts");
-const { getRecordedTokenUsage, withTokenUsage } = await import("./usage.ts");
+
 const { log } = await import("./log.ts");
 
 beforeEach(() => {
@@ -170,7 +171,7 @@ test("streams bounded text previews, throttles deltas, and shows tools without d
     await reportOutcome({ outcome: "completed", summary: "Done" });
   };
   try {
-    await observeRunlingEvents(e => events.push(e), () => runAgent("Test", { cwd: "/project", model: "anthropic/claude-opus-4-5" }));
+    await observeRunlingEvents(e => events.push(e), () => runAgent(createWorkflowContext(), "Test", { cwd: "/project", model: "anthropic/claude-opus-4-5" }));
     const previews = events.filter(e => e.type === "agent.progress").map(e => e.text);
     expect(previews).toContain("Looking at files");
     expect(previews).not.toContain("This update is throttled");
@@ -197,7 +198,7 @@ test("previews report-only output such as the joke workflow", async () => {
     }
     await sdk.runInAsyncScope(() => reportOutcome({ outcome: "completed", summary: "Joke written", details: "A joke\nwith a punchline." }));
   };
-  await observeRunlingEvents(e => events.push(e), () => runAgent("Write a joke", { cwd: "/project", model: "anthropic/claude-opus-4-5", tools: [] }));
+  await observeRunlingEvents(e => events.push(e), () => runAgent(createWorkflowContext(), "Write a joke", { cwd: "/project", model: "anthropic/claude-opus-4-5", tools: [] }));
   const previews = events.filter(e => e.type === "agent.progress").map(e => e.text);
   expect(previews.filter(text => text === "Preparing result…")).toHaveLength(1);
   expect(previews.at(-1)).toBe("A joke with a punchline.");
@@ -236,13 +237,13 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the first thing", { cwd: "/project",
+      await runAgent(createWorkflowContext(), "Do the first thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
       const firstAgentColors = withColor.mock.calls.map((call) => call[0]);
       withColor.mockClear();
 
-      await runAgent("Do the second thing", { cwd: "/project",
+      await runAgent(createWorkflowContext(), "Do the second thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
 
@@ -272,7 +273,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
+      await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
     } finally {
       console.log = originalLog;
     }
@@ -311,7 +312,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
+      await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
     } finally {
       console.log = originalLog;
       console.error = originalError;
@@ -370,7 +371,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
+      await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
     } finally {
       console.log = originalLog;
       console.error = originalError;
@@ -432,7 +433,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { cwd: "/project",
+      await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
     } finally {
@@ -458,7 +459,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", { cwd: "/project",
+    await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
       onEvent: (event) => events.push(event.type),
     });
@@ -495,7 +496,7 @@ describe("runAgent", () => {
     };
 
     try {
-      await runAgent("Do the thing", { cwd: "/project",
+      await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
       });
     } finally {
@@ -524,7 +525,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", {
+    await runAgent(createWorkflowContext(), "Do the thing", {
       model: "anthropic/claude-opus-4-5",
       cwd: "/tmp/project",
       resources: { agentDir: "/tmp/custom-agent" },
@@ -549,7 +550,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+      runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "blocked",
       summary: "Need access",
@@ -563,7 +564,7 @@ describe("runAgent", () => {
     promptImplementation = async () => emitAssistantText("I could not finish");
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+      runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "failed",
       summary: "Agent finished without a valid outcome report",
@@ -582,7 +583,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+      runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "completed",
       summary: "Done",
@@ -613,7 +614,7 @@ describe("runAgent", () => {
 
     try {
       await expect(
-        runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+        runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
       ).resolves.toEqual({
         outcome: "completed",
         summary: "Done",
@@ -638,22 +639,23 @@ describe("runAgent", () => {
     ).toBe(true);
   });
 
-  test("records usage into the workflow-wide totals", () => withTokenUsage(async () => {
+  test("records usage into the workflow-wide totals", async () => {
+    const ctx = createWorkflowContext();
     promptImplementation = async () => {
       emitAssistantUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
+    await runAgent(ctx, "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
 
-    expect(getRecordedTokenUsage()).toEqual({
+    expect(ctx.usage).toEqual({
       input: 10,
       output: 5,
       cacheRead: 0,
       cacheWrite: 0,
       costIncomplete: true,
     });
-  }));
+  });
 
   test("emits immutable live usage snapshots before an agent finishes", async () => {
     const events: RunlingEvent[] = [];
@@ -679,7 +681,7 @@ describe("runAgent", () => {
     await expect(
       observeRunlingEvents(
         (e) => events.push(e),
-        () => runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+        () => runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
       ),
     ).rejects.toThrow("Provider unavailable");
     const snapshots = events.filter((e) => e.type === "agent.usage");
@@ -689,7 +691,8 @@ describe("runAgent", () => {
     expect(finished?.usage).toEqual(snapshots[1]?.usage);
   });
 
-  test("records tokens and cost as each model turn completes", () => withTokenUsage(async () => {
+  test("records tokens and cost as each model turn completes", async () => {
+    const ctx = createWorkflowContext();
     promptImplementation = async () => {
       emitAssistantUsage({
         input: 10,
@@ -698,7 +701,7 @@ describe("runAgent", () => {
         cacheWrite: 1,
         cost: { total: 0.0125 },
       });
-      expect(getRecordedTokenUsage()).toEqual({
+      expect(ctx.usage).toEqual({
         input: 10,
         output: 5,
         cacheRead: 20,
@@ -708,10 +711,10 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", { cwd: "/project",
+    await runAgent(ctx, "Do the thing", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
-  }));
+  });
 
   test("returns token usage even when no outcome is reported", async () => {
     promptImplementation = async () => {
@@ -727,7 +730,7 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+      runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).resolves.toEqual({
       outcome: "failed",
       summary: "Agent finished without a valid outcome report",
@@ -747,12 +750,13 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+      runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).rejects.toThrow("Provider unavailable");
     expect(disposed).toBe(true);
   });
 
-  test("records usage when prompting fails", () => withTokenUsage(async () => {
+  test("records usage when prompting fails", async () => {
+    const ctx = createWorkflowContext();
     promptImplementation = async () => {
       emitAssistantUsage({
         input: 10,
@@ -764,22 +768,22 @@ describe("runAgent", () => {
     };
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
+      runAgent(ctx, "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" }),
     ).rejects.toThrow("Provider unavailable");
-    expect(getRecordedTokenUsage()).toEqual({
+    expect(ctx.usage).toEqual({
       input: 10,
       output: 5,
       cacheRead: 20,
       cacheWrite: 1,
       costIncomplete: true,
     });
-  }));
+  });
 
   test("rejects unavailable models before creating a session", async () => {
     modelAvailable = false;
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project", model: "anthropic/missing" }),
+      runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/missing" }),
     ).rejects.toThrow("Model anthropic/missing is unavailable");
     expect(sessionOptions).toBeUndefined();
   });
@@ -789,7 +793,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", { cwd: "/project",
+    await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project",
       model: "openai-codex/gpt-5.6-sol",
       thinkingLevel: "medium",
     });
@@ -802,7 +806,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
+    await runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project", model: "anthropic/claude-opus-4-5" });
 
     expect(sessionOptions.thinkingLevel).toBeUndefined();
   });
@@ -812,7 +816,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Research the topic", { cwd: "/project",
+    await runAgent(createWorkflowContext(), "Research the topic", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
     });
 
@@ -841,7 +845,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Done" });
     };
 
-    await runAgent("Implement the change", { cwd: "/project",
+    await runAgent(createWorkflowContext(), "Implement the change", { cwd: "/project",
       model: "anthropic/claude-opus-4-5",
       extensions: [localExtension],
       resources: { extensions: false },
@@ -857,7 +861,7 @@ describe("runAgent", () => {
       await reportOutcome({ outcome: "completed", summary: "Reviewed" });
     };
 
-    await runAgent("Review", {
+    await runAgent(createWorkflowContext(), "Review", {
       model: "anthropic/claude-opus-4-5",
       cwd: "/tmp/project",
       tools: ["read"],
@@ -896,7 +900,7 @@ describe("runAgent", () => {
     promptImplementation = async () => controller.abort("Stopped");
 
     await expect(
-      runAgent("Do the thing", { cwd: "/project",
+      runAgent(createWorkflowContext(), "Do the thing", { cwd: "/project",
         model: "anthropic/claude-opus-4-5",
         signal: controller.signal,
       }),
@@ -972,7 +976,7 @@ describe("agent", () => {
     };
     instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
 
-    await instance.run("Work");
+    await instance.run(createWorkflowContext(), "Work");
     instance.dispose();
 
     await expect(instance.fork()).rejects.toThrow("has been disposed");
@@ -988,11 +992,11 @@ describe("agent", () => {
 
     try {
       expect(instance.id).toMatch(/^[a-z]+-[a-z]+-\d{4}$/);
-      await expect(instance.run("Investigate")).resolves.toMatchObject({
+      await expect(instance.run(createWorkflowContext(), "Investigate")).resolves.toMatchObject({
         outcome: "completed",
         summary: "Investigate",
       });
-      await expect(instance.run("Implement")).resolves.toMatchObject({
+      await expect(instance.run(createWorkflowContext(), "Implement")).resolves.toMatchObject({
         outcome: "completed",
         summary: "Implement",
       });
@@ -1020,11 +1024,11 @@ describe("agent", () => {
     });
 
     try {
-      await expect(instance.run("First")).resolves.toMatchObject({
+      await expect(instance.run(createWorkflowContext(), "First")).resolves.toMatchObject({
         outcome: "completed",
         summary: "First result",
       });
-      await expect(instance.runOutcome("Second")).resolves.toMatchObject({
+      await expect(instance.runOutcome(createWorkflowContext(), "Second")).resolves.toMatchObject({
         outcome: "blocked",
         summary: "Second result",
       });
@@ -1046,8 +1050,8 @@ describe("agent", () => {
     });
 
     try {
-      const first = instance.run("First");
-      await expect(instance.run("Second")).rejects.toThrow("already running");
+      const first = instance.run(createWorkflowContext(), "First");
+      await expect(instance.run(createWorkflowContext(), "Second")).rejects.toThrow("already running");
       release?.();
       await first;
     } finally {
@@ -1061,7 +1065,7 @@ describe("agent", () => {
     });
     instance.dispose();
 
-    await expect(instance.run("Too late")).rejects.toThrow("has been disposed");
+    await expect(instance.run(createWorkflowContext(), "Too late")).rejects.toThrow("has been disposed");
   });
 
   test("can run again after an aborted turn", async () => {
@@ -1073,14 +1077,14 @@ describe("agent", () => {
 
     try {
       await expect(
-        instance.run("First", { signal: controller.signal }),
+        instance.run(createWorkflowContext(), "First", { signal: controller.signal }),
       ).rejects.toBe("Stopped");
       expect(disposed).toBe(false);
 
       promptImplementation = async () => {
         await reportOutcome({ outcome: "completed", summary: "Recovered" });
       };
-      await expect(instance.run("Second")).resolves.toMatchObject({
+      await expect(instance.run(createWorkflowContext(), "Second")).resolves.toMatchObject({
         outcome: "completed",
         summary: "Recovered",
       });
@@ -1110,7 +1114,7 @@ describe("agent", () => {
     });
 
     try {
-      await instance.run("Do the thing");
+      await instance.run(createWorkflowContext(), "Do the thing");
       throw new Error("Expected run to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(AgentOutcomeError);
@@ -1128,4 +1132,66 @@ test("requires an explicit directory before creating an agent", async () => {
   // @ts-expect-error Agents require an explicit directory.
   await expect(agent({ model: "anthropic/claude-opus-4-5" })).rejects.toThrow("An explicit directory is required");
   await expect(agent({ model: "anthropic/claude-opus-4-5", cwd: "" })).rejects.toThrow("An explicit directory is required");
+});
+
+test("attributes each reusable agent interaction to its supplied context", async () => {
+  const first = createWorkflowContext();
+  const second = createWorkflowContext();
+  promptImplementation = async () => {
+    emitAssistantUsage({ ...emptyUsage, input: 10, cost: { total: 0.25 } });
+    await reportOutcome({ outcome: "completed", summary: "Done" });
+  };
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  try {
+    const one = await instance.run(first, "First");
+    const two = await instance.runOutcome(second, "Second");
+    expect(one.usage.input).toBe(10);
+    expect(two.usage.input).toBe(10);
+    expect(first.usage).toEqual({ ...emptyUsage, input: 10, cost: 0.25 });
+    expect(second.usage).toEqual(first.usage);
+    await instance.run(second, "Third");
+    expect(first.usage.input).toBe(10);
+    expect(second.usage).toEqual({ ...emptyUsage, input: 20, cost: 0.5 });
+  } finally {
+    instance.dispose();
+  }
+});
+
+test("records fork usage only in the context passed to the fork interaction", async () => {
+  const parentContext = createWorkflowContext();
+  const childContext = createWorkflowContext();
+  promptImplementation = async () => {
+    emitAssistantUsage({ ...emptyUsage, input: 10, cost: { total: 0.25 } });
+    await reportOutcome({ outcome: "completed", summary: "Done" });
+  };
+  const instance = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  try {
+    await instance.run(parentContext, "Investigate");
+    const fork = await instance.fork();
+    try {
+      await fork.run(childContext, "Review");
+      expect(parentContext.usage.input).toBe(10);
+      expect(childContext.usage.input).toBe(10);
+      await fork.run(parentContext, "Review again");
+      expect(parentContext.usage.input).toBe(20);
+      expect(childContext.usage.input).toBe(10);
+    } finally {
+      fork.dispose();
+    }
+  } finally {
+    instance.dispose();
+  }
+});
+
+test("retains usage recorded before cancellation without counting it again", async () => {
+  const ctx = createWorkflowContext();
+  const controller = new AbortController();
+  promptImplementation = async () => {
+    emitAssistantUsage({ ...emptyUsage, input: 10, cost: { total: 0.25 } });
+    controller.abort("Stopped");
+  };
+  await expect(runAgent(ctx, "Work", {
+    cwd: "/project", model: "anthropic/claude-opus-4-5", signal: controller.signal,
+  })).rejects.toBe("Stopped");
+  expect(ctx.usage).toEqual({ ...emptyUsage, input: 10, cost: 0.25 });
 });

@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { vi, describe, expect, test } from "vitest";
 import type { AgentResult } from "runling";
 import { plan } from "./plan.ts";
@@ -28,7 +29,7 @@ const runtimeWith = (
       agentOptions = { ...options, cwd: options.cwd };
       return {
         id: "patient-pandas-1234",
-        async runOutcome(agentPrompt: string) {
+        async runOutcome(_ctx: unknown, agentPrompt: string) {
           agentPrompts.push(agentPrompt);
           const report = reports.shift();
           if (report === undefined) throw new Error("No agent report prepared");
@@ -84,7 +85,7 @@ describe("plan workflow", () => {
       ["Fly.io", "Yes, for main"],
     );
 
-    await expect(plan({ directory: runtime.f.cwd ?? "/project", prompt: "Add deployment support" })).resolves.toEqual({
+    await expect(plan(createWorkflowContext(), { directory: runtime.f.cwd ?? "/project", prompt: "Add deployment support" })).resolves.toEqual({
       summary: "Plan deployment support",
       details: "## Plan\n\n1. Add the deployment adapter.\n2. Test it.",
       outputs: {
@@ -122,7 +123,7 @@ describe("plan workflow", () => {
       ["Add a cache"],
     );
 
-    await plan({ directory: runtime.f.cwd ?? "/project", prompt: "" });
+    await plan(createWorkflowContext(), { directory: runtime.f.cwd ?? "/project", prompt: "" });
 
     expect(runtime.questions).toEqual([
       "What would you like to build or change?",
@@ -143,7 +144,7 @@ describe("plan workflow", () => {
       [],
     );
 
-    await expect(plan({ directory: runtime.f.cwd ?? "/project", prompt: "Plan something" })).rejects.toThrow(
+    await expect(plan(createWorkflowContext(), { directory: runtime.f.cwd ?? "/project", prompt: "Plan something" })).rejects.toThrow(
       "Planning failed: Could not inspect the repository",
     );
     expect(runtime.disposed).toBe(true);
@@ -156,7 +157,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },

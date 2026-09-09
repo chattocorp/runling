@@ -13,7 +13,7 @@ export const plan = task(
       outputs: Type.Object({ plan: Type.String() }),
     }),
   },
-  async ({ directory, prompt: input }) => {
+  async (ctx, { directory, prompt: input }) => {
     const request =
       input.trim() === ""
         ? await askInput("What would you like to build or change?")
@@ -44,7 +44,7 @@ export const plan = task(
     );
 
     while (true) {
-      const report = await planner.runOutcome(message);
+      const report = await planner.runOutcome(ctx, message);
 
       if (report.outcome === "completed") {
         const completedPlan = report.details ?? report.summary;

@@ -1,15 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { observeRunlingEvents, type RunlingEvent } from "./events.ts";
 import {
   accumulateTokenUsage,
   emptyTokenUsage,
   formatTokenUsage,
-  getRecordedTokenUsage,
   isTokenUsage,
-  recordTokenUsage,
-  resetTokenUsage,
   totalTokens,
-  withTokenUsage,
 } from "./usage.ts";
 
 describe("token usage", () => {
@@ -160,73 +155,4 @@ describe("token usage", () => {
       isTokenUsage({ input: 1.5, output: 2, cacheRead: 3, cacheWrite: 4 }),
     ).toBe(false);
   });
-});
-
-describe("recorded token usage", () => {
-  test("does not retain usage or emit run totals outside a run", () => {
-    const events: RunlingEvent[] = [];
-    observeRunlingEvents((event) => events.push(event), () => {
-      recordTokenUsage({ ...emptyTokenUsage(), input: 10, cost: 0.5 });
-      expect(getRecordedTokenUsage()).toEqual(emptyTokenUsage());
-      resetTokenUsage();
-    });
-    expect(events).toEqual([]);
-    withTokenUsage(() => expect(getRecordedTokenUsage()).toEqual(emptyTokenUsage()));
-  });
-
-  test("isolates concurrent runs while summing their parallel work", async () => {
-    const run = (input: number, cost: number) => withTokenUsage(async () => {
-      await Promise.all([1, 2].map(async () => {
-        await Promise.resolve();
-        recordTokenUsage({ ...emptyTokenUsage(), input, cost });
-      }));
-      return getRecordedTokenUsage();
-    });
-    const [first, second] = await Promise.all([run(10, 0.25), run(100, 2)]);
-    expect(first).toEqual({ ...emptyTokenUsage(), input: 20, cost: 0.5 });
-    expect(second).toEqual({ ...emptyTokenUsage(), input: 200, cost: 4 });
-    expect(getRecordedTokenUsage()).toEqual(emptyTokenUsage());
-  });
-
-  test("restores parent totals after a nested run fails", async () => {
-    await withTokenUsage(async () => {
-      recordTokenUsage({ ...emptyTokenUsage(), input: 10, cost: 0.5 });
-      await expect(withTokenUsage(async () => {
-        expect(getRecordedTokenUsage()).toEqual(emptyTokenUsage());
-        recordTokenUsage({ ...emptyTokenUsage(), input: 100, cost: 5 });
-        throw new Error("Failed child");
-      })).rejects.toThrow("Failed child");
-      expect(getRecordedTokenUsage()).toEqual({ ...emptyTokenUsage(), input: 10, cost: 0.5 });
-    });
-    expect(getRecordedTokenUsage()).toEqual(emptyTokenUsage());
-  });
-
-  test("records usage across interactions and resets", () => withTokenUsage(async () => {
-    resetTokenUsage();
-
-    recordTokenUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
-    recordTokenUsage({ input: 1, output: 2, cacheRead: 3, cacheWrite: 4 });
-
-    expect(getRecordedTokenUsage()).toEqual({
-      costIncomplete: true,
-      input: 11,
-      output: 7,
-      cacheRead: 3,
-      cacheWrite: 4,
-    });
-
-    resetTokenUsage();
-
-    expect(getRecordedTokenUsage()).toEqual(emptyTokenUsage());
-  }));
-
-  test("does not expose mutable internal totals", () => withTokenUsage(async () => {
-    resetTokenUsage();
-    recordTokenUsage({ input: 10, output: 5, cacheRead: 0, cacheWrite: 0 });
-
-    const snapshot = getRecordedTokenUsage();
-    snapshot.input = 999;
-
-    expect(getRecordedTokenUsage().input).toBe(10);
-  }));
 });

@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { vi, describe, expect, test } from "vitest";
 import type { RunlingAgent, Exec } from "runling";
 import { review } from "./review.ts";
@@ -20,7 +21,7 @@ describe("review workflow", () => {
 
     const branch = (): RunlingAgent => ({
       id: `reviewer-${forks}`,
-      async run(prompt) {
+      async run(_ctx, prompt) {
         prompts.push(prompt);
         activeReviews++;
         maxActiveReviews = Math.max(maxActiveReviews, activeReviews);
@@ -52,7 +53,7 @@ describe("review workflow", () => {
     let orchestratorRuns = 0;
     const orchestrator: RunlingAgent = {
       id: "orchestrator",
-      async run(prompt) {
+      async run(_ctx, prompt) {
         prompts.push(prompt);
         orchestratorRuns++;
         return orchestratorRuns === 1
@@ -106,7 +107,7 @@ describe("review workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await expect(review({ directory: f.cwd ?? "/project", prompt: "Review the current change" })).resolves.toEqual({
+    await expect(review(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "Review the current change" })).resolves.toEqual({
       summary: "Found two issues",
       details: "## Findings\n\nTwo actionable issues.",
       outputs: { review: "## Findings\n\nTwo actionable issues." },
@@ -192,7 +193,7 @@ describe("review workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await expect(review({ directory: f.cwd ?? "/project", prompt: "Review the current change" })).rejects.toThrow("review failed");
+    await expect(review(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "Review the current change" })).rejects.toThrow("review failed");
     expect(finishedReviews).toBe(2);
     expect(disposed).toBe(4);
   });
@@ -208,7 +209,7 @@ describe("review workflow", () => {
     } as Record<string, any>;
   mocks.current = f;
 
-    await expect(review({ directory: f.cwd ?? "/project", prompt: "" })).resolves.toEqual({
+    await expect(review(createWorkflowContext(), { directory: f.cwd ?? "/project", prompt: "" })).resolves.toEqual({
       summary: "No changes to review",
     });
   });
@@ -220,7 +221,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },

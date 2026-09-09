@@ -1,3 +1,4 @@
+export { createWorkflowContext, type WorkflowContext } from "./context.ts";
 export {
   agent,
   type AgentExtension,
@@ -82,4 +83,5 @@ export {
   isTokenUsage,
   totalTokens,
   type TokenUsage,
+  type TokenUsageInput,
 } from "./usage.ts";

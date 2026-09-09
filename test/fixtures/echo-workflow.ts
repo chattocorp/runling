@@ -9,7 +9,7 @@ export default task(
       outputs: Type.Object({ id: Type.String() }),
     }),
   },
-  function echo(input) {
+  function echo(ctx, input) {
     const id = randomId();
     return {
       summary: input,

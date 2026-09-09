@@ -1,3 +1,4 @@
+import { createWorkflowContext } from "runling";
 import { vi, describe, expect, test } from "vitest";
 import type { Exec, WorkflowResult } from "runling";
 import {
@@ -66,7 +67,7 @@ describe("make-pr workflow", () => {
         };
         return {
           id: "test-agent-0000",
-          async run(receivedPrompt: string) {
+          async run(_ctx: unknown, receivedPrompt: string) {
             prompt = receivedPrompt;
             return {
               outcome: "completed" as const,
@@ -87,6 +88,7 @@ describe("make-pr workflow", () => {
 
     await expect(
       describePullRequest(
+        createWorkflowContext(),
         f.cwd ?? "/project",
         "Changed the behavior to fix the bug",
         "commit abc123\n\ndiff --git a/foo.ts b/foo.ts",
@@ -162,7 +164,7 @@ vi.mock("runling", async (importOriginal) => {
   return {
     ...actual,
     agent: (options: unknown) => mocks.current.agent(options),
-    runAgent: (...args: unknown[]) => mocks.current.runAgent(...args),
+    runAgent: (_ctx: unknown, ...args: unknown[]) => mocks.current.runAgent(...args),
     input: (...args: unknown[]) => mocks.current.input(...args),
     step: (name: string, work: () => unknown) => mocks.current.step(name, work),
     log: { info: (message: string) => mocks.current.log?.info(message) },
