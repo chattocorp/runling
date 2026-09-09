@@ -1,3 +1,4 @@
+import { serverLog } from "./server-log.ts";
 import { dirname, relative, sep } from "node:path";
 import { stat } from "node:fs/promises";
 import { watch } from "chokidar";
@@ -43,7 +44,7 @@ export class ConfigReloader {
       this.watcher.on("error", (error) => {
         reject(error);
         this.error = `Configuration watcher failed: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(this.error);
+        serverLog("error", "config.watch_failed", { config: this.path, message: this.error });
         for (const listener of this.listeners) listener();
       });
     });
@@ -106,7 +107,7 @@ export class ConfigReloader {
       this.revision++;
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);
-      console.error(`Config reload failed: ${this.error}`);
+      serverLog("error", "config.reload_failed", { config: this.path, message: `Config reload failed: ${this.error}` });
       if (!this.current) throw error;
     } finally {
       for (const listener of this.listeners) listener();

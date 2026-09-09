@@ -340,6 +340,13 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
     "utf8",
   );
   assert(history.includes("console: consumer cwd"));
+  const serverLog = (await readFile(resolve(project, ".runling/logs/server.jsonl"), "utf8"))
+    .trim().split("\n").map((line) => JSON.parse(line));
+  assert(serverLog.some((record) => record.event === "server.listening"));
+  assert(serverLog.some((record) => record.event === "http.response" && record.status === 200));
+  assert(serverLog.some((record) => record.event === "run.finished" && record.runId === id));
+  assert(serverLog.some((record) => record.event === "config.reload_failed"));
+
   if (process.env.RUNLING_RELEASE_DIR) {
     const destination = resolve(process.env.RUNLING_RELEASE_DIR);
     await mkdir(destination, { recursive: true });

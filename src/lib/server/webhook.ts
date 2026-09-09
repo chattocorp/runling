@@ -1,3 +1,4 @@
+import { serverLog } from "../../runtime/server-log.ts";
 import { runWorkflow, validateSchema, type Task, type WorkflowExecution } from "runling";
 import { describeTaskSchemas, type WebhookRouter, type WebConfig } from "runling/web";
 
@@ -97,5 +98,6 @@ export async function routeWebhook<Result>(
   };
   if (!prepared.route) return once();
   const result = await prepared.route(prepared.input, once);
+  if (!started && result === null) serverLog("info", "webhook.handled", { startedRun: false });
   return started ?? result;
 }

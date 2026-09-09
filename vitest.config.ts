@@ -26,7 +26,7 @@ export default defineConfig({
   },
   test: {
     include: ["**/*.test.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.context/**"],
     testTimeout: 15000,
     fileParallelism: false,
   },

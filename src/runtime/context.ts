@@ -1,3 +1,4 @@
+import type { WorkflowMessages } from "./messages.ts";
 import type { InputHandler } from "./input.ts";
 import {
   accumulateTokenUsage,
@@ -15,7 +16,13 @@ export class WorkflowAbortError extends Error {
   }
 }
 
+export type TextHandler = (text: string) => void | Promise<void>;
+
 export interface WorkflowContext {
+  /** Optional incoming-message channel assigned by the parent task. */
+  messages?: WorkflowMessages;
+  /** Deliver user-facing text. Await the handler to wait for delivery. */
+  onText?: TextHandler;
   /** Handle questions from this context. Hosts can supply the initial handler. */
   onInput?: InputHandler;
   /** Signals cancellation to agents and other cooperative work. */
@@ -51,6 +58,7 @@ export function createObservedWorkflowContext(
   });
   return {
     onInput: undefined,
+    onText: undefined,
     signal,
     usage,
     abort(reason) {

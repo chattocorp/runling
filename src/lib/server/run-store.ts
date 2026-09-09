@@ -1,3 +1,4 @@
+import { serverLog } from "../../runtime/server-log.ts";
 import {
   mkdir,
   readdir,
@@ -91,10 +92,11 @@ export class RunStore {
           };
           await appendFile(path, `${JSON.stringify(record)}\n`);
           applyStoredRecord(run, record, false);
+          serverLog("warn", "run.interrupted", { runId: id });
         }
         this.runs.set(id, summary(run));
       } catch (cause) {
-        console.error(`Cannot restore run ${id}:`, cause);
+        serverLog("error", "run.restore_failed", { runId: id, error: cause });
       }
     }
   }
@@ -191,9 +193,10 @@ export class RunStore {
     this.runs.set(id, summary(run));
     this.details.set(id, run);
     this.publish(id, started);
+    serverLog("info", "run.started", { runId: id, webhook, workflow: workflow.name, source });
     const completion = this.execute(id, workflow, input);
     // Background runs must always have a rejection handler, even after the HTTP client leaves.
-    void completion.catch((cause) => console.error(`Run ${id} failed:`, cause));
+    void completion.catch((cause) => serverLog("error", "run.error", { runId: id, error: cause }));
     return { id, completion };
   }
 
@@ -240,6 +243,10 @@ export class RunStore {
     } finally {
       this.pending.delete(id);
     }
+    serverLog(execution.ok ? "info" : "error", "run.finished", {
+      runId: id, status: execution.ok ? "completed" : "failed",
+      durationMs: execution.durationMs, usage: execution.usage, error: execution.error,
+    });
     return execution;
   }
 }

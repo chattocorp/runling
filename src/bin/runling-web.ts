@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { serverLog, serverLogPath } from "../runtime/server-log.ts";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -12,6 +13,8 @@ export async function runRunlingWeb(options: ServeOptions): Promise<void> {
   const appRoot = resolve(import.meta.dirname, "../..");
   const configPath = resolve(options.config);
   process.env.RUNLING_WEB_CONFIG = configPath;
+
+  serverLog("info", "server.starting", { config: configPath, logFile: serverLogPath(), port: options.port });
 
   // SvelteKit resolves its app files from the process directory, even with Vite's
   // root set. This is the tooling root; tasks still require explicit directories.
@@ -32,6 +35,8 @@ export async function runRunlingWeb(options: ServeOptions): Promise<void> {
 
   await server.listen();
   server.printUrls();
+  serverLog("info", "server.listening", { host: options.host, port: options.port });
+  server.httpServer?.once("close", () => serverLog("info", "server.stopped"));
 }
 
 if (
@@ -48,7 +53,7 @@ if (
     if (cause instanceof CommanderError) {
       process.exitCode = cause.exitCode;
     } else {
-      console.error(cause instanceof Error ? cause.message : String(cause));
+      serverLog("error", "server.start_failed", { error: cause });
       process.exitCode = 1;
     }
   }
