@@ -23,7 +23,6 @@
     onfit: () => void;
     onzoomstart: (anchor: number) => (dx: number, dy: number) => void;
   } = $props();
-  let collapsed = $state(false);
   let middleDragging = $state(false);
   function attachMiddleDrag(element: HTMLElement) {
     return middleDrag(
@@ -148,95 +147,80 @@
   }
 </script>
 
-<div
-  class={[
-    "card absolute top-3 right-3 z-5 max-w-full border border-base-300 bg-base-200/95 p-2 shadow-lg backdrop-blur-sm",
-    collapsed ? "w-28" : "w-56",
-  ]}
->
+<div class="min-w-0 py-2 pr-0.5">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (Two-dimensional overview supports pointer and keyboard navigation.) -->
   <div
-    class="flex justify-between items-center text-base-content/60 text-xs mb-1.5"
+    class={[
+      "relative bg-base-100 border border-base-300 rounded-field overflow-hidden touch-none focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2",
+      gesture || middleDragging ? "cursor-grabbing" : "cursor-grab",
+    ]}
+    style:height={`${Math.min(160, Math.max(80, rows.length * 3))}px`}
+    {@attach attachMiddleDrag}
+    role="region"
+    tabindex="0"
+    aria-label={`Timeline minimap, ${duration(view.start)} to ${duration(view.start + view.span)}. Arrow keys pan in both directions; plus and minus zoom; F fits time.`}
+    onpointerdown={down}
+    onpointermove={move}
+    onpointerup={end}
+    onpointercancel={end}
+    onlostpointercapture={end}
+    onmousedown={preventMiddleDefault}
+    onauxclick={preventMiddleDefault}
+    onkeydown={key}
   >
-    <span>Overview</span><button
-      class="btn btn-ghost btn-xs btn-square"
-      onclick={() => (collapsed = !collapsed)}
-      aria-expanded={!collapsed}
-      aria-label={collapsed ? "Show minimap" : "Hide minimap"}
-      >{collapsed ? "+" : "−"}</button
+    <svg
+      class="absolute w-full h-full pointer-events-none"
+      viewBox={`0 0 1000 ${axis.total}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
     >
+      {#each rows as { node, top, height } (node.id)}
+        <rect
+          class={[
+            node.status === "failed" || node.status === "blocked"
+              ? "fill-error light:fill-rose-300"
+              : node.status === "interrupted"
+                ? "fill-neutral light:fill-slate-300"
+                : node.kind === "agent"
+                  ? "fill-secondary light:fill-violet-300"
+                  : node.kind === "command"
+                    ? "fill-accent light:fill-teal-300"
+                    : node.kind === "input"
+                      ? "fill-warning light:fill-amber-300"
+                      : "fill-primary light:fill-blue-300",
+            node.id === selected &&
+              "stroke-base-content stroke-1 [vector-effect:non-scaling-stroke]",
+          ]}
+          x={(node.startedAt / total) * 1000}
+          y={top + height * 0.2}
+          width={Math.max(
+            1,
+            ((node.durationMs ?? Math.max(0, elapsed - node.startedAt)) /
+              total) *
+              1000,
+          )}
+          height={height * 0.6}
+          data-kind={node.kind}
+        />
+      {/each}
+    </svg>
+    <span
+      class="absolute pointer-events-none border-2 border-primary bg-primary/5 light:border-slate-400 light:bg-slate-400/5 min-w-0.5 min-h-0.5 box-border shadow-[0_0_0_100vmax] shadow-base-300/60"
+      style:left={`${(view.start / total) * 100}%`}
+      style:width={`${(view.span / total) * 100}%`}
+      style:top={`${(top / axis.total) * 100}%`}
+      style:height={`${(visible / axis.total) * 100}%`}
+    ></span>
+    <span
+      class="absolute pointer-events-none top-0 bottom-0 w-0.5 bg-error"
+      style:left={`${(elapsed / total) * 100}%`}
+    ></span>
   </div>
-  {#if !collapsed}
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (Two-dimensional overview supports pointer and keyboard navigation.) -->
-    <div
-      class={[
-        "h-32 relative bg-base-100 border border-base-300 rounded-field overflow-hidden touch-none focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2",
-        gesture || middleDragging ? "cursor-grabbing" : "cursor-grab",
-      ]}
-      {@attach attachMiddleDrag}
-      role="region"
-      tabindex="0"
-      aria-label={`Timeline minimap, ${duration(view.start)} to ${duration(view.start + view.span)}. Arrow keys pan in both directions; plus and minus zoom; F fits time.`}
-      onpointerdown={down}
-      onpointermove={move}
-      onpointerup={end}
-      onpointercancel={end}
-      onlostpointercapture={end}
-      onmousedown={preventMiddleDefault}
-      onauxclick={preventMiddleDefault}
-      onkeydown={key}
-    >
-      <svg
-        class="absolute w-full h-full pointer-events-none"
-        viewBox={`0 0 1000 ${axis.total}`}
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        {#each rows as { node, top, height } (node.id)}
-          <rect
-            class={[
-              node.status === "failed" || node.status === "blocked"
-                ? "fill-error light:fill-rose-300"
-                : node.status === "interrupted"
-                  ? "fill-neutral light:fill-slate-300"
-                  : node.kind === "agent"
-                    ? "fill-secondary light:fill-violet-300"
-                    : node.kind === "command"
-                      ? "fill-accent light:fill-teal-300"
-                      : node.kind === "input"
-                        ? "fill-warning light:fill-amber-300"
-                        : "fill-primary light:fill-blue-300",
-              node.id === selected &&
-                "stroke-base-content stroke-1 [vector-effect:non-scaling-stroke]",
-            ]}
-            x={(node.startedAt / total) * 1000}
-            y={top + height * 0.2}
-            width={Math.max(
-              1,
-              ((node.durationMs ?? Math.max(0, elapsed - node.startedAt)) /
-                total) *
-                1000,
-            )}
-            height={height * 0.6}
-            data-kind={node.kind}
-          />
-        {/each}
-      </svg>
-      <span
-        class="absolute pointer-events-none border-2 border-primary bg-primary/5 light:border-slate-400 light:bg-slate-400/5 min-w-0.5 min-h-0.5 box-border shadow-[0_0_0_1000px] shadow-base-300/60"
-        style:left={`${(view.start / total) * 100}%`}
-        style:width={`${(view.span / total) * 100}%`}
-        style:top={`${(top / axis.total) * 100}%`}
-        style:height={`${(visible / axis.total) * 100}%`}
-      ></span>
-      <span
-        class="absolute pointer-events-none top-0 bottom-0 w-0.5 bg-error"
-        style:left={`${(elapsed / total) * 100}%`}
-      ></span>
-    </div>
-    <div
-      class="flex justify-between items-center text-base-content/60 text-xs mb-1.5 mt-1.5 mr-0 mb-0 ml-0 tabular-nums"
-    >
-      <span>0</span><span>{duration(total)}</span>
-    </div>
-  {/if}
+  <div
+    class="flex justify-between items-center text-base-content/60 text-xs mt-1 tabular-nums"
+  >
+    <span>0</span>
+    <span>{rows.length ? `Rows ${Math.min(rows.length, Math.floor(top / axis.total * rows.length) + 1)}–${Math.min(rows.length, Math.ceil((top + visible) / axis.total * rows.length))} of ${rows.length}` : "No rows"}</span>
+    <span>{duration(total)}</span>
+  </div>
 </div>
