@@ -1,3 +1,4 @@
+import type { InputHandler } from "./input.ts";
 import {
   accumulateTokenUsage,
   emptyTokenUsage,
@@ -15,11 +16,13 @@ export class WorkflowAbortError extends Error {
 }
 
 export interface WorkflowContext {
+  /** Handle questions from this context. Hosts can supply the initial handler. */
+  onInput?: InputHandler;
   /** Signals cancellation to agents and other cooperative work. */
   readonly signal: AbortSignal;
   /** Abort this workflow and throw its abort error. The first reason is retained. */
   abort(reason?: string): never;
-  /** A snapshot of all usage recorded in this context. */
+  /** A shared read-only view of all usage recorded in this execution. */
   readonly usage: Readonly<TokenUsage>;
   /** Add one usage increment, including any reported cost in US dollars. */
   recordUsage(usage: TokenUsageInput): void;
@@ -36,18 +39,23 @@ export function createObservedWorkflowContext(
 ): WorkflowContext {
   const total = emptyTokenUsage();
   const controller = new AbortController();
+  const usage: Readonly<TokenUsage> = Object.freeze({
+    get input() { return total.input; },
+    get output() { return total.output; },
+    get cacheRead() { return total.cacheRead; },
+    get cacheWrite() { return total.cacheWrite; },
+    get cost() { return total.cost; },
+    get costIncomplete() { return total.costIncomplete; },
+  });
   return {
-    get signal() {
-      return controller.signal;
-    },
+    onInput: undefined,
+    signal: controller.signal,
+    usage,
     abort(reason) {
       if (!controller.signal.aborted) {
         controller.abort(new WorkflowAbortError(reason));
       }
       throw controller.signal.reason;
-    },
-    get usage() {
-      return { ...total };
     },
     recordUsage(usage) {
       if (!hasValidTokenCounts(usage)) return;

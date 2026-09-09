@@ -17,7 +17,7 @@ export const chattoDocs = task(
   async (ctx, { directory, prompt: input }) => {
     const question =
       input.trim() === ""
-        ? await askInput("What would you like to know about Chatto?")
+        ? await askInput(ctx, "What would you like to know about Chatto?")
         : input;
 
     const report = await step("Consulting Chatto documentation", () =>

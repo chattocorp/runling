@@ -157,7 +157,7 @@ export async function executeWorkflow(
   options: ExecutionOptions = {},
 ): Promise<WorkflowExecution> {
   return reportExecution(
-    (_host, ctx) => log.indented(() => run(ctx)),
+    ctx => log.indented(() => run(ctx)),
     options,
   );
 }
@@ -167,17 +167,17 @@ export async function runWorkflow<Input, Output>(
   run: (ctx: WorkflowContext, input: Input) => Output,
   { input, verbose = false, onInput, onEvent = () => {} }: RunWorkflowOptions<Input>,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
-  return withExecutionServices({ verbose, handleInput: onInput }, () =>
+  return withExecutionServices({ verbose }, () =>
     observeRunlingEvents(onEvent, () =>
       log.withDestination("silent", () =>
-        captureExecution(ctx => log.indented(() => run(ctx, input))),
+        captureExecution(ctx => log.indented(() => run(ctx, input)), onInput),
       ),
     ),
   );
 }
 
 async function reportExecution(
-  run: (host: ExecutionHost, ctx: WorkflowContext) => Promise<unknown> | unknown,
+  run: (ctx: WorkflowContext) => Promise<unknown> | unknown,
   {
     json = false,
     presentation = "log",
@@ -196,9 +196,7 @@ async function reportExecution(
           presentation === "tui" ? "silent" : json ? "stderr" : "stdout",
           async () => {
             if (presentation === "log") log.info("Runling starting");
-            const execution = await captureExecution(ctx =>
-              run({ handleInput: reporter?.input }, ctx),
-            );
+            const execution = await captureExecution(run, reporter?.input);
 
             if (execution.error !== null) {
               log.error(execution.error);
@@ -237,16 +235,14 @@ async function reportExecution(
   }
 }
 
-interface ExecutionHost {
-  handleInput?: InputHandler;
-}
-
 async function captureExecution<Output>(
   run: (ctx: WorkflowContext) => Promise<Output> | Output,
+  onInput?: InputHandler,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
   const ctx = createObservedWorkflowContext(bindRunlingContext((usage: TokenUsage) =>
     emitRunlingEvent({ type: "usage.updated", usage }),
   ));
+  ctx.onInput = onInput;
   const start = performance.now();
   let result: WorkflowResult | null = null;
   let output: Awaited<Output> | null = null;
@@ -262,7 +258,7 @@ async function captureExecution<Output>(
     error = failure instanceof Error ? failure.message : String(failure);
   }
 
-  const usage = ctx.usage;
+  const usage = { ...ctx.usage };
   const durationMs = performance.now() - start;
 
   return {
@@ -294,10 +290,10 @@ export async function runRunling(
   const { json, verbose } = options;
   const presentation = shouldUseTui(options) ? "tui" : "log";
   await reportExecution(
-    async ({ handleInput }, ctx) => {
+    async ctx => {
       const run = await loadWorkflow(workflowPath);
       const input = options.input === undefined ? prompt : JSON.parse(options.input);
-      return withExecutionServices({ verbose, handleInput }, () =>
+      return withExecutionServices({ verbose }, () =>
         log.indented(() => run(ctx, input)),
       );
     },

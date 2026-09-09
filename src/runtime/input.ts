@@ -1,4 +1,4 @@
-import { executionServices } from "./execution.ts";
+import type { WorkflowContext } from "./context.ts";
 import { bindRunlingContext, emitRunlingEvent } from "./events.ts";
 import { log, logInput } from "./log.ts";
 
@@ -27,6 +27,8 @@ export class InputUnavailableError extends Error {
 
 export const createInput = (handleInput?: InputHandler): Input =>
   async (message, options = {}) => {
+    const signal = options.signal;
+    let abort: (() => void) | undefined;
     const id = crypto.randomUUID();
     const startedAt = performance.now();
     const request = { id, message, ...options };
@@ -41,10 +43,20 @@ export const createInput = (handleInput?: InputHandler): Input =>
     logInput(id, "info", `${log.highlight("Asking", "#f59f00")} ${message}`);
 
     try {
-      options.signal?.throwIfAborted();
+      signal?.throwIfAborted();
       if (handleInput === undefined) throw new InputUnavailableError(message);
 
-      const value = await handleInput(request);
+      const value = await new Promise<string>((resolve, reject) => {
+        if (signal) {
+          abort = () => reject(signal.reason);
+          signal.addEventListener("abort", abort, { once: true });
+        }
+        Promise.resolve().then(() => {
+          signal?.throwIfAborted();
+          return handleInput(request);
+        }).then(resolve, reject);
+      });
+      signal?.throwIfAborted();
       if (typeof value !== "string") {
         throw new TypeError("An input handler must return a string");
       }
@@ -67,9 +79,19 @@ export const createInput = (handleInput?: InputHandler): Input =>
       });
       logInput(id, "error", `${log.highlight("Input failed", "crimson")} ${message}`);
       throw error;
+    } finally {
+      if (abort) signal?.removeEventListener("abort", abort);
     }
   };
 
-/** Ask the input handler of the active execution. */
-export const input: Input = (message, options) =>
-  createInput(executionServices()?.handleInput)(message, options);
+/** Ask through the handler supplied by this context. */
+export const input = (
+  ctx: WorkflowContext,
+  message: string,
+  options: InputOptions = {},
+): Promise<string> => createInput(ctx.onInput)(message, {
+  ...options,
+  signal: options.signal
+    ? AbortSignal.any([ctx.signal, options.signal])
+    : ctx.signal,
+});
