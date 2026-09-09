@@ -58,7 +58,7 @@ test("waits until every pending input finishes, including failed inputs", () => 
     { type: "input.requested", id: "first", message: "First?", timestamp: 40 },
     { type: "input.requested", id: "second", message: "Second?", timestamp: 50 },
   ];
-  expect(summarizeRunActivity(run(history))).toMatchObject({ waiting: true, pendingInputs: 2 });
+  expect(summarizeRunActivity(run(history))).toMatchObject({ waiting: true, pendingInputs: 2, parallel: 2 });
   history.push({ type: "input.finished", id: "first", status: "answered", value: "Yes", durationMs: 20, timestamp: 60 });
   expect(summarizeRunActivity(run(history))).toMatchObject({ waiting: true, pendingInputs: 1 });
   history.push({ type: "input.finished", id: "second", status: "failed", durationMs: 20, timestamp: 70 });
