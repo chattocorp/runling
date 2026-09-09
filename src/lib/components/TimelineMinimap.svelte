@@ -150,7 +150,7 @@
 
 <div
   class={[
-    "card absolute bottom-3 right-3 z-5 max-w-full border border-base-300 bg-base-200/95 p-2 shadow-lg backdrop-blur-sm",
+    "card absolute top-3 right-3 z-5 max-w-full border border-base-300 bg-base-200/95 p-2 shadow-lg backdrop-blur-sm",
     collapsed ? "w-28" : "w-56",
   ]}
 >
