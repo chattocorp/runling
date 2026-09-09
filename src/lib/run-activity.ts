@@ -33,6 +33,7 @@ export function summarizeRunActivity(run: RunDetail): RunActivity | null {
     step: parent?.label,
     preview: selected.preview?.slice(-500),
     waiting: selected.kind === "input",
-    parallel: Math.max(0, current.length - 1),
+    pendingInputs: current.filter(node => node.kind === "input").length,
+    parallel: current.filter(node => node.kind !== "input" && node !== selected).length,
   } : null;
 }

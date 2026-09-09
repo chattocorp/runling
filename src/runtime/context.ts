@@ -36,9 +36,11 @@ export function createWorkflowContext(): WorkflowContext {
 /** Internal bridge from context accounting to runner events. */
 export function createObservedWorkflowContext(
   onUsage?: (usage: TokenUsage) => void,
+  cancellation?: AbortSignal,
 ): WorkflowContext {
   const total = emptyTokenUsage();
   const controller = new AbortController();
+  const signal = cancellation ? AbortSignal.any([controller.signal, cancellation]) : controller.signal;
   const usage: Readonly<TokenUsage> = Object.freeze({
     get input() { return total.input; },
     get output() { return total.output; },
@@ -49,13 +51,13 @@ export function createObservedWorkflowContext(
   });
   return {
     onInput: undefined,
-    signal: controller.signal,
+    signal,
     usage,
     abort(reason) {
-      if (!controller.signal.aborted) {
+      if (!signal.aborted) {
         controller.abort(new WorkflowAbortError(reason));
       }
-      throw controller.signal.reason;
+      throw signal.reason;
     },
     recordUsage(usage) {
       if (!hasValidTokenCounts(usage)) return;

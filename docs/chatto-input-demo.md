@@ -31,7 +31,13 @@ authenticated receiver before this demo can be used there.
 
 ## Limits
 
-Each conversation expires five minutes after it starts. Pending conversations and duplicate checks
+Each question uses `input(ctx, message, { timeout: 30 })`. To test a timeout,
+send a new root DM and leave the question unanswered for 30 seconds. The bot
+posts a timeout notice in the same thread, and the console marks that input as
+“timed out”. Send a new root DM to try again. Answering the first question gives
+you a fresh 30 seconds for the second question.
+
+Pending conversations and duplicate checks
 live in memory. A restart or config reload loses them. Only one conversation per
 person and thread can run at a time. Wait for each question before replying.
 Channel mentions are ignored. Replies use the configured Chatto server, never a

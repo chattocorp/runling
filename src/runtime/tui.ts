@@ -65,6 +65,7 @@ interface InputNode extends TreeNodeBase {
   type: "input";
   message: string;
   status: "waiting" | "answered" | "failed";
+  reason?: "timeout" | "cancelled";
   value?: string;
   durationMs?: number;
 }
@@ -160,6 +161,7 @@ export class RunlingDashboard implements Component {
         const input = this.nodesById.get(event.id);
         if (input?.type === "input") {
           input.status = event.status;
+          if (event.status === "failed") input.reason = event.reason;
           if (event.status === "answered") input.value = event.value;
           input.durationMs = event.durationMs;
         }
@@ -418,7 +420,7 @@ export class RunlingDashboard implements Component {
             : ` ${dim(`· ${formatStepDuration(node.durationMs)}`)}`;
         lines = this.wrapNode(
           `${indent}${marker} `,
-          `${node.message}${node.value === undefined ? "" : ` ${dim("→")} ${node.value}`}${duration}`,
+          `${node.message}${node.reason ? ` (${node.reason === "timeout" ? "timed out" : "cancelled"})` : ""}${node.value === undefined ? "" : ` ${dim("→")} ${node.value}`}${duration}`,
           width,
         );
         const editor = this.inputEditors.get(node.id);

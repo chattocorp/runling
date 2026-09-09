@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buildTimeline, isActivityActive, type Activity } from "./timeline.ts";
+import { buildTimeline, isActivityActive, activityStatus, type Activity } from "./timeline.ts";
 import type { RunlingEvent } from "runling";
 
 const task = (overrides: Partial<Activity> = {}): Activity => ({
@@ -269,4 +269,19 @@ test("keeps repeated turns of one agent distinct and interrupts unfinished block
     "completed",
     "interrupted",
   ]);
+});
+
+test("input outcomes retain failure reasons and old journals still render", () => {
+  const events: RunlingEvent[] = [
+    { type: "input.requested", id: "q", message: "Question", timestamp: 0 },
+  ];
+  expect(activityStatus(buildTimeline(events, "running")[0]!)).toBe("waiting for input");
+  for (const reason of [undefined, "timeout", "cancelled"] as const) {
+    const node = buildTimeline([...events, { type: "input.finished", id: "q", status: "failed", reason, durationMs: 500, timestamp: 500 }], "completed")[0]!;
+    expect(node.durationMs).toBe(500);
+    expect(activityStatus(node)).toBe(reason === "timeout" ? "timed out" : reason ?? "failed");
+  }
+  const answered = buildTimeline([...events, { type: "input.finished", id: "q", status: "answered", value: "Yes", durationMs: 400, timestamp: 400 }], "completed")[0]!;
+  expect(activityStatus(answered)).toBe("answered");
+  expect(answered.logs).toContain("Yes");
 });

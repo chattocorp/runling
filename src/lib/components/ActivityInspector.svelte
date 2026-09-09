@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { Activity } from "$lib/timeline.ts";
+  import { activityStatus, type Activity } from "$lib/timeline.ts";
   import { duration } from "$lib/runs.ts";
   import AnsiText from "./AnsiText.svelte";
   import Usage from "./Usage.svelte";
 
-  let { activity, onclose }: { activity: Activity; onclose: () => void } = $props();
+  let { activity, elapsed, onclose }: { activity: Activity; elapsed: number; onclose: () => void } = $props();
   let dialog: HTMLDialogElement;
   const titleId = $props.id();
 
@@ -21,9 +21,9 @@
         <h2 id={titleId} class="text-lg font-medium wrap-anywhere">{activity.label}</h2>
         <p class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-base-content/60">
           <span>{activity.kind}</span>
-          <span>{activity.status}</span>
+          <span>{activityStatus(activity)}</span>
           <span>Started at {duration(activity.startedAt)}</span>
-          {#if activity.durationMs !== undefined}<span>Duration {duration(activity.durationMs)}</span>{/if}
+          <span>{activity.kind === "input" ? "Wait" : "Duration"} {duration(activity.durationMs ?? Math.max(0, elapsed - activity.startedAt))}</span>
         </p>
       </div>
       <button class="btn btn-ghost btn-sm btn-square shrink-0 cursor-pointer" onclick={() => dialog.close()} aria-label="Close activity details">

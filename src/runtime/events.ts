@@ -54,6 +54,7 @@ export type RunlingEventPayload =
       type: "input.finished";
       id: string;
       status: "failed";
+      reason?: "timeout" | "cancelled";
       durationMs: number;
     }
   | {

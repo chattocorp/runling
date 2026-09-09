@@ -14,7 +14,7 @@
   let now = $state(Date.now());
   let selected = $state("");
   let tab = $state<"timeline" | "input" | "output" | "logs">("timeline");
-  let waiting = $derived(summarizeRunActivity(run)?.waiting ?? false);
+  let pendingInputs = $derived(summarizeRunActivity(run)?.pendingInputs ?? 0);
   let nodes = $derived(buildTimeline(run.events, run.status));
   let activity = $derived(findActivity(nodes, selected));
   let elapsed = $derived(run.durationMs ?? Math.max(0, now - run.startedAt));
@@ -36,7 +36,7 @@
         >{run.source === "web"
           ? "Started from web"
           : `Webhook /${run.webhook}`}</span
-      ><StatusBadge status={run.status} {waiting} />
+      ><StatusBadge status={run.status} waiting={pendingInputs > 0} />
     </div>
     <h1 class="text-3xl tracking-tight font-medium my-3.5 mx-0 wrap-anywhere">
       {run.workflow}
@@ -48,6 +48,7 @@
         >{duration(elapsed)}</span
       >
     </div>
+    {#if pendingInputs}<p class="mt-3 text-sm text-warning">{pendingInputs} {pendingInputs === 1 ? "input" : "inputs"} pending</p>{/if}
     <Usage usage={run.usage} detail />
     <p
       class="text-base-content/60 text-xs flex justify-between mt-5 mr-0 mb-0 ml-0"
@@ -116,7 +117,7 @@
             : "No activity events were recorded for this run."}
         </div>{/if}
       {#if activity}
-        <ActivityInspector {activity} onclose={() => (selected = "")} />
+        <ActivityInspector {activity} {elapsed} onclose={() => (selected = "")} />
       {/if}
     {:else if tab === "input"}
       {#key run.id}<RunValue value={run.input} kind="input" />{/key}

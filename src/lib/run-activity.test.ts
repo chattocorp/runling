@@ -20,7 +20,7 @@ const events: RunlingEvent[] = [
 
 test("shows the latest agent update with its step and parallel activity count", () => {
   expect(summarizeRunActivity(run(events))).toEqual({
-    label: "Model A", step: "Review change", preview: "Reading the tests", waiting: false, parallel: 1,
+    label: "Model A", step: "Review change", preview: "Reading the tests", waiting: false, pendingInputs: 0, parallel: 1,
   });
   expect(summarizeRunActivity(run([...events,
     { type: "agent.progress", agentId: "b", text: "Checking types", timestamp: 40 },
@@ -58,11 +58,11 @@ test("waits until every pending input finishes, including failed inputs", () => 
     { type: "input.requested", id: "first", message: "First?", timestamp: 40 },
     { type: "input.requested", id: "second", message: "Second?", timestamp: 50 },
   ];
-  expect(summarizeRunActivity(run(history))?.waiting).toBe(true);
+  expect(summarizeRunActivity(run(history))).toMatchObject({ waiting: true, pendingInputs: 2, parallel: 2 });
   history.push({ type: "input.finished", id: "first", status: "answered", value: "Yes", durationMs: 20, timestamp: 60 });
-  expect(summarizeRunActivity(run(history))?.waiting).toBe(true);
+  expect(summarizeRunActivity(run(history))).toMatchObject({ waiting: true, pendingInputs: 1 });
   history.push({ type: "input.finished", id: "second", status: "failed", durationMs: 20, timestamp: 70 });
-  expect(summarizeRunActivity(run(history))?.waiting).toBe(false);
+  expect(summarizeRunActivity(run(history))).toMatchObject({ waiting: false, pendingInputs: 0 });
 });
 
 test("terminal runs never show a pending input as waiting", () => {

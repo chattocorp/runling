@@ -1,3 +1,4 @@
+export { TimeoutError } from "./timeout.ts";
 export { createWorkflowContext, WorkflowAbortError, type WorkflowContext } from "./context.ts";
 export {
   agent,

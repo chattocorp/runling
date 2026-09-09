@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWorkflowContext } from "runling";
+import { createWorkflowContext, runWorkflow, type RunlingEvent } from "runling";
 import { createChattoInputDemo, createChattoPoster } from "./chatto-input-demo.ts";
 
 function delivery(body: string, author = "alice", id: string = crypto.randomUUID(), threadRootId: string | null = null) {
@@ -67,10 +67,36 @@ describe("Chatto input demo", () => {
     expect(await bot(createWorkflowContext(), delivery("late answer", "alice", "late", "root-message"))).toBe("ignored");
   });
 
-  it("times out a waiting question", async () => {
-    const bot = createChattoInputDemo({ post: async () => {}, timeout: 0.01 });
-    await expect(bot(createWorkflowContext(), delivery("start"))).rejects.toThrow();
-    expect(await bot(createWorkflowContext(), delivery("late answer", "alice", "late", "root-message"))).toBe("ignored");
+  it.each([false, true])("reports the input timeout in its thread (first answered: %s)", async firstAnswered => {
+    vi.useFakeTimers();
+    try {
+      const post = vi.fn<Parameters<typeof createChattoInputDemo>[0]["post"]>(async () => {});
+      const bot = createChattoInputDemo({ post });
+      const events: RunlingEvent[] = [];
+      const run = runWorkflow(bot, {
+        input: delivery("hello", "alice", "timeout-root"),
+        onEvent: event => events.push(event),
+      });
+      await vi.advanceTimersByTimeAsync(20_000);
+      if (firstAnswered) {
+        await bot(createWorkflowContext(), delivery("Alice", "alice", "name", "timeout-root"));
+        await vi.advanceTimersByTimeAsync(20_000);
+        // The second question has a fresh deadline, beyond the first one's deadline.
+        expect(post).toHaveBeenCalledTimes(2);
+      }
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await run).toMatchObject({ ok: false, error: "Input timed out after 30 seconds" });
+      expect(post.mock.calls.at(-1)).toEqual([
+        { roomId: "dm", threadRootId: "timeout-root" },
+        "The question timed out. Send me a new DM to try again.", expect.any(AbortSignal),
+      ]);
+      expect(post.mock.calls.at(-1)![2].aborted).toBe(false);
+      expect(events.filter(event => event.type === "input.finished").at(-1))
+        .toMatchObject({ status: "failed", reason: "timeout" });
+      expect(await bot(createWorkflowContext(), delivery("late", "alice", "late", "timeout-root"))).toBe("ignored");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("posts through ConnectRPC without retrying a failed request", async () => {
