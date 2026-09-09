@@ -457,20 +457,17 @@
         <div class="hero min-h-96 p-8">
           <div class="hero-content flex-col text-center">
             <h1 class="text-3xl font-semibold tracking-tight">
-              Follow the work.
+              No run selected
             </h1>
             <p class="max-w-sm text-base-content/60">
-              Every step, from the first request to the final result.
+              Select a run to view its steps and results, or start a new run.
             </p>
             <button
               class="btn btn-primary"
               disabled={!data.webhooks.length}
               onclick={() => (composer = data.webhooks[0] ?? null)}
-              >Start your first run</button
+              >Start a run</button
             >
-            <p class="text-sm text-base-content/60">
-              Or select a past run to inspect its timeline.
-            </p>
           </div>
         </div>
       {/if}
