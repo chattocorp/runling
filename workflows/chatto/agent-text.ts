@@ -1,4 +1,9 @@
+import type { AgentOptions, RunlingAgent } from "runling/agents";
 import type { WorkflowContext } from "runling";
+
+export type ChattoAgentFactory = (options: AgentOptions) => Promise<
+  Pick<RunlingAgent, "runOutcome" | "steer" | "dispose">
+>;
 
 export type SpecialistUpdate = { type: "text"; text: string };
 

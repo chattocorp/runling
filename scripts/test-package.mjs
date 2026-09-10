@@ -58,9 +58,14 @@ try {
   );
   await writeFile(resolve(project, "channels.mjs"), `
 import assert from "node:assert/strict";
-import { createWorkflowContext, createChannel, spawn, task, agent as rootAgent } from "runling";
-import { connectAgent, agent } from "runling/agents";
+import { createWorkflowContext, createChannel, spawn, task, Type, agent as rootAgent } from "runling";
+import { connectAgent, agent, taskTool } from "runling/agents";
 assert.equal(agent, rootAgent);
+const echo = task({ name: "Echo", input: Type.String(), output: Type.String() }, (_ctx, input) => input);
+const echoTool = taskTool(createWorkflowContext(), {
+  name: "echo", label: "Echo", description: "Echo input", parameters: echo.input,
+}, echo);
+assert.equal((await echoTool.execute("id", "hello")).content[0].text, "hello");
 const connected = connectAgent(createWorkflowContext(), {
   async runOutcome() { return { outcome: "completed", summary: "connected", usage: createWorkflowContext().usage }; },
 });

@@ -19,3 +19,4 @@ export {
   type AgentConnection,
   type AgentConnectionOptions,
 } from "./connection.ts";
+export { taskTool } from "./task-tool.ts";

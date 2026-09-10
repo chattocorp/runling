@@ -1,7 +1,7 @@
 # Agent connections
 
 Import agent APIs from `runling/agents`. This entrypoint exports `agent`,
-`runAgent`, `defineAgentExtension`, their types, and `connectAgent`. Existing
+`runAgent`, `defineAgentExtension`, their types, `connectAgent`, and `taskTool`. Existing
 agent exports from `runling` remain available.
 
 Use a connection when a task needs live input and asynchronous output:
@@ -62,3 +62,48 @@ Use `await using`, or call `await connection.dispose()` in `finally`. Disposal
 is idempotent, closes the inbox iterator, and prevents reuse. It does not dispose
 the supplied agent. Within an `await using` scope, use `return await` so the
 connection stays alive until the interaction finishes.
+
+## Tasks as agent tools
+
+`taskTool(ctx, definition, run)` adapts an explicit task call to a text-result
+agent tool. Register it inside the run so it uses that run's context:
+
+```ts
+import { agent, defineAgentExtension, taskTool } from "runling/agents";
+import { task, Type } from "runling";
+
+const greet = task({
+  name: "Greet",
+  input: Type.Object({ name: Type.String() }),
+  output: Type.String(),
+}, (_ctx, { name }) => `Hello, ${name}`);
+
+export const workflow = task(async (ctx) => {
+  const tools = defineAgentExtension(pi => {
+    pi.registerTool(taskTool(ctx, {
+      name: "greet",
+      label: "Greet",
+      description: "Return a greeting for a name.",
+      parameters: greet.input,
+    }, greet));
+  });
+
+  await using worker = await agent({
+    cwd: ".",
+    tools: ["greet"],
+    extensions: [tools],
+  });
+  return await worker.runOutcome(ctx, "Greet Ada.");
+});
+```
+
+The callback receives the context and inferred arguments. It returns a string
+or a promise of a string. Use a callback when you need to spawn a task, consume
+its updates, or format its result. Those decisions remain explicit.
+
+The adapter combines tool cancellation with the workflow signal, preserves
+context fields and shared usage, and rejects an already-cancelled call before
+invoking the callback. Running work must cooperate with the signal. Errors
+propagate unchanged. The task still validates its input and output; the adapter
+does not add validation or convert schemas. For a Standard Schema task, supply
+a matching JSON schema in `parameters` and call the task in the callback.

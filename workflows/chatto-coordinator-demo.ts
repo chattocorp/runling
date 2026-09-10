@@ -1,41 +1,32 @@
+import { createChattoInvestigation } from "./chatto/investigate.ts";
+import { createChattoApproval } from "./chatto/approve-implementation.ts";
+import { createChattoConversation } from "./chatto/conversation.ts";
 import {
   agent,
-  connectAgent,
-  type AgentOptions,
-  type RunlingAgent,
+  taskTool,
   defineAgentExtension,
 } from "runling/agents";
-import {
-  progressInstructions,
-  type SpecialistContext,
-  type SpecialistUpdate,
+import type {
+  ChattoAgentFactory,
+  SpecialistUpdate,
 } from "./chatto/agent-text.ts";
-import {
-  spawn,
-  input,
-  task,
-  Type,
-  TimeoutError,
-  type TaskHandle,
-} from "runling";
+import { spawn, input, task, Type, type TaskHandle } from "runling";
 import { sendChattoTyping, type ChattoTyping } from "./chatto/typing.ts";
 import { createChattoImplementation } from "./chatto/implement.ts";
 import { runChattoAgent } from "./chatto/agent.ts";
 import {
   createChattoWebhook,
-  messageSignal,
   postToChatto,
   type ChattoPost,
 } from "./chatto/webhook.ts";
 
-type BotAgent = Pick<RunlingAgent, "runOutcome" | "steer" | "dispose">;
 export interface CoordinatorDemoOptions {
   directory: string;
   post: ChattoPost;
   typing?: ChattoTyping;
   model?: string;
   timeout?: number;
-  createAgent?: (options: AgentOptions) => Promise<BotAgent>;
+  createAgent?: ChattoAgentFactory;
   implement?: ReturnType<typeof createChattoImplementation>;
 }
 
@@ -61,8 +52,6 @@ export function createChattoCoordinatorDemo({
     output: Type.Object({ summary: Type.String() }),
     post,
     async run(rootCtx, delivery, destination, inbox) {
-      let outgoing = Promise.resolve();
-      let questions = 0;
       const children = new Set<TaskHandle<string, SpecialistUpdate, unknown>>();
 
       async function delegate<T>(
@@ -84,74 +73,11 @@ export function createChattoCoordinatorDemo({
         }
       }
 
-      const send: ChattoPost = (target, text, signal) => {
-        const sent = outgoing.then(() => post(target, text, signal));
-        outgoing = sent.catch(() => {});
-        return sent;
-      };
-      // Tools share this run's context. A question follows any already queued replies.
-      const ctx = {
-        ...rootCtx,
-        onInput: async (
-          request: Parameters<NonNullable<typeof rootCtx.onInput>>[0],
-        ) => {
-          await outgoing;
-          request.signal?.throwIfAborted();
-          questions++;
-          try {
-            return await rootCtx.onInput!(request);
-          } finally {
-            questions--;
-          }
-        },
-      };
-      const say = (text: string) =>
-        send(destination, text, messageSignal(rootCtx));
-      const investigationInput = Type.Object({
-        question: Type.String({ minLength: 1 }),
+      const { ctx, say, agentOptions } = createChattoConversation(rootCtx, {
+        destination, inbox, post, typing,
       });
-      const investigate = (question: string) =>
-        task(
-          {
-            name: `Investigate: ${question.replace(/\s+/g, " ").trim()}`,
-            input: investigationInput,
-            output: Type.String(),
-          },
-          async (taskCtx: SpecialistContext, { question }) => {
-            const researcher = await createAgent({
-              cwd: directory,
-              model,
-              thinkingLevel: "medium",
-              tools: ["read", "grep", "find", "ls"],
-              resources: {
-                extensions: false,
-                skills: false,
-                promptTemplates: false,
-              },
-              instructions: [
-                ...progressInstructions,
-                "Investigate the requested repository facts without modifying files.",
-                "Answer only the assigned question. Use targeted searches and stop once you have enough evidence; do not perform a broad repository audit.",
-                "Return concise findings with file paths. Do not ask the user questions; explain gaps to the coordinator.",
-              ],
-            });
-            try {
-              await using connection = connectAgent(taskCtx, researcher, {
-                inbox: taskCtx.inbox,
-                onText: (text) => taskCtx.emit({ type: "text", text }),
-              });
-              const report = await connection.runOutcome(question);
-              if (report.outcome === "failed") throw new Error(report.summary);
-              await taskCtx.emit({
-                type: "text",
-                text: "Investigation complete. Reviewing the findings for the plan.",
-              });
-              return report.details ?? report.summary;
-            } finally {
-              researcher.dispose();
-            }
-          },
-        );
+
+      const investigate = createChattoInvestigation({ directory, model, createAgent });
       const askUser = task(
         {
           name: "Ask Chatto user",
@@ -161,130 +87,38 @@ export function createChattoCoordinatorDemo({
         (taskCtx, { question }) => input(taskCtx, question, { timeout }),
       );
 
-      const implementationTask =
-        implement ??
-        createChattoImplementation({
-          createAgent,
-        });
-      let approving = false;
-      let implementationAttempted = false;
-      const implementPlan = task(
-        {
-          name: "Approve Chatto implementation",
-          input: Type.Object({
-            plan: Type.String({ minLength: 1, maxLength: 20_000 }),
-          }),
-          output: Type.String(),
-        },
-        async (taskCtx, { plan }) => {
-          if (approving || implementationAttempted)
-            throw new Error(
-              "An implementation is already pending or was attempted in this conversation. Start a new DM for another attempt.",
-            );
-          approving = true;
-          try {
-            let answer: string;
-            try {
-              answer = await input(
-                taskCtx,
-                `${plan}\n\nReply /implement to implement this exact plan in a new worktree, or send feedback to revise it.`,
-                { timeout },
-              );
-            } catch (error) {
-              if (error instanceof TimeoutError && !taskCtx.signal.aborted) {
-                return "Approval timed out while waiting for the user's /implement reply. Implementation did not start. No worktree was created and no files were changed. Tell the user and end this conversation.";
-              }
-              throw error;
-            }
-            if (answer.trim() !== "/implement")
-              return `Implementation was not approved. User feedback: ${answer}`;
-            taskCtx.signal.throwIfAborted();
-            implementationAttempted = true;
-            try {
-              const result = await delegate(
-                spawn(taskCtx, implementationTask, { directory, plan, model }),
-              );
-              return `${result.summary}\n\nWorktree: ${result.directory}\nBranch: ${result.branch}\nChecks and tests passed. Review the changes in this worktree.`;
-            } catch (error) {
-              await say(
-                error instanceof Error
-                  ? error.message
-                  : "Implementation failed; inspect the run for details.",
-              ).catch(() => {});
-              throw error;
-            }
-          } finally {
-            approving = false;
-          }
-        },
-      );
+      const implementPlan = createChattoApproval({
+        directory, model, timeout, createAgent, implement, delegate, say,
+      });
 
       // Context stays explicit at the task call. These tools belong to this run only.
       const tools = defineAgentExtension((pi) => {
-        pi.registerTool({
+        pi.registerTool(taskTool(ctx, {
           name: "investigate",
           label: "Investigate Chatto",
-          description:
-            "Ask one read-only specialist a focused repository question. Each call starts a new agent with its own cost. Reuse returned findings; combine related questions in one call. Returns findings to you, not the user.",
-          parameters: investigationInput,
-          async execute(_id, args, signal) {
-            const result = await delegate(
-              spawn(
-                {
-                  ...ctx,
-                  signal: signal
-                    ? AbortSignal.any([ctx.signal, signal])
-                    : ctx.signal,
-                },
-                investigate(args.question),
-                args,
-              ),
-            );
-            return { content: [{ type: "text", text: result }], details: {} };
-          },
-        });
-        pi.registerTool({
+          description: "Ask one read-only specialist a focused repository question. Each call starts a new agent with its own cost. Reuse returned findings; combine related questions in one call. Returns findings to you, not the user.",
+          parameters: Type.Object({ question: Type.String({ minLength: 1 }) }),
+        }, (toolCtx, args) => delegate(spawn(toolCtx, investigate(args.question), args))));
+
+        pi.registerTool(taskTool(ctx, {
           name: "ask_user",
           label: "Ask user",
-          description:
-            "Post a question to the Chatto thread and wait for the user's answer. Use this for clarification or plan feedback.",
+          description: "Post a question to the Chatto thread and wait for the user's answer. Use this for clarification or plan feedback.",
           parameters: askUser.input,
-          async execute(_id, args, signal) {
-            const result = await askUser(
-              {
-                ...ctx,
-                signal: signal
-                  ? AbortSignal.any([ctx.signal, signal])
-                  : ctx.signal,
-              },
-              args,
-            );
-            return { content: [{ type: "text", text: result }], details: {} };
-          },
-        });
-        pi.registerTool({
+        }, askUser));
+
+        pi.registerTool(taskTool(ctx, {
           name: "implement",
           label: "Implement plan",
-          description:
-            "Present the complete proposed plan, request explicit user approval, then implement and validate it in a separate worktree. This tool asks for approval itself; do not ask for /implement separately. Returns feedback if the user declines.",
+          description: "Present the complete proposed plan, request explicit user approval, then implement and validate it in a separate worktree. This tool asks for approval itself; do not ask for /implement separately. Returns feedback if the user declines.",
           parameters: implementPlan.input,
-          async execute(_id, args, signal) {
-            const result = await implementPlan(
-              {
-                ...ctx,
-                signal: signal
-                  ? AbortSignal.any([ctx.signal, signal])
-                  : ctx.signal,
-              },
-              args,
-            );
-            return { content: [{ type: "text", text: result }], details: {} };
-          },
-        });
+        }, implementPlan));
       });
+
       await say(
         "I’ll coordinate this request with specialist tasks. Send thoughts at any time, or /cancel to stop. I’ll ask you to approve the exact plan before implementing it.",
       );
+
       const coordinator = await createAgent({
         cwd: directory,
         model,
@@ -305,8 +139,10 @@ export function createChattoCoordinatorDemo({
           "Likewise, implement posts the plan and approval question itself; do not emit a separate preface or duplicate plan. Report completed when the user's request is handled, or when they want only a plan. Do not report blocked to ask questions: call ask_user instead.",
         ],
       });
+
       try {
         let prompt = delivery.message.body;
+
         while (true) {
           const report = await runChattoAgent(
             ctx,
@@ -328,23 +164,18 @@ export function createChattoCoordinatorDemo({
               },
             },
             prompt,
-            {
-              destination,
-              inbox,
-              post: (_target, text) => say(text),
-              typing: typing
-                ? (target, signal) =>
-                    questions ? Promise.resolve() : typing(target, signal)
-                : undefined,
-            },
+            agentOptions,
           );
+
           ctx.signal.throwIfAborted();
           if (report.outcome === "failed") throw new Error(report.summary);
+
           const remaining = inbox.drain();
           if (remaining.length) {
             prompt = `Consider these additional messages before finishing:\n\n${remaining.join("\n\n")}`;
             continue;
           }
+
           const summary = report.details ?? report.summary;
           await say(summary);
           return { summary };

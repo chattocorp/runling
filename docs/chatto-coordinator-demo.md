@@ -98,3 +98,18 @@ Each specialist returns a complete report. If steering produces another report
 within the same interaction, the returned details retain earlier findings and
 label the latest report as authoritative. Approval timeouts tell the coordinator
 that implementation did not start and no worktree was created.
+
+## Code structure
+
+The root workflow defines the agent tools and owns child tracking, steering,
+and the final inbox drain. `runling/agents` provides `taskTool()` for tool signal
+composition and text results.
+
+The `chatto/` helpers keep separate responsibilities:
+
+- `investigate.ts`: read-only research and its agent lifetime.
+- `approve-implementation.ts`: plan approval and the one-attempt guard per conversation.
+- `implement.ts`: worktree setup, implementation, and validation.
+- `conversation.ts`: ordered replies and typing suppression while questions are pending.
+
+These extractions preserve the existing message routing and approval flow.
