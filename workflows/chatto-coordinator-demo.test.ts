@@ -136,7 +136,7 @@ test("the coordinator calls ordinary and agentic tasks as tools in one workflow"
   expect(execution.usage).toMatchObject({ input: 8, output: 3, cost: 0.02 });
   expect(researcherCtx.usage).toBe(coordinatorCtx.usage);
   const messages = post.mock.calls.map((call) => call[1]);
-  expect(messages).toContain("Investigating: Find theme code");
+  expect(messages).not.toContain("Investigating: Find theme code");
   expect(messages).toContain(
     "Found the theme registry; checking how themes are selected.",
   );
@@ -236,23 +236,7 @@ test.each(["delivered", "rejected", "parallel"])(
         ),
       );
     }
-    if (mode === "delivered") {
-      await vi.waitFor(() =>
-        expect(
-          post.mock.calls.some(
-            (call) =>
-              call[1] ===
-              "Passed your message to the active specialist: Also consider accessibility",
-          ),
-        ).toBe(true),
-      );
-    } else {
-      expect(
-        post.mock.calls.some((call) =>
-          call[1].startsWith("Passed your message"),
-        ),
-      ).toBe(false);
-    }
+    expect(post.mock.calls.some(call => call[1].startsWith("Passed your message"))).toBe(false);
     await bot.route(delivery("/cancel", "cancel", "root"), async () => null);
     await failed;
     expect(childCtx.signal.aborted).toBe(true);
@@ -369,4 +353,37 @@ test("implementation requires approval of the displayed plan and cannot run twic
     messages.indexOf("Running project checks and tests (attempt 1/3)."),
   );
   expect(worker.dispose).toHaveBeenCalledOnce();
+});
+
+test("reports approval timeout without starting implementation", async () => {
+  const tools = new Map<string, any>();
+  const implement = vi.fn();
+  let returned = "";
+  const coordinator = {
+    runOutcome: vi.fn(async (ctx: WorkflowContext<unknown>) => {
+      const result = await tools.get("implement").execute("approve", { plan: "Small fix" }, ctx.signal);
+      returned = result.content[0].text;
+      return report(returned);
+    }),
+    steer: vi.fn(async () => true),
+    dispose: vi.fn(),
+  };
+  const bot = createChattoCoordinatorDemo({
+    directory: process.cwd(),
+    post: async () => {},
+    timeout: 0.01,
+    implement: implement as any,
+    createAgent: async options => {
+      for (const extension of options.extensions ?? []) {
+        await (typeof extension === "function" ? extension : extension.factory)({
+          registerTool: (tool: any) => tools.set(tool.name, tool),
+        } as unknown as AgentExtensionAPI);
+      }
+      return coordinator;
+    },
+  });
+  await bot(createWorkflowContext(), delivery("Small fix", "timeout-root"));
+  expect(returned).toContain("Approval timed out");
+  expect(returned).toContain("Implementation did not start");
+  expect(implement).not.toHaveBeenCalled();
 });

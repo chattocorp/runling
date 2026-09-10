@@ -3,10 +3,12 @@
   import ColumnResizer from "./ColumnResizer.svelte";
   import Usage from "./Usage.svelte";
   import AnsiText from "./AnsiText.svelte";
+  import TaskMessageInspector from "./TaskMessageInspector.svelte";
+  import TaskMessageMarkers from "./TaskMessageMarkers.svelte";
   import TimelineMinimap from "./TimelineMinimap.svelte";
   import { middleDrag } from "$lib/middle-drag.ts";
   import { duration } from "$lib/runs.ts";
-  import { findActivity, isActivityActive, activityStatus, type Activity } from "$lib/timeline.ts";
+  import { findActivity, isActivityActive, activityStatus, type Activity, type TaskMessage } from "$lib/timeline.ts";
   import ActivityIndicator from "./ActivityIndicator.svelte";
   import {
     barPosition,
@@ -36,6 +38,7 @@
     elapsed: number;
     running: boolean;
   } = $props();
+  let selectedMessageId = $state<string>();
   let activityWidth = $state<number>();
   let overview = $state(true);
   function toggleOverview() {
@@ -75,6 +78,7 @@
     clampWindow(!manual || manual.span >= elapsed ? fitWindow(extent) : manual, fitWindow(extent).span),
   );
   let rows = $derived(flattenActivities(nodes, collapsed));
+  let message = $derived(rows.flatMap(row => row.node.messages ?? []).find(item => item.id === selectedMessageId));
   let contentHeight = $derived(Math.max(1, rows.length * rowHeight));
   let miniRows = $derived(
     rows.map(({ node }, index) => ({
@@ -104,7 +108,8 @@
     else expandButton.focus();
   }
   function globalKey(event: KeyboardEvent) {
-    if (!expanded) return;
+    // A message dialog owns Escape and focus while it is open.
+    if (!expanded || (event.target instanceof Element && event.target.closest("dialog"))) return;
     if (event.key === "Escape") {
       event.preventDefault();
       void toggleExpanded();
@@ -202,6 +207,7 @@
       gesture = { ...center(), view: { ...view }, scroll: board.scrollTop };
     };
     const down = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest("[data-message-marker]")) return;
       if (event.pointerType === "mouse" && event.button === 1) return;
       if (
         (event.button !== 0 && event.button !== 1) ||
@@ -245,6 +251,7 @@
       }
     };
     const click = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest("[data-message-marker]")) return;
       if (event.detail && performance.now() < suppressUntil) {
         event.preventDefault();
         event.stopPropagation();
@@ -423,7 +430,7 @@
             (node.durationMs ?? Math.max(0, elapsed - node.startedAt))}
           {@const bar = barPosition(node.startedAt, end, view)}
           <div
-            class="col-span-2 grid grid-cols-subgrid h-(--row-height) min-h-0 overflow-hidden"
+            class="col-span-2 grid grid-cols-subgrid h-(--row-height) min-h-0"
             data-timeline-row={node.id}
           >
             <div
@@ -478,7 +485,7 @@
             </div>
             <div
               class={[
-                "touch-none select-none relative border-b border-base-300 min-w-0 overflow-hidden",
+                "touch-none select-none relative border-b border-base-300 min-w-0",
                 dragging ? "cursor-grabbing" : "cursor-grab",
                 selected === node.id ? "bg-primary/10" : "even:bg-base-200/50",
               ]}
@@ -498,10 +505,12 @@
                   style:left={`${cursor}%`}
                   aria-hidden="true"
                 ></span>{/if}
+              <TaskMessageMarkers messages={node.messages ?? []} {view} width={plotWidth} onselect={id => { selectedMessageId = id; }} />
               {#if bar}
                 <button
                   class={[
-                    "absolute inset-y-1 min-w-1.5 flex items-center gap-2 overflow-hidden rounded-field border text-left inset-shadow-2xs inset-shadow-white/10 bg-linear-to-b from-white/5 to-black/5 hover:brightness-105",
+                    "absolute min-w-1.5 flex items-center gap-2 overflow-hidden rounded-field border text-left inset-shadow-2xs inset-shadow-white/10 bg-linear-to-b from-white/5 to-black/5 hover:brightness-105",
+                    "inset-y-2",
                     dragging ? "cursor-grabbing" : "cursor-pointer",
                     node.status === "failed" || node.status === "blocked"
                       ? "bg-error border-error text-error-content light:bg-rose-100 light:border-rose-200 light:text-rose-950"
@@ -572,8 +581,9 @@
               inert={collapsed.has(node.id)}
               aria-hidden={collapsed.has(node.id)}
             >
+              <!-- Open branches let message markers bridge the boundary between rows. -->
               <div
-                class="col-span-2 grid grid-cols-subgrid min-h-0 overflow-hidden"
+                class={["col-span-2 grid grid-cols-subgrid min-h-0", collapsed.has(node.id) && "overflow-hidden"]}
               >
                 {#each node.children as child (child.id)}
                   {@render branch(child, depth + 1)}
@@ -610,6 +620,14 @@
         />
       </div>
     </div>
+  {/if}
+  {#if message}
+    <TaskMessageInspector
+      messages={rows.flatMap(row => row.node.messages ?? [])}
+      selected={message}
+      onselect={id => { selectedMessageId = id; }}
+      onclose={() => { selectedMessageId = undefined; }}
+    />
   {/if}
   {#if expanded && inspected}
     <div class="py-3.5 px-5 border-t border-t-base-300 shrink-0">

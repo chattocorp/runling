@@ -1,3 +1,4 @@
+import { reportMessageReceipt } from "../message-observation.ts";
 import type { AgentResult, AgentRunOptions, RunlingAgent } from "../agent.ts";
 import type { WorkflowContext } from "../context.ts";
 
@@ -85,6 +86,7 @@ export function connectAgent(
       delivery = delivery.then(async () => {
         const delivered = await interruptible(consumed);
         signal.throwIfAborted();
+        reportMessageReceipt(message, delivered);
         await options.onDelivery?.(message.value, delivered);
       });
       void delivery.catch((reason) => controller.abort(reason));

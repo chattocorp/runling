@@ -250,6 +250,7 @@ async function createRunlingAgent(
     success: (message: string) => writeAgentLog("success", message),
   };
   let activeReport: AgentReport | undefined;
+  let reports: AgentReport[] = [];
 
   const reportOutcome = defineTool({
     name: "report_outcome",
@@ -259,10 +260,12 @@ async function createRunlingAgent(
     promptGuidelines: [
       "Always call report_outcome as your final action.",
       "Do not finish with a plain-text assistant response.",
+      "Every report must contain the complete current result. If new messages arrive after a report, incorporate them and report the full updated result again. Never refer to a preceding report or replace findings with a meta-summary.",
     ],
     parameters: reportSchema,
     async execute(_toolCallId, params) {
       activeReport = params;
+      reports.push({ ...params });
       return {
         content: [{ type: "text" as const, text: "Outcome recorded." }],
         details: params,
@@ -386,6 +389,7 @@ async function createRunlingAgent(
     interactionSignal = signal;
     acceptingSteering = true;
     activeReport = undefined;
+    reports = [];
     let finalText: string | undefined;
     const usage = emptyTokenUsage();
     let turn = 0;
@@ -592,8 +596,24 @@ async function createRunlingAgent(
         }
 
         if (activeReport !== undefined) {
-          agentLog.info(activeReport.details?.trim() || activeReport.summary);
-          return { ...activeReport, usage };
+          // Steering can reopen an interaction after a valid report. Preserve
+          // that evidence even if the next report only refers back to it.
+          let details = activeReport.details;
+          if (reports.length > 1) {
+            details = reports.map((report, index) => {
+              const label = index === reports.length - 1
+                ? "latest; supersedes earlier conclusions"
+                : "earlier findings";
+              const body = report.details
+                ? `${report.summary}\n\n${report.details}`
+                : report.summary;
+
+              return `Report ${index + 1} (${label}):\n${body}`;
+            }).join("\n\n");
+          }
+
+          agentLog.info(details?.trim() || activeReport.summary);
+          return { ...activeReport, ...(details !== undefined ? { details } : {}), usage };
         }
 
         if (finalText !== undefined && finalText.trim() !== "") {

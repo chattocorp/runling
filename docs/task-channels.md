@@ -71,3 +71,19 @@ Run `workflows/channel-demo.ts` through the CLI, or select `channel-demo` in the
 web app. It needs no credentials. Its parent sends an addition, receives the
 update, changes the child's label, sends another addition, and collects the
 result. Starting at 0 produces three updates and a final total of 11.
+
+
+## Timeline messages
+
+Spawned tasks record queued messages, task reads, and agent consumption receipts.
+The timeline places input (↓) and update (↑) markers on the child task's row.
+Nearby messages share a numbered marker. Click a marker and select a message
+to inspect its direction, payload, and delivery state.
+
+Payload previews are captured when sent and limited to 16,000 characters.
+Values remain unchanged in the channel. Values that cannot be represented as
+JSON show a placeholder. A task read does not imply agent consumption.
+Agent connections record consumption separately when reading a spawned inbox.
+
+These events are stored in the run journal. Existing runs without message
+events have no markers; they cannot be reconstructed from agent text.

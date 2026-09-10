@@ -159,9 +159,6 @@ export function createChattoImplementation({
         await using connection = connectAgent(ctx, implementer, {
           inbox: ctx.inbox,
           onText: (text) => ctx.emit({ type: "text", text }),
-          onDelivery: (text, consumed) => {
-            if (consumed) return ctx.emit({ type: "consumed", text });
-          },
         });
 
         // Keep the same agent and task inbox through all repair attempts.

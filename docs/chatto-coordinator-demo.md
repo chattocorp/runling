@@ -69,8 +69,8 @@ The coordinator reads `child.updates`, posts progress to Chatto, and awaits
 `child.result`.
 
 Every busy message goes to the coordinator. When exactly one specialist task is
-active, it also receives a queued copy through `child.send()`. The thread shows
-an acknowledgement only after the specialist agent confirms consumption. Sending
+active, it also receives a queued copy through `child.send()`. The timeline shows
+queue acceptance, task reads, and agent consumption separately. Sending
 to the queue alone does not confirm consumption. Messages received during setup
 or validation, or while several children are active, remain available to the
 coordinator. `/cancel` reaches the children through their shared cancellation
@@ -88,6 +88,13 @@ The coordinator prompt asks it to put greetings and questions together in
 suppression of its conversational messages.
 
 Specialist agents send brief progress updates through `ctx.emit({ type: "text", text })` to the same
-Chatto thread. Investigations also announce their start and completion. Complete
+Chatto thread. Task startup and delivery acknowledgements appear in the timeline. Investigations
+announce completion in the thread. Complete
 specialist results go to the coordinator. Intermediate messages are delivered
 after each assistant message completes; private reasoning is not forwarded.
+
+
+Each specialist returns a complete report. If steering produces another report
+within the same interaction, the returned details retain earlier findings and
+label the latest report as authoritative. Approval timeouts tell the coordinator
+that implementation did not start and no worktree was created.

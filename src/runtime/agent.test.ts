@@ -1333,3 +1333,21 @@ test("forwards completed assistant text during the interaction, excluding reason
   expect(onText).toHaveBeenCalledOnce();
   instance.dispose();
 });
+
+test("retains earlier findings when a later report refers back to them, without leaking across interactions", async () => {
+  promptImplementation = async () => {
+    await reportOutcome({ outcome: "completed", summary: "Found locale files", details: "Edit locales.ts and messages/bar.json." });
+    await reportOutcome({ outcome: "completed", summary: "See the preceding outcome." });
+  };
+  await using worker = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5" });
+  const result = await worker.runOutcome(createWorkflowContext(), "Investigate");
+  expect(result.summary).toBe("See the preceding outcome.");
+  expect(result.details).toContain("Edit locales.ts and messages/bar.json.");
+  expect(result.details).toContain("latest; supersedes earlier conclusions");
+
+  promptImplementation = async () => {
+    await reportOutcome({ outcome: "completed", summary: "Unrelated task" });
+  };
+  const next = await worker.runOutcome(createWorkflowContext(), "Other");
+  expect(next.details).toBeUndefined();
+});

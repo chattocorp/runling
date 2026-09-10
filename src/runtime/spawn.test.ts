@@ -285,3 +285,70 @@ test("schema tasks preserve channel types alongside parsed input and output", as
   expect(updates).toEqual([{ total: 12 }]);
   expect(await handle.result).toBe("12");
 });
+
+test("journals message identities, reads, receipts, and task links without changing values", async () => {
+  const { observeRunlingEvents } = await import("./events.ts");
+  const { connectAgent } = await import("./agents/index.ts");
+  const events: import("./events.ts").RunlingEvent[] = [];
+  let finish!: () => void;
+  const done = new Promise<void>(resolve => { finish = resolve; });
+  const child = task(async (ctx: WorkflowContext<string, string>) => {
+    await using connection = connectAgent(ctx, {
+      async runOutcome() {
+        await done;
+        return { outcome: "completed", summary: "Done", usage: ctx.usage } as const;
+      },
+      async steer(text) { return text !== "missed"; },
+    }, { inbox: ctx.inbox });
+    await connection.runOutcome("Go");
+    await ctx.emit("result");
+  });
+
+  await observeRunlingEvents(event => events.push(event), async () => {
+    const handle = spawn(createWorkflowContext(), child);
+    await handle.send("same");
+    await handle.send("same");
+    await handle.send("missed");
+    const { vi } = await import("vitest");
+    await vi.waitFor(() => expect(events.filter(e => e.type === "message.receipt")).toHaveLength(3));
+    finish();
+    const updates = [];
+    for await (const update of handle.updates) updates.push(update);
+    await handle.result;
+    expect(updates).toEqual(["result"]);
+  });
+
+  const sent = events.filter(e => e.type === "message.sent");
+  expect(sent).toHaveLength(4);
+  expect(new Set(sent.map(e => e.id)).size).toBe(4);
+  expect(sent.map(e => e.payload)).toEqual(["same", "same", "missed", "result"]);
+  expect(events.filter(e => e.type === "message.read")).toHaveLength(4);
+  expect(events.filter(e => e.type === "message.receipt").map(e => e.consumed)).toEqual([true, true, false]);
+  expect(events.filter(e => e.type === "task.linked")).toHaveLength(1);
+  for (const message of sent) {
+    expect(events.findIndex(e => e === message)).toBeLessThan(events.findIndex(e => e.type === "message.read" && e.id === message.id));
+  }
+});
+
+test("message previews tolerate circular values and do not record rejected sends", async () => {
+  const { observeRunlingEvents } = await import("./events.ts");
+  const events: import("./events.ts").RunlingEvent[] = [];
+  const circular: { self?: unknown } = {};
+  circular.self = circular;
+
+  await observeRunlingEvents(event => events.push(event), async () => {
+    const handle = spawn(createWorkflowContext(), task(async (_ctx: WorkflowContext<object>) => {
+      await new Promise(() => {});
+    }));
+    await handle.send(circular);
+    for (let i = 1; i < 64; i++) await handle.send({ i });
+    await expect(handle.send({ overflow: true })).rejects.toBeInstanceOf(ChannelFullError);
+    handle.cancel();
+    await expect(handle.result).rejects.toThrow("cancelled");
+  });
+
+  const sent = events.filter(event => event.type === "message.sent");
+  expect(sent).toHaveLength(64);
+  expect(sent[0]!.payload).toBe("[Value cannot be represented as JSON]");
+  expect(events.some(event => event.type === "message.read")).toBe(false);
+});

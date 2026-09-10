@@ -10,7 +10,14 @@ import {
   type SpecialistContext,
   type SpecialistUpdate,
 } from "./chatto/agent-text.ts";
-import { spawn, input, task, Type, type TaskHandle } from "runling";
+import {
+  spawn,
+  input,
+  task,
+  Type,
+  TimeoutError,
+  type TaskHandle,
+} from "runling";
 import { sendChattoTyping, type ChattoTyping } from "./chatto/typing.ts";
 import { createChattoImplementation } from "./chatto/implement.ts";
 import { runChattoAgent } from "./chatto/agent.ts";
@@ -67,10 +74,6 @@ export function createChattoCoordinatorDemo({
           for await (const update of child.updates) {
             if (update.type === "text") {
               await say(update.text);
-            } else {
-              await say(
-                `Passed your message to the active specialist: ${update.text}`,
-              );
             }
           }
 
@@ -115,10 +118,6 @@ export function createChattoCoordinatorDemo({
             output: Type.String(),
           },
           async (taskCtx: SpecialistContext, { question }) => {
-            await taskCtx.emit({
-              type: "text",
-              text: `Investigating: ${question}`,
-            });
             const researcher = await createAgent({
               cwd: directory,
               model,
@@ -140,9 +139,6 @@ export function createChattoCoordinatorDemo({
               await using connection = connectAgent(taskCtx, researcher, {
                 inbox: taskCtx.inbox,
                 onText: (text) => taskCtx.emit({ type: "text", text }),
-                onDelivery: (text, consumed) => {
-                  if (consumed) return taskCtx.emit({ type: "consumed", text });
-                },
               });
               const report = await connection.runOutcome(question);
               if (report.outcome === "failed") throw new Error(report.summary);
@@ -187,11 +183,19 @@ export function createChattoCoordinatorDemo({
             );
           approving = true;
           try {
-            const answer = await input(
-              taskCtx,
-              `${plan}\n\nReply /implement to implement this exact plan in a new worktree, or send feedback to revise it.`,
-              { timeout },
-            );
+            let answer: string;
+            try {
+              answer = await input(
+                taskCtx,
+                `${plan}\n\nReply /implement to implement this exact plan in a new worktree, or send feedback to revise it.`,
+                { timeout },
+              );
+            } catch (error) {
+              if (error instanceof TimeoutError && !taskCtx.signal.aborted) {
+                return "Approval timed out while waiting for the user's /implement reply. Implementation did not start. No worktree was created and no files were changed. Tell the user and end this conversation.";
+              }
+              throw error;
+            }
             if (answer.trim() !== "/implement")
               return `Implementation was not approved. User feedback: ${answer}`;
             taskCtx.signal.throwIfAborted();

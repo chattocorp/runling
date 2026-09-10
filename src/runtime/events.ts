@@ -2,6 +2,16 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { TokenUsage } from "./usage.ts";
 
 export type RunlingEventPayload =
+  | { type: "task.linked"; channelId: string; taskId: string }
+  | {
+      type: "message.sent";
+      id: string;
+      channelId: string;
+      direction: "input" | "update";
+      payload: string;
+    }
+  | { type: "message.read"; id: string }
+  | { type: "message.receipt"; id: string; consumed: boolean }
   | {
       type: "log";
       level: "debug" | "info" | "success" | "error";
