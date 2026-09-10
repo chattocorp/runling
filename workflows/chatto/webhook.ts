@@ -83,22 +83,22 @@ export function createChattoWebhook<Output extends TSchema>({ name, output, post
     conversations.set(key, { messages: [], listeners: new Set(), cancelled: false });
     return "start";
   };
-  const route: WebhookRouter<Delivery> = async (delivery, start) => {
-    if (routeDelivery(delivery) !== "start") return null;
+  const route: WebhookRouter<Delivery> = async (ctx, delivery) => {
+    if (routeDelivery(delivery) !== "start") return;
     const id = deliveryKey(delivery);
     reserved.add(id);
     try {
-      return await start();
+      await ctx.start(workflow, { input: delivery });
     } catch (error) {
       // A failed journal creation must leave the delivery retryable.
-      if (reserved.has(id)) {
+      if (reserved.delete(id)) {
         seen.delete(id);
         conversations.delete(conversationKey(delivery));
       }
       throw error;
-    } finally {
-      reserved.delete(id);
     }
+    // Registration can finish before execution enters the task. Keep its
+    // reservation until the task consumes it, so it is not treated as a duplicate.
   };
 
   const workflow = task({
@@ -176,6 +176,7 @@ export function createChattoWebhook<Output extends TSchema>({ name, output, post
       conversations.delete(key);
     }
   });
+  Object.assign(route, { label: name, input: deliverySchema });
   return Object.assign(workflow, { route });
 }
 

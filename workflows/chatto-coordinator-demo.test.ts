@@ -127,9 +127,9 @@ test("the coordinator calls ordinary and agentic tasks as tools in one workflow"
       true,
     ),
   );
-  await bot.route(delivery("Darcula", "answer", "root"), async () => {
+  await bot.route({ start: async () => {
     throw new Error("must not start another run");
-  });
+  } }, delivery("Darcula", "answer", "root"));
   const execution = await run;
   expect(execution.ok).toBe(true);
   expect(execution.output).toEqual({ summary: "Agreed plan" });
@@ -218,10 +218,9 @@ test.each(["delivered", "rejected", "parallel"])(
       ),
     );
     await bot.route(
-      delivery("Also consider accessibility", "steering", "root"),
-      async () => {
+      { start: async () => {
         throw new Error("unexpected run");
-      },
+      } }, delivery("Also consider accessibility", "steering", "root"),
     );
     await vi.waitFor(() =>
       expect(coordinator.steer).toHaveBeenCalledWith(
@@ -237,7 +236,7 @@ test.each(["delivered", "rejected", "parallel"])(
       );
     }
     expect(post.mock.calls.some(call => call[1].startsWith("Passed your message"))).toBe(false);
-    await bot.route(delivery("/cancel", "cancel", "root"), async () => null);
+    await bot.route({ start: async () => ({ id: "unused" }) }, delivery("/cancel", "cancel", "root"));
     await failed;
     expect(childCtx.signal.aborted).toBe(true);
     expect(researcher.dispose).toHaveBeenCalledTimes(
@@ -322,8 +321,7 @@ test("implementation requires approval of the displayed plan and cannot run twic
       ),
   ).rejects.toThrow("already pending");
   await bot.route(
-    delivery("Use the existing API", "feedback", "root"),
-    async () => null,
+    { start: async () => ({ id: "unused" }) }, delivery("Use the existing API", "feedback", "root"),
   );
   await vi.waitFor(() =>
     expect(
@@ -331,7 +329,7 @@ test("implementation requires approval of the displayed plan and cannot run twic
     ).toBe(true),
   );
   expect(prepare).not.toHaveBeenCalled();
-  await bot.route(delivery("/implement", "approval", "root"), async () => null);
+  await bot.route({ start: async () => ({ id: "unused" }) }, delivery("/implement", "approval", "root"));
   await run;
   expect(prepare).toHaveBeenCalledOnce();
   expect(worker.runOutcome.mock.calls[0]![1]).toBe(

@@ -8,9 +8,15 @@ const directory = await mkdtemp(join(tmpdir(), "runling-dev-events-"));
 const configPath = join(directory, "runling.config.ts");
 await writeFile(configPath, `
   import { task, input, Type } from "runling";
-  export default { webhooks: { probe: { route: async (value, start) => value === "skip" ? null : start(), task: task({
+  import { defineWebConfig } from "runling/web";
+  const probe = task({
     name: "Event probe", input: Type.String(), output: Type.String(),
-  }, async (ctx, value) => input({ ...ctx, onInput: async () => value }, "Question?")) } } };
+  }, async (ctx, value) => input({ ...ctx, onInput: async () => value }, "Question?"));
+  export default defineWebConfig({ webhooks: {
+    probe: async (ctx, value) => {
+      if (value !== "skip") await ctx.start(probe, { input: value });
+    },
+  } });
 `);
 process.env.RUNLING_WEB_CONFIG = configPath;
 // Match pnpm dev: the config loader and web host must use the same native runtime.
@@ -26,7 +32,14 @@ try {
   const config = await loader.load();
   const store = new RunStore(join(directory, "runs"));
   await store.init();
-  const { id, completion } = await store.start("probe", config.webhooks.probe.task, "Answer", "web");
+  let started;
+  await config.webhooks.probe({
+    start: async (task, { input }) => {
+      started = await store.start("probe", task, input, "web");
+      return { id: started.id };
+    },
+  }, "Answer");
+  const { id, completion } = started;
   await completion;
   const run = await store.get(id);
   assert.equal(run.status, "completed");
@@ -43,11 +56,11 @@ try {
   }) });
   const ignored = await send("skip");
   assert.equal(ignored.status, 202);
-  assert.deepEqual(await ignored.json(), { handled: true });
+  assert.deepEqual(await ignored.json(), { runs: [] });
   assert.equal(hostStore.list().length, 0);
   const accepted = await send("Answer");
   assert.equal(accepted.status, 202);
-  const acceptedId = (await accepted.json()).id;
+  const acceptedId = (await accepted.json()).runs[0].id;
   for (let attempts = 0; attempts < 100 && (await hostStore.get(acceptedId)).status === "running"; attempts++) {
     await new Promise(resolve => setTimeout(resolve, 10));
   }

@@ -95,13 +95,20 @@ test("agent subpath imports share the host runtime across config reloads", async
     await writeFile(path, `
       import { task, Type } from "runling";
       import { agent, connectAgent } from "runling/agents";
+      import { startWorkflow } from "runling/web";
       export default { webhooks: {
-        probe: { task: task({ name: "Probe", input: Type.Null(), output: Type.Any() },
-          () => ({ agent, connectAgent })) }
+        probe: startWorkflow(task({ name: "Probe", input: Type.Null(), output: Type.Any() },
+          () => ({ agent, connectAgent })))
       }};
     `);
     for (const config of [await loader.load(), await loader.reload()]) {
-      const result = await config.webhooks.probe!.task(createWorkflowContext(), null);
+      let result: unknown;
+      await config.webhooks.probe!({
+        start: async (task, { input }) => {
+          result = await task(createWorkflowContext(), input);
+          return { id: "probe" };
+        },
+      }, null);
       expect(result).toEqual({ agent, connectAgent });
     }
   });

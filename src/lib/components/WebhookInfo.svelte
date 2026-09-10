@@ -51,7 +51,7 @@
       <dl
         class="grid grid-cols-[auto_minmax(0,_1fr)] gap-y-2.5 gap-x-5 text-xs"
       >
-        <dt class="text-base-content/60">Workflow</dt>
+        <dt class="text-base-content/60">Route</dt>
         <dd class="m-0 wrap-anywhere">{webhook.workflow}</dd>
         <dt class="text-base-content/60">Method</dt>
         <dd class="m-0 wrap-anywhere"><code class="font-mono">POST</code></dd>
@@ -61,9 +61,9 @@
         </dd>
       </dl>
       <p class="text-base-content/60 text-xs leading-relaxed">
-        The request body must match the workflow input schema and is passed
-        directly to the workflow. The response returns the workflow result when
-        the run finishes.
+        The router handles the request and can start one or more runs. The response
+        lists their IDs without waiting for completion. An empty list means no
+        new run was started.
       </p>
       <section class="mt-6" aria-labelledby="hook-url-title">
         <div class="flex items-center justify-between gap-4">
@@ -89,7 +89,7 @@
           >
         </div>
         <p class="text-base-content/60 text-xs leading-relaxed">
-          For bash or zsh. This sample comes from the workflow input schema.
+          For bash or zsh. This sample comes from the webhook input schema.
           Check its values and add any required authentication headers before
           use.
         </p>
@@ -105,7 +105,7 @@
           class="collapse collapse-arrow border border-base-300 bg-base-200 mt-3"
         >
           <summary class="collapse-title text-sm font-medium"
-            >Workflow input</summary
+            >Webhook input</summary
           >
           <div class="collapse-content">
             <pre
@@ -120,7 +120,7 @@
           class="collapse collapse-arrow border border-base-300 bg-base-200 mt-3"
         >
           <summary class="collapse-title text-sm font-medium"
-            >Workflow output</summary
+            >Workflow output (when declared)</summary
           >
           <div class="collapse-content">
             <pre

@@ -1,103 +1,109 @@
 import { serverLog } from "../../runtime/server-log.ts";
-import { runWorkflow, validateSchema, type Task, type WorkflowExecution } from "runling";
-import { describeTaskSchemas, type WebhookRouter, type WebConfig } from "runling/web";
-
-type WebhookRunner = (
-  workflow: Task,
-  input: unknown,
-) => Promise<WorkflowExecution>;
+import { validateSchema } from "runling";
+import {
+  describeRouterSchemas,
+  type StartedRun,
+  type WebhookContext,
+  type WebhookRouter,
+  type WebConfig,
+} from "runling/web";
 
 export interface WebhookDependencies {
   config: WebConfig;
-  log?: (output: unknown) => void;
-  run?: WebhookRunner;
+  start: WebhookContext["start"];
 }
 
-const runConfiguredWorkflow: WebhookRunner = (workflow, input) =>
-  runWorkflow(workflow, {
-    input,
-  });
-
-const json = (body: unknown, status = 200) => Response.json(body, { status });
-
-export function describeWebhook(
-  name: string,
-  { config }: Pick<WebhookDependencies, "config">,
-): Response {
+export function describeWebhook(name: string, { config }: Pick<WebhookDependencies, "config">): Response {
   if (!Object.hasOwn(config.webhooks, name)) {
-    return json({ error: `Unknown webhook ${JSON.stringify(name)}.` }, 404);
+    return Response.json({ error: `Unknown webhook ${JSON.stringify(name)}.` }, { status: 404 });
   }
-  const definition = config.webhooks[name]!;
-
-  return json(describeTaskSchemas(definition.task));
-}
-
-export async function handleWebhook(
-  name: string,
-  request: Request,
-  {
-    config,
-    log = (output) => console.log(output),
-    run = runConfiguredWorkflow,
-  }: WebhookDependencies,
-): Promise<Response> {
-  const prepared = await prepareWebhook(name, request, config);
-  if (prepared instanceof Response) return prepared;
-  const execution = await routeWebhook(prepared, () => run(prepared.task, prepared.input));
-  if (execution === null) return json({ handled: true }, 202);
-  if (!execution.ok) {
-    return json({ error: execution.error ?? "The workflow failed." }, 500);
-  }
-  log(execution.output);
-  return json({ output: execution.output });
+  return Response.json(describeRouterSchemas(config.webhooks[name]!));
 }
 
 export async function prepareWebhook(
   name: string,
   request: Request,
   config: WebConfig,
-): Promise<Response | { task: Task; input: unknown; route?: WebhookRouter<any> }> {
+): Promise<Response | { input: unknown; route: WebhookRouter<any> }> {
   if (!Object.hasOwn(config.webhooks, name)) {
-    return json({ error: `Unknown webhook ${JSON.stringify(name)}.` }, 404);
+    return Response.json({ error: `Unknown webhook ${JSON.stringify(name)}.` }, { status: 404 });
   }
-  const definition = config.webhooks[name]!;
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return json({ error: "The request body must be valid JSON." }, 400);
+    return Response.json({ error: "The request body must be valid JSON." }, { status: 400 });
   }
 
-  const result = await validateSchema(definition.task.input, body);
-  if (result.issues) {
-    return json(
-      {
-        error: "The request body does not match the workflow input schema.",
+  const route = config.webhooks[name]!;
+  if (route.input !== undefined) {
+    const result = await validateSchema(route.input, body);
+    if (result.issues) {
+      return Response.json({
+        error: "The request body does not match the webhook input schema.",
         issues: result.issues,
-      },
-      400,
-    );
+      }, { status: 400 });
+    }
   }
 
-  // Pass the original input. The task parses it when the run starts.
-  return { task: definition.task, input: body, route: definition.route };
+  // The task or custom router owns parsing; do not pass a transformed value twice.
+  return { input: body, route };
 }
 
-/** A router may start at most one run for this delivery. */
-export async function routeWebhook<Result>(
-  prepared: { input: unknown; route?: WebhookRouter<any> },
-  start: () => Promise<Result>,
-): Promise<Result | null> {
-  let started: Promise<Result> | undefined;
-  const once = () => {
-    started ??= Promise.resolve().then(start);
-    // A misbehaving router must not create an unhandled start rejection.
-    void started.catch(() => {});
-    return started;
+/** Register all starts initiated during routing, including calls not awaited by the router. */
+export async function handleWebhook(
+  name: string,
+  request: Request,
+  { config, start }: WebhookDependencies,
+): Promise<Response> {
+  const prepared = await prepareWebhook(name, request, config);
+  if (prepared instanceof Response) return prepared;
+
+  const pending: Promise<StartedRun>[] = [];
+  let accepting = true;
+  let failure: unknown;
+  let failed = false;
+  const ctx: WebhookContext = {
+    start(task, options) {
+      if (!accepting) return Promise.reject(new Error("Webhook routing has finished"));
+
+      const registration = Promise.resolve().then(() => start(task, options));
+      pending.push(registration);
+      // Observe failures even when the routing function forgets to await a start.
+      void registration.catch(() => {});
+      return registration;
+    },
   };
-  if (!prepared.route) return once();
-  const result = await prepared.route(prepared.input, once);
-  if (!started && result === null) serverLog("info", "webhook.handled", { startedRun: false });
-  return started ?? result;
+
+  try {
+    await prepared.route(ctx, prepared.input);
+  } catch (error) {
+    failed = true;
+    failure = error;
+  } finally {
+    accepting = false;
+  }
+
+  const registrations = await Promise.allSettled(pending);
+  const runs: StartedRun[] = [];
+  for (const registration of registrations) {
+    if (registration.status === "fulfilled") {
+      runs.push({ id: registration.value.id });
+    } else if (!failed) {
+      failed = true;
+      failure = registration.reason;
+    }
+  }
+
+  if (failed) {
+    serverLog("error", "webhook.route_failed", { webhook: name, runs, error: failure });
+    return Response.json({
+      error: failure instanceof Error ? failure.message : "Webhook routing failed.",
+      runs,
+    }, { status: 500 });
+  }
+
+  if (!runs.length) serverLog("info", "webhook.handled", { webhook: name, startedRun: false });
+  return Response.json({ runs }, { status: 202 });
 }

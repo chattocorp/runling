@@ -1,5 +1,5 @@
 import channelDemo from "./workflows/channel-demo.ts";
-import { defineWebConfig } from "runling/web";
+import { defineWebConfig, startWorkflow } from "runling/web";
 import chattoInputDemo from "./workflows/chatto-input-demo.ts";
 import chattoCoordinatorDemo from "./workflows/chatto-coordinator-demo.ts";
 import chattoPlanDemo from "./workflows/chatto-plan-demo.ts";
@@ -8,24 +8,11 @@ import makePullRequest from "./workflows/make-pr.ts";
 
 export default defineWebConfig({
   webhooks: {
-    "channel-demo": { task: channelDemo },
-    "chatto-input-demo": {
-      task: chattoInputDemo,
-      route: chattoInputDemo.route,
-    },
-    "chatto-plan-demo": {
-      task: chattoPlanDemo,
-      route: chattoPlanDemo.route,
-    },
-    "chatto-coordinator-demo": {
-      task: chattoCoordinatorDemo,
-      route: chattoCoordinatorDemo.route,
-    },
-    joke: {
-      task: joke,
-    },
-    "make-pr": {
-      task: makePullRequest,
-    },
+    "channel-demo": startWorkflow(channelDemo),
+    "chatto-input-demo": chattoInputDemo.route,
+    "chatto-plan-demo": chattoPlanDemo.route,
+    "chatto-coordinator-demo": chattoCoordinatorDemo.route,
+    joke: startWorkflow(joke),
+    "make-pr": startWorkflow(makePullRequest),
   },
 });

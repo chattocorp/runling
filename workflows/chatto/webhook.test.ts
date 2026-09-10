@@ -38,9 +38,9 @@ test("serializes concurrent questions and never uses queued steering as answers"
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect(drain()).toEqual(["steer"]);
   expect(drain()).toEqual([]);
-  await bot.route(delivery("one", "one"), async () => { throw new Error("must not start"); });
+  await bot.route({ start: async () => { throw new Error("must not start"); } }, delivery("one", "one"));
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(2));
-  await bot.route(delivery("two", "two"), async () => { throw new Error("must not start"); });
+  await bot.route({ start: async () => { throw new Error("must not start"); } }, delivery("two", "two"));
   expect(await run).toEqual(["one", "two"]);
 });
 
@@ -49,9 +49,9 @@ test("queues startup replies and cancels before the task enters", async () => {
   const work = vi.fn(async () => "done");
   const bot = createChattoWebhook({ name: "Test", output: Type.String(), post: async () => {}, run: work });
   const root = delivery("start", "root", null);
-  const run = bot.route(root, async () => { await gate.promise; return bot(createWorkflowContext(), root); });
+  const run = bot.route({ start: async () => { await gate.promise; await bot(createWorkflowContext(), root); return { id: "test" }; } }, root);
   const rejected = expect(run).rejects.toThrow("Cancelled from Chatto");
-  await bot.route(delivery("/cancel", "cancel"), async () => { throw new Error("must not start"); });
+  await bot.route({ start: async () => { throw new Error("must not start"); } }, delivery("/cancel", "cancel"));
   gate.resolve();
   await rejected;
   expect(work).not.toHaveBeenCalled();
@@ -71,7 +71,7 @@ test("skips an expired queued question without posting it", async () => {
   });
   const run = bot(createWorkflowContext(), delivery("start", "root", null));
   await new Promise(resolve => setTimeout(resolve, 30));
-  await bot.route(delivery("one", "one"), async () => null);
+  await bot.route({ start: async () => ({ id: "unused" }) }, delivery("one", "one"));
   await run;
   expect(post.mock.calls).toHaveLength(1);
 });
@@ -85,16 +85,31 @@ test("routes replies, duplicates and unrelated messages without starting runs; r
     bot_id: "bot", room_id: "dm", thread_root_id: thread, message: { id, body, author_id: "alice" },
   });
   const root = delivery("hello", "root");
-  await expect(bot.route(root, async () => { throw new Error("disk full"); })).rejects.toThrow("disk full");
+  await expect(bot.route({ start: async () => { throw new Error("disk full"); } }, root)).rejects.toThrow("disk full");
   let run!: ReturnType<typeof bot>;
   const start = vi.fn(async () => { run = bot(createWorkflowContext(), root); return { id: "run-id" }; });
-  expect(await bot.route(root, start)).toEqual({ id: "run-id" });
-  expect(await bot.route(root, start)).toBeNull();
+  expect(await bot.route({ start: start }, root)).toBeUndefined();
+  expect(await bot.route({ start: start }, root)).toBeUndefined();
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(await bot.route(delivery("Alice", "name", "root"), start)).toBeNull();
+  expect(await bot.route({ start: start }, delivery("Alice", "name", "root"))).toBeUndefined();
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(2));
-  expect(await bot.route(delivery("Testing", "topic", "root"), start)).toBeNull();
+  expect(await bot.route({ start: start }, delivery("Testing", "topic", "root"))).toBeUndefined();
   expect(await run).toEqual({ name: "Alice", topic: "Testing" });
-  expect(await bot.route(delivery("late", "late", "root"), start)).toBeNull();
+  expect(await bot.route({ start: start }, delivery("late", "late", "root"))).toBeUndefined();
   expect(start).toHaveBeenCalledTimes(1);
+});
+
+test("keeps a successful registration reserved until the host starts execution", async () => {
+  const work = vi.fn(async () => "done");
+  const bot = createChattoWebhook({ name: "Delayed", output: Type.String(), post: async () => {}, run: work });
+  const root = delivery("hello", "delayed-root", null);
+  const start = vi.fn(async () => ({ id: "registered" }));
+
+  await bot.route({ start }, root);
+  await bot.route({ start }, root);
+  expect(start).toHaveBeenCalledOnce();
+  expect(work).not.toHaveBeenCalled();
+
+  expect(await bot(createWorkflowContext(), root)).toBe("done");
+  expect(work).toHaveBeenCalledOnce();
 });

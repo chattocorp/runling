@@ -90,7 +90,7 @@ The planning workflow reserves `/implement` and handles approval itself.
 See [agent steering](agent-steering.md) for the delivery contract.
 The root config attaches each demo's `route` function. It delivers answers to
 pending questions before creating a run. Replies, duplicates, and unrelated
-messages return `202 { "handled": true }` without adding run history. Only a new
+messages return `202 { "runs": [] }` without adding run history. Only a new
 root DM starts a conversation. Failed run creation permits a retry.
 
 The adapter presents concurrent input requests one at a time in call order.

@@ -1,3 +1,4 @@
+import type { WebhookTask } from "runling/web";
 import { serverLog } from "../../runtime/server-log.ts";
 import {
   mkdir,
@@ -13,10 +14,7 @@ import { randomUUID } from "node:crypto";
 import {
   emptyTokenUsage,
   runWorkflow,
-  type Task,
   type WorkflowExecution,
-  type SchemaInput,
-  type WorkflowSchema,
 } from "runling";
 import {
   type RunDetail,
@@ -172,10 +170,10 @@ export class RunStore {
     return next;
   }
 
-  async start<I extends WorkflowSchema, O extends WorkflowSchema>(
+  async start<Input, Output>(
     webhook: string,
-    workflow: Task<I, O>,
-    input: SchemaInput<I>,
+    workflow: WebhookTask<Input, Output>,
+    input: Input,
     source: "webhook" | "web",
   ) {
     const id = randomUUID();
@@ -210,10 +208,10 @@ export class RunStore {
     return { id, completion };
   }
 
-  private async execute<I extends WorkflowSchema, O extends WorkflowSchema>(
+  private async execute<Input, Output>(
     id: string,
-    workflow: Task<I, O>,
-    input: SchemaInput<I>,
+    workflow: WebhookTask<Input, Output>,
+    input: Input,
     signal: AbortSignal,
   ): Promise<WorkflowExecution> {
     const base = performance.now();

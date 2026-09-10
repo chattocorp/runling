@@ -135,9 +135,9 @@ export default task({ name: "CLI echo", input: Type.String(), output: Type.Strin
   );
   await writeFile(
     resolve(project, "runling.config.ts"),
-    `import { defineWebConfig } from "runling/web";
+    `import { defineWebConfig, startWorkflow } from "runling/web";
 import echo from "./workflow.ts";
-export default defineWebConfig({ webhooks: { echo: { task: echo } } });
+export default defineWebConfig({ webhooks: { echo: startWorkflow(echo) } });
 `,
   );
   const cli = await exec(
@@ -251,8 +251,17 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
     });
   assert.equal((await post("/api/webhooks/echo", "invalid")).status, 400);
   const webhook = await post("/api/webhooks/echo", { topic: "webhook" });
-  assert.equal(webhook.status, 200);
-  assert.deepEqual(await webhook.json(), { output: "webhook: consumer cwd" });
+  assert.equal(webhook.status, 202);
+  const waitForRun = async (id) => {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const run = await (await fetch(`${origin}/api/runs/${id}`)).json();
+      if (run.status !== "running" && run.status !== "waiting") return run;
+      await delay(100);
+    }
+    throw new Error(`Run did not finish: ${id}`);
+  };
+  const webhookRun = await waitForRun((await webhook.json()).runs[0].id);
+  assert.equal(webhookRun.output, "webhook: consumer cwd");
   const workflowPath = resolve(project, "workflow.ts");
   const originalWorkflow = await readFile(workflowPath, "utf8");
   await writeFile(
@@ -268,7 +277,7 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
   };
   await waitForPage("Reloaded echo");
   const active = await post("/api/runs/start/echo", { topic: "slow" });
-  const activeId = (await active.json()).id;
+  const activeId = (await active.json()).runs[0].id;
   await writeFile(
     resolve(project, "helper.ts"),
     'export const suffix = " updated";\n',
@@ -278,7 +287,7 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
     const output = await (
       await post("/api/webhooks/echo", { topic: "new" })
     ).json();
-    if (output.output === "new: consumer cwd updated") {
+    if ((await waitForRun(output.runs[0].id)).output === "new: consumer cwd updated") {
       updated = true;
       break;
     }
@@ -335,9 +344,9 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
   assert((await configState()).error, "Browser clients receive reload errors");
   assert.equal(
     (await post("/api/webhooks/echo", { topic: "retained" })).status,
-    200,
+    202,
   );
-  await writeFile(configPath, originalConfig.replace("echo: {", "renamed: {"));
+  await writeFile(configPath, originalConfig.replace("echo: startWorkflow", "renamed: startWorkflow"));
   await waitForPage("/api/webhooks/renamed");
   assert.equal(
     (await configState()).error,
@@ -349,7 +358,7 @@ export default defineWebConfig({ webhooks: { echo: { task: echo } } });
   await waitForPage("/api/webhooks/echo");
   const started = await post("/api/runs/start/echo", { topic: "console" });
   assert.equal(started.status, 202);
-  const { id } = await started.json();
+  const { runs: [{ id }] } = await started.json();
   const streamAbort = new AbortController();
   const stream = await fetch(`${origin}/api/runs/${id}/events`, {
     signal: streamAbort.signal,
