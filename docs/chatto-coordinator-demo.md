@@ -62,12 +62,18 @@ new DM after inspecting a failed attempt.
 
 ## Boundaries
 
-The coordinator hands busy messages to a single active specialist through an
-explicit context channel. It acknowledges consumed messages in the thread and
-keeps a note in its own conversation. If a specialist cannot consume a message,
-or several specialists are active, the message goes to the coordinator. During
-setup or validation there is no active specialist receiver, so messages also
-wait for the coordinator. `/cancel` reaches both through their shared cancellation
+The coordinator uses `spawn()` for investigations and implementation. Each child
+uses [`connectAgent`](agents.md) from `runling/agents` to forward `ctx.inbox`
+messages and sends typed updates with `ctx.emit()`.
+The coordinator reads `child.updates`, posts progress to Chatto, and awaits
+`child.result`.
+
+Every busy message goes to the coordinator. When exactly one specialist task is
+active, it also receives a queued copy through `child.send()`. The thread shows
+an acknowledgement only after the specialist agent confirms consumption. Sending
+to the queue alone does not confirm consumption. Messages received during setup
+or validation, or while several children are active, remain available to the
+coordinator. `/cancel` reaches the children through their shared cancellation
 signal. Once a question opens, the next new message answers it. Questions allow
 15 minutes, and concurrent questions are presented sequentially by the adapter.
 Typing refreshes pause while questions wait for input.
@@ -81,7 +87,7 @@ The coordinator prompt asks it to put greetings and questions together in
 `ask_user`, without a separate assistant-text preface. There is no code-level
 suppression of its conversational messages.
 
-Specialist agents send brief progress updates through `ctx.onText` to the same
+Specialist agents send brief progress updates through `ctx.emit({ type: "text", text })` to the same
 Chatto thread. Investigations also announce their start and completion. Complete
 specialist results go to the coordinator. Intermediate messages are delivered
 after each assistant message completes; private reasoning is not forwarded.

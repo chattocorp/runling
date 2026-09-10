@@ -86,3 +86,23 @@ test("rejects an existing invalid config and missing imports", async () => {
     log.mockRestore();
   }
 });
+
+test("agent subpath imports share the host runtime across config reloads", async () => {
+  const { agent, connectAgent } = await import("./agents/index.ts");
+  const { createWorkflowContext } = await import("./context.ts");
+
+  await fixture(async (loader, path) => {
+    await writeFile(path, `
+      import { task, Type } from "runling";
+      import { agent, connectAgent } from "runling/agents";
+      export default { webhooks: {
+        probe: { task: task({ name: "Probe", input: Type.Null(), output: Type.Any() },
+          () => ({ agent, connectAgent })) }
+      }};
+    `);
+    for (const config of [await loader.load(), await loader.reload()]) {
+      const result = await config.webhooks.probe!.task(createWorkflowContext(), null);
+      expect(result).toEqual({ agent, connectAgent });
+    }
+  });
+});

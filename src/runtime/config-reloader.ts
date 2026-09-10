@@ -4,6 +4,7 @@ import { stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import { createJiti } from "jiti";
 import * as runling from "./index.ts";
+import * as agents from "./agents/index.ts";
 import * as web from "./web-config.ts";
 import { isWebConfig, type WebConfig } from "./web-config.ts";
 
@@ -94,7 +95,7 @@ export class ConfigReloader {
         tryNative: false,
         interopDefault: false,
         // Reuse the host runtime: live events must reach its AsyncLocalStorage.
-        virtualModules: { runling, "runling/web": web },
+        virtualModules: { runling, "runling/agents": agents, "runling/web": web },
       });
       const module = await jiti.import<{ default?: unknown }>(this.path);
       if (!isWebConfig(module.default))

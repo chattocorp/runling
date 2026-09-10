@@ -197,7 +197,7 @@ test("forwards busy feedback before the active interaction completes", async () 
   const run = f.bot(createWorkflowContext(), delivery("Feature", "root"));
   await vi.waitFor(() => expect(f.planner.runOutcome).toHaveBeenCalledOnce());
   await f.answer("Include accessibility tests");
-  expect(f.planner.steer).toHaveBeenCalledWith("Include accessibility tests");
+  await vi.waitFor(() => expect(f.planner.steer).toHaveBeenCalledWith("Include accessibility tests"));
   expect(f.planner.runOutcome).toHaveBeenCalledOnce();
   await f.answer("/implement");
   expect(f.planner.steer).toHaveBeenCalledOnce();

@@ -56,6 +56,34 @@ try {
     ["install", "--no-audit", "--no-fund", resolve(directory, packed.filename), `zod@${manifest.devDependencies.zod}`],
     { cwd: project, maxBuffer: 8 * 1024 * 1024 },
   );
+  await writeFile(resolve(project, "channels.mjs"), `
+import assert from "node:assert/strict";
+import { createWorkflowContext, createChannel, spawn, task, agent as rootAgent } from "runling";
+import { connectAgent, agent } from "runling/agents";
+assert.equal(agent, rootAgent);
+const connected = connectAgent(createWorkflowContext(), {
+  async runOutcome() { return { outcome: "completed", summary: "connected", usage: createWorkflowContext().usage }; },
+});
+assert.equal((await connected.runOutcome("hello")).summary, "connected");
+await connected.dispose();
+const worker = task(async ctx => {
+  let total = 0;
+  for await (const value of ctx.inbox) { total += value; await ctx.emit(total); }
+  return total;
+});
+const child = spawn(createWorkflowContext(), worker);
+await child.send(2);
+await child.send(3);
+child.closeInput();
+const updates = [];
+for await (const update of child.updates) updates.push(update);
+assert.deepEqual(updates, [2, 5]);
+assert.equal(await child.result, 5);
+const channel = createChannel({ capacity: 1 });
+channel.close();
+await assert.rejects(channel.send(1), { name: "ChannelClosedError" });
+`);
+  await exec(process.execPath, ["channels.mjs"], { cwd: project });
   await writeFile(resolve(project, "message.txt"), "consumer cwd");
   await writeFile(
     resolve(project, ".env"),
@@ -81,7 +109,17 @@ export default task({ name: "Consumer echo", input: z.object({ topic: z.string()
     resolve(project, "cli.ts"),
     `import { task, Type, exec, step, log, createWorkflowContext } from "runling";
 import * as git from "runling/git";
-export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, (ctx, input) => {
+import { connectAgent, agent, runAgent, defineAgentExtension } from "runling/agents";
+async function checkAgents() {
+const connection = connectAgent(createWorkflowContext(), {
+  async runOutcome() { return { outcome: "completed", summary: "ok", usage: createWorkflowContext().usage }; },
+});
+if ((await connection.runOutcome("test")).summary !== "ok") throw new Error("Agent connection failed");
+await connection.dispose();
+}
+if ([agent, runAgent, defineAgentExtension].some(value => typeof value !== "function")) throw new Error("Missing agent exports");
+export default task({ name: "CLI echo", input: Type.String(), output: Type.String() }, async (ctx, input) => {
+  await checkAgents();
   if (typeof git.getPwd !== "function" || typeof git.workingTreeHash !== "function" || typeof git.WorkingDirectory.create !== "function") throw new Error("Git helpers were not exported");
   if (process.env.RUNLING_PACKAGE_TEST_ENV !== "loaded") throw new Error("Project .env was not loaded");
   if (createWorkflowContext().usage.input !== 0 || "cwd" in ctx) throw new Error("Invalid workflow context");

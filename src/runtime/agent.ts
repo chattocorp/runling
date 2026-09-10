@@ -146,9 +146,9 @@ export interface RunlingAgent extends AsyncDisposable {
   /** Human-friendly ID used to prefix this agent's log lines. */
   readonly id: string;
   /** Run one turn and require it to complete successfully. */
-  run(ctx: WorkflowContext, prompt: string, options?: AgentRunOptions): Promise<CompletedAgentReport>;
+  run(ctx: WorkflowContext<unknown>, prompt: string, options?: AgentRunOptions): Promise<CompletedAgentReport>;
   /** Run one turn and return any reported outcome. */
-  runOutcome(ctx: WorkflowContext, prompt: string, options?: AgentRunOptions): Promise<AgentResult>;
+  runOutcome(ctx: WorkflowContext<unknown>, prompt: string, options?: AgentRunOptions): Promise<AgentResult>;
   /** Deliver plain text during an interaction. Resolves true when inserted into its
    * conversation, false if idle or the interaction ends before delivery. */
   steer(text: string): Promise<boolean>;
@@ -190,7 +190,7 @@ function highlightToolAction(tool: string, description: string): string {
 }
 
 export async function runAgent(
-  ctx: WorkflowContext,
+  ctx: WorkflowContext<unknown>,
   prompt: string,
   options: RunAgentOptions,
 ): Promise<AgentResult> {

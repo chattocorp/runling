@@ -23,7 +23,7 @@ export type Task<
   InputSchema extends WorkflowSchema = WorkflowSchema,
   OutputSchema extends WorkflowSchema = WorkflowSchema,
   Run extends TaskFunction = (ctx: WorkflowContext, input: SchemaOutput<InputSchema>) => SchemaInput<OutputSchema> | Promise<SchemaInput<OutputSchema>>,
-> = ((ctx: WorkflowContext, input: SchemaInput<InputSchema>) =>
+> = ((ctx: Parameters<Run>[0], input: SchemaInput<InputSchema>) =>
   InputSchema extends StandardSchemaV1 ? Promise<SchemaOutput<OutputSchema>>
     : OutputSchema extends StandardSchemaV1 ? Promise<SchemaOutput<OutputSchema>> : ReturnType<Run>
 ) & Readonly<TaskDefinition<InputSchema, OutputSchema>>;

@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^runling\/agents$/,
+        replacement: fileURLToPath(new URL("./src/runtime/agents/index.ts", import.meta.url)),
+      },
+      {
         find: /^runling$/,
         replacement: fileURLToPath(
           new URL("./src/runtime/index.ts", import.meta.url),

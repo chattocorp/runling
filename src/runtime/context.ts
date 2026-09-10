@@ -1,4 +1,3 @@
-import type { WorkflowMessages } from "./messages.ts";
 import type { InputHandler } from "./input.ts";
 import {
   accumulateTokenUsage,
@@ -18,19 +17,28 @@ export class WorkflowAbortError extends Error {
 
 export type TextHandler = (text: string) => void | Promise<void>;
 
-export interface WorkflowContext {
-  /** Optional incoming-message channel assigned by the parent task. */
-  messages?: WorkflowMessages;
+export interface WorkflowContext<Incoming = never, Update = unknown> {
+  /** Incoming values for a spawned task; empty for a normal context. */
+  readonly inbox: AsyncIterable<Incoming>;
+
+  /** Queue an update for the spawning parent; no-op on a normal context. */
+  emit(update: Update): Promise<void>;
+
   /** Deliver user-facing text. Await the handler to wait for delivery. */
   onText?: TextHandler;
+
   /** Handle questions from this context. Hosts can supply the initial handler. */
   onInput?: InputHandler;
+
   /** Signals cancellation to agents and other cooperative work. */
   readonly signal: AbortSignal;
+
   /** Abort this workflow and throw its abort error. The first reason is retained. */
   abort(reason?: string): never;
+
   /** A shared read-only view of all usage recorded in this execution. */
   readonly usage: Readonly<TokenUsage>;
+
   /** Add one usage increment, including any reported cost in US dollars. */
   recordUsage(usage: TokenUsageInput): void;
 }
@@ -47,26 +55,47 @@ export function createObservedWorkflowContext(
 ): WorkflowContext {
   const total = emptyTokenUsage();
   const controller = new AbortController();
-  const signal = cancellation ? AbortSignal.any([controller.signal, cancellation]) : controller.signal;
+  const signal = cancellation
+    ? AbortSignal.any([controller.signal, cancellation])
+    : controller.signal;
+
   const usage: Readonly<TokenUsage> = Object.freeze({
-    get input() { return total.input; },
-    get output() { return total.output; },
-    get cacheRead() { return total.cacheRead; },
-    get cacheWrite() { return total.cacheWrite; },
-    get cost() { return total.cost; },
-    get costIncomplete() { return total.costIncomplete; },
+    get input() {
+      return total.input;
+    },
+    get output() {
+      return total.output;
+    },
+    get cacheRead() {
+      return total.cacheRead;
+    },
+    get cacheWrite() {
+      return total.cacheWrite;
+    },
+    get cost() {
+      return total.cost;
+    },
+    get costIncomplete() {
+      return total.costIncomplete;
+    },
   });
+
   return {
+    // Direct calls do not allocate channels or retain emitted updates.
+    inbox: { async *[Symbol.asyncIterator]() {} },
+    async emit() {},
     onInput: undefined,
     onText: undefined,
     signal,
     usage,
+
     abort(reason) {
       if (!signal.aborted) {
         controller.abort(new WorkflowAbortError(reason));
       }
       throw signal.reason;
     },
+
     recordUsage(usage) {
       if (!hasValidTokenCounts(usage)) return;
       accumulateTokenUsage(total, usage);
