@@ -214,6 +214,8 @@ test("does not permit starts through a retained routing context after the router
   const start = vi.fn(async () => ({ id: "unused" }));
   await handleWebhook("capture", request(), { config, start });
   await expect(saved.start(echo, { input: "late" })).rejects.toThrow("routing has finished");
+  void saved.start(echo, { input: "detached late call" });
+  await new Promise(resolve => setTimeout(resolve, 0));
   expect(start).not.toHaveBeenCalled();
 });
 
@@ -235,3 +237,13 @@ function typeChecks(ctx: WebhookContext) {
   // @ts-expect-error task input is required
   ctx.start(echo, {});
 }
+
+
+test("routers may return a start promise without changing the HTTP response", async () => {
+  const config = defineWebConfig({ webhooks: {
+    direct: ctx => ctx.start(echo, { input: "hello" }),
+  } });
+
+  const response = await handleWebhook("direct", request(), { config, start: host().start });
+  expect(await response.json()).toEqual({ runs: [{ id: "run-1" }] });
+});

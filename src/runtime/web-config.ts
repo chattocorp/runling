@@ -18,7 +18,7 @@ export interface WebhookContext {
 
 /** A route may start any number of workflows or handle the delivery itself. */
 export type WebhookRouter<Input = unknown> = (
-  (ctx: WebhookContext, input: Input) => void | Promise<void>
+  (ctx: WebhookContext, input: Input) => unknown
 ) & {
   label?: string;
   /** Optional boundary validation and schema discovery. The router receives raw input. */
@@ -53,7 +53,10 @@ export function defineWebConfig<const Webhooks extends Record<string, WebhookRou
 ): WebConfig<Webhooks> {
   for (const [name, route] of Object.entries(config.webhooks)) {
     try {
-      if (typeof route !== "function") throw new TypeError("webhook must be a routing function");
+      if (typeof route !== "function") {
+        throw new TypeError("webhook must be a routing function");
+      }
+
       describeRouterSchemas(route);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);

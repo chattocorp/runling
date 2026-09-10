@@ -66,7 +66,13 @@ export async function handleWebhook(
   let failed = false;
   const ctx: WebhookContext = {
     start(task, options) {
-      if (!accepting) return Promise.reject(new Error("Webhook routing has finished"));
+      if (!accepting) {
+        const rejection = Promise.reject<StartedRun>(new Error("Webhook routing has finished"));
+        // A detached callback must not create an unhandled rejection in the host.
+        void rejection.catch(() => {});
+        return rejection;
+      }
+
 
       const registration = Promise.resolve().then(() => start(task, options));
       pending.push(registration);

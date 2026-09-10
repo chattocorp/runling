@@ -49,6 +49,7 @@ export default defineWebConfig({
 });
 ```
 
+Router return values are ignored; return `ctx.start(...)` directly if convenient.
 Await all routing work before returning. The host observes starts already
 initiated by the router, including calls it did not await. A retained routing
 context cannot start runs after the router returns. Workflow completion is
