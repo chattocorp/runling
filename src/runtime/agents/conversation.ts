@@ -40,7 +40,7 @@ export async function runAgentConversation(
     return message.value;
   };
 
-  await using connection = connectAgent(ctx, agent, {
+  const connection = connectAgent(ctx, agent, {
     inbox: ctx.inbox,
     onText: text => ctx.emit(text),
     onDelivery: async (text, consumed) => {
@@ -90,10 +90,14 @@ export async function runAgentConversation(
       }
     }
   } finally {
-    // Release the pending read on every exit. `await using` disconnects the
-    // inbox and agent callbacks; it does not dispose the caller's agent.
-    onBusy?.(false);
-    pending.close();
-    await reader.return?.();
+    // Explicit cleanup also works on Node 22, which cannot parse `await using`.
+    // Disconnecting releases callbacks, but does not dispose the caller's agent.
+    try {
+      onBusy?.(false);
+    } finally {
+      pending.close();
+      await reader.return?.();
+      await connection.dispose();
+    }
   }
 }
