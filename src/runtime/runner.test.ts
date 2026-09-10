@@ -631,6 +631,41 @@ test("completed executions retain usage snapshots after the context changes", as
   expect(contexts[0]!.usage.input).toBe(3);
 });
 
+test("passes text handlers through nested tasks and isolates concurrent runs", async () => {
+  const first: string[] = [];
+  const second: string[] = [];
+  const leaf = task(async (ctx, text: string) => { await ctx.onText?.(text); });
+  const root = task(async (ctx) => {
+    await Promise.all([leaf(ctx, "one"), leaf(ctx, "two")]);
+    const parent = ctx.onText;
+    await leaf({ ...ctx, onText: async text => { await parent?.(`child: ${text}`); } }, "three");
+    await leaf(ctx, "four");
+  });
+  const results = await Promise.all([
+    runWorkflow(root, { input: undefined, onText: async text => { first.push(text); } }),
+    runWorkflow(root, { input: undefined, onText: text => { second.push(text); } }),
+  ]);
+  expect(results.every(result => result.ok)).toBe(true);
+  expect(first).toEqual(["one", "two", "child: three", "four"]);
+  expect(second).toEqual(first);
+  expect((await runWorkflow(root, { input: undefined })).ok).toBe(true);
+});
+
+test("awaits text delivery and reports handler failures through normal task errors", async () => {
+  let release!: () => void;
+  const delivered = new Promise<void>(resolve => { release = resolve; });
+  let finished = false;
+  const root = task(async ctx => { await ctx.onText?.("hello"); finished = true; });
+  const execution = runWorkflow(root, { input: undefined, onText: () => delivered });
+  expect(finished).toBe(false);
+  release();
+  expect((await execution).ok).toBe(true);
+  expect(finished).toBe(true);
+  const failure = await runWorkflow(root, { input: undefined, onText: async () => { throw new Error("delivery failed"); } });
+  expect(failure.ok).toBe(false);
+  expect(failure.error).toContain("delivery failed");
+});
+
 test("does not start a workflow when the host signal is already aborted", async () => {
   let called = false;
   const execution = await runWorkflow(() => { called = true; }, {

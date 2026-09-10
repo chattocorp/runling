@@ -17,6 +17,7 @@
   let pending = $state(false);
   let error = $state("");
   let notice = $state("");
+  let startedRuns = $state<{ id: string }[]>([]);
   let schemaTab = $state<"input" | "output">("input");
   let origin = $state("");
   let copied = $state(false);
@@ -30,6 +31,7 @@
     if (pending) return;
     error = "";
     notice = "";
+    startedRuns = [];
     try {
       JSON.parse(body);
     } catch {
@@ -47,6 +49,7 @@
         },
       );
       const result = await response.json();
+      startedRuns = result.runs ?? [];
       if (!response.ok)
         throw new Error(
           [
@@ -57,11 +60,15 @@
             ),
           ].join("\n"),
         );
-      if (result.handled) {
+      if (!startedRuns.length) {
         notice = "Message handled. No new run was started.";
         return;
       }
-      onstarted(result.id);
+      if (startedRuns.length > 1) {
+        notice = `Started ${startedRuns.length} runs.`;
+        return;
+      }
+      onstarted(startedRuns[0]!.id);
       dialog.close();
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
@@ -132,12 +139,12 @@
               class="btn btn-sm btn-ghost"
               type="button"
               class:btn-active={schemaTab === "input"}
-              onclick={() => (schemaTab = "input")}>Workflow input</button
+              onclick={() => (schemaTab = "input")}>Webhook input</button
             ><button
               class="btn btn-sm btn-ghost"
               type="button"
               class:btn-active={schemaTab === "output"}
-              onclick={() => (schemaTab = "output")}>Workflow output</button
+              onclick={() => (schemaTab = "output")}>Workflow output (when declared)</button
             >
           </div>
           <pre
@@ -149,6 +156,16 @@
         </div>
       </details>
       {#if notice}<p class="alert alert-info" role="status">{notice}</p>{/if}
+      {#if startedRuns.length}
+        <ul class="mt-3 flex flex-wrap gap-2">
+          {#each startedRuns as run (run.id)}
+            <li><button type="button" class="btn btn-sm btn-ghost" onclick={() => {
+              onstarted(run.id);
+              dialog.close();
+            }}>Open run {run.id.slice(0, 8)}</button></li>
+          {/each}
+        </ul>
+      {/if}
       {#if error}<p id="request-error" class="alert alert-error" role="alert">
           {error}
         </p>{/if}

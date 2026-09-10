@@ -1,3 +1,5 @@
+import type { WebhookTask } from "runling/web";
+import { serverLog } from "../../runtime/server-log.ts";
 import {
   mkdir,
   readdir,
@@ -12,10 +14,7 @@ import { randomUUID } from "node:crypto";
 import {
   emptyTokenUsage,
   runWorkflow,
-  type Task,
   type WorkflowExecution,
-  type SchemaInput,
-  type WorkflowSchema,
 } from "runling";
 import {
   type RunDetail,
@@ -92,10 +91,11 @@ export class RunStore {
           };
           await appendFile(path, `${JSON.stringify(record)}\n`);
           applyStoredRecord(run, record, false);
+          serverLog("warn", "run.interrupted", { runId: id });
         }
         this.runs.set(id, summary(run));
       } catch (cause) {
-        console.error(`Cannot restore run ${id}:`, cause);
+        serverLog("error", "run.restore_failed", { runId: id, error: cause });
       }
     }
   }
@@ -170,10 +170,10 @@ export class RunStore {
     return next;
   }
 
-  async start<I extends WorkflowSchema, O extends WorkflowSchema>(
+  async start<Input, Output>(
     webhook: string,
-    workflow: Task<I, O>,
-    input: SchemaInput<I>,
+    workflow: WebhookTask<Input, Output>,
+    input: Input,
     source: "webhook" | "web",
   ) {
     const id = randomUUID();
@@ -201,16 +201,17 @@ export class RunStore {
     const controller = new AbortController();
     this.controllers.set(id, controller);
     this.publish(id, started);
+    serverLog("info", "run.started", { runId: id, webhook, workflow: workflow.name, source });
     const completion = this.execute(id, workflow, input, controller.signal);
     // Background runs must always have a rejection handler, even after the HTTP client leaves.
-    void completion.catch((cause) => console.error(`Run ${id} failed:`, cause));
+    void completion.catch((cause) => serverLog("error", "run.error", { runId: id, error: cause }));
     return { id, completion };
   }
 
-  private async execute<I extends WorkflowSchema, O extends WorkflowSchema>(
+  private async execute<Input, Output>(
     id: string,
-    workflow: Task<I, O>,
-    input: SchemaInput<I>,
+    workflow: WebhookTask<Input, Output>,
+    input: Input,
     signal: AbortSignal,
   ): Promise<WorkflowExecution> {
     const base = performance.now();
@@ -253,6 +254,10 @@ export class RunStore {
     } finally {
       this.pending.delete(id);
     }
+    serverLog(execution.ok ? "info" : "error", "run.finished", {
+      runId: id, status: execution.ok ? "completed" : "failed",
+      durationMs: execution.durationMs, usage: execution.usage, error: execution.error,
+    });
     return execution;
   }
 }

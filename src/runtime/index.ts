@@ -1,5 +1,7 @@
+export { createChannel, ChannelClosedError, ChannelFullError, type Channel } from "./channel.ts";
+export { spawn, type TaskHandle } from "./spawn.ts";
 export { TimeoutError } from "./timeout.ts";
-export { createWorkflowContext, WorkflowAbortError, type WorkflowContext } from "./context.ts";
+export { createWorkflowContext, WorkflowAbortError, type TextHandler, type WorkflowContext } from "./context.ts";
 export {
   agent,
   type AgentExtension,

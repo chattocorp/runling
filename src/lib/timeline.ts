@@ -2,6 +2,20 @@ import type { RunlingEvent, TokenUsage } from "runling";
 import { mergeUsage } from "./usage.ts";
 import type { RunStatus } from "./runs.ts";
 
+export interface TaskMessage {
+  id: string;
+  timestamp: number;
+  direction: "input" | "update";
+  payload: string;
+  from: string;
+  to: string;
+  status:
+    | "Queued"
+    | "Read by task"
+    | "Consumed by agent"
+    | "Not consumed by agent";
+}
+
 export interface Activity {
   id: string;
   label: string;
@@ -15,13 +29,20 @@ export interface Activity {
   children: Activity[];
   usage?: TokenUsage;
   preview?: string;
+  messages?: TaskMessage[];
 }
 
 /** Running leaf work is our best signal; parent/child work can still overlap. */
 export function isActivityActive(activity: Activity): boolean {
   const hasRunningDescendant = (node: Activity): boolean =>
-    node.children.some((child) => child.status === "running" || hasRunningDescendant(child));
-  return activity.status === "running" && activity.kind !== "input" && !hasRunningDescendant(activity);
+    node.children.some(
+      (child) => child.status === "running" || hasRunningDescendant(child),
+    );
+  return (
+    activity.status === "running" &&
+    activity.kind !== "input" &&
+    !hasRunningDescendant(activity)
+  );
 }
 
 export function buildTimeline(
@@ -66,7 +87,8 @@ export function buildTimeline(
       if (node) {
         node.status = event.status === "answered" ? "completed" : event.status;
         node.durationMs = event.durationMs;
-        if (event.type === "input.finished" && event.status === "failed") node.reason = event.reason;
+        if (event.type === "input.finished" && event.status === "failed")
+          node.reason = event.reason;
         if (event.type === "command.finished") {
           if (event.output.stdout) node.logs.push(event.output.stdout);
           if (event.output.stderr) node.logs.push(event.output.stderr);
@@ -120,6 +142,53 @@ export function buildTimeline(
       node?.logs.push(event.message);
     }
   }
+  // Resolve links after all events: schema parsing can delay a child's first step.
+  const links = new Map(
+    events.flatMap((event) =>
+      event.type === "task.linked"
+        ? [[event.channelId, event.taskId] as const]
+        : [],
+    ),
+  );
+  const reads = new Set(
+    events.flatMap((event) =>
+      event.type === "message.read" ? [event.id] : [],
+    ),
+  );
+  const receipts = new Map(
+    events.flatMap((event) =>
+      event.type === "message.receipt"
+        ? [[event.id, event.consumed] as const]
+        : [],
+    ),
+  );
+
+  for (const event of events) {
+    if (event.type !== "message.sent") continue;
+    const child = nodes.get(links.get(event.channelId) ?? "");
+    const parent = nodes.get(event.activityId ?? "");
+    const lane = child ?? parent;
+    if (!lane) continue;
+
+    const from = event.direction === "input" ? parent : child;
+    const to = event.direction === "input" ? child : parent;
+    (lane.messages ??= []).push({
+      id: event.id,
+      timestamp: event.timestamp,
+      direction: event.direction,
+      payload: event.payload,
+      from: from?.label ?? "Caller",
+      to: to?.label ?? "Task",
+      status: receipts.has(event.id)
+        ? receipts.get(event.id)
+          ? "Consumed by agent"
+          : "Not consumed by agent"
+        : reads.has(event.id)
+          ? "Read by task"
+          : "Queued",
+    });
+  }
+
   // Prefer formatted log events. Older activity instances may only have actions.
   for (const [id, actions] of actionLogs) {
     const node = nodes.get(id)!;

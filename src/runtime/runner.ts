@@ -1,5 +1,5 @@
 import { createTimeout } from "./timeout.ts";
-import { createObservedWorkflowContext, type WorkflowContext } from "./context.ts";
+import { createObservedWorkflowContext, type WorkflowContext, type TextHandler } from "./context.ts";
 import { withExecutionServices } from "./execution.ts";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -81,6 +81,7 @@ export interface RunWorkflowOptions<Input = unknown> {
   input: Input;
   verbose?: boolean;
   onInput?: InputHandler;
+  onText?: TextHandler;
   onEvent?: RunlingEventListener;
 }
 
@@ -169,12 +170,12 @@ export async function executeWorkflow(
 /** Run a workflow without assuming a terminal, printing, or changing process state. */
 export async function runWorkflow<Input, Output>(
   run: (ctx: WorkflowContext, input: Input) => Output,
-  { input, verbose = false, onInput, onEvent = () => {}, timeout, signal }: RunWorkflowOptions<Input>,
+  { input, verbose = false, onInput, onText, onEvent = () => {}, timeout, signal }: RunWorkflowOptions<Input>,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
   return withExecutionServices({ verbose }, () =>
     observeRunlingEvents(onEvent, () =>
       log.withDestination("silent", () =>
-        captureExecution(ctx => log.indented(() => run(ctx, input)), onInput, timeout, signal),
+        captureExecution(ctx => log.indented(() => run(ctx, input)), onInput, timeout, signal, onText),
       ),
     ),
   );
@@ -244,12 +245,14 @@ async function captureExecution<Output>(
   onInput?: InputHandler,
   timeout?: number,
   signal?: AbortSignal,
+  onText?: TextHandler,
 ): Promise<WorkflowExecution<Awaited<Output>>> {
   const deadline = createTimeout(timeout, "Workflow");
   const ctx = createObservedWorkflowContext(bindRunlingContext((usage: TokenUsage) =>
     emitRunlingEvent({ type: "usage.updated", usage }),
   ), signal && deadline.signal ? AbortSignal.any([signal, deadline.signal]) : signal ?? deadline.signal);
   ctx.onInput = onInput;
+  ctx.onText = onText;
   const start = performance.now();
   let result: WorkflowResult | null = null;
   let output: Awaited<Output> | null = null;

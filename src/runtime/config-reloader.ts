@@ -1,8 +1,10 @@
+import { serverLog } from "./server-log.ts";
 import { dirname, relative, sep } from "node:path";
 import { stat } from "node:fs/promises";
 import { watch } from "chokidar";
 import { createJiti } from "jiti";
 import * as runling from "./index.ts";
+import * as agents from "./agents/index.ts";
 import * as web from "./web-config.ts";
 import { isWebConfig, type WebConfig } from "./web-config.ts";
 
@@ -43,7 +45,7 @@ export class ConfigReloader {
       this.watcher.on("error", (error) => {
         reject(error);
         this.error = `Configuration watcher failed: ${error instanceof Error ? error.message : String(error)}`;
-        console.error(this.error);
+        serverLog("error", "config.watch_failed", { config: this.path, message: this.error });
         for (const listener of this.listeners) listener();
       });
     });
@@ -93,7 +95,7 @@ export class ConfigReloader {
         tryNative: false,
         interopDefault: false,
         // Reuse the host runtime: live events must reach its AsyncLocalStorage.
-        virtualModules: { runling, "runling/web": web },
+        virtualModules: { runling, "runling/agents": agents, "runling/web": web },
       });
       const module = await jiti.import<{ default?: unknown }>(this.path);
       if (!isWebConfig(module.default))
@@ -106,7 +108,7 @@ export class ConfigReloader {
       this.revision++;
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);
-      console.error(`Config reload failed: ${this.error}`);
+      serverLog("error", "config.reload_failed", { config: this.path, message: `Config reload failed: ${this.error}` });
       if (!this.current) throw error;
     } finally {
       for (const listener of this.listeners) listener();

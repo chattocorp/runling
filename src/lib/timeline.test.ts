@@ -285,3 +285,22 @@ test("input outcomes retain failure reasons and old journals still render", () =
   expect(activityStatus(answered)).toBe("answered");
   expect(answered.logs).toContain("Yes");
 });
+
+test("message markers resolve delayed task links and distinguish queue, read, and agent receipts", () => {
+  const nodes = buildTimeline([
+    { type: "step.started", id: "parent", label: "Coordinator", timestamp: 0 },
+    { type: "message.sent", id: "q", channelId: "channel", direction: "input", payload: "queued", activityId: "parent", timestamp: 1 },
+    { type: "step.started", id: "child", label: "Investigator", activityId: "parent", timestamp: 2 },
+    { type: "task.linked", channelId: "channel", taskId: "child", timestamp: 2 },
+    { type: "message.sent", id: "r", channelId: "channel", direction: "input", payload: "read", activityId: "parent", timestamp: 3 },
+    { type: "message.read", id: "r", timestamp: 4 },
+    { type: "message.sent", id: "a", channelId: "channel", direction: "input", payload: "agent", activityId: "parent", timestamp: 5 },
+    { type: "message.receipt", id: "a", consumed: true, timestamp: 6 },
+    { type: "message.sent", id: "u", channelId: "channel", direction: "update", payload: "result", activityId: "parent", timestamp: 7 },
+    { type: "message.read", id: "u", timestamp: 8 },
+  ], "running");
+  const messages = nodes[0]!.children[0]!.messages!;
+  expect(messages.map(message => message.status)).toEqual(["Queued", "Read by task", "Consumed by agent", "Read by task"]);
+  expect(messages[0]).toMatchObject({ from: "Coordinator", to: "Investigator" });
+  expect(messages[3]).toMatchObject({ from: "Investigator", to: "Coordinator" });
+});

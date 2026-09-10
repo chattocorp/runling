@@ -11,7 +11,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=22.18.0"
+    "node": ">=22.19.0"
   },
   "keywords": [
     "pi-package"
@@ -42,6 +42,11 @@
       "runling-source": "./src/runtime/config-reloader.ts",
       "types": "./dist/src/runtime/config-reloader.d.ts",
       "default": "./dist/src/runtime/config-reloader.js"
+    },
+    "./agents": {
+      "runling-source": "./src/runtime/agents/index.ts",
+      "types": "./dist/src/runtime/agents/index.d.ts",
+      "default": "./dist/src/runtime/agents/index.js"
     }
   },
   "imports": {

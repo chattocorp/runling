@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^runling\/agents$/,
+        replacement: fileURLToPath(new URL("./src/runtime/agents/index.ts", import.meta.url)),
+      },
+      {
         find: /^runling$/,
         replacement: fileURLToPath(
           new URL("./src/runtime/index.ts", import.meta.url),
@@ -26,7 +30,7 @@ export default defineConfig({
   },
   test: {
     include: ["**/*.test.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.context/**"],
     testTimeout: 15000,
     fileParallelism: false,
   },
