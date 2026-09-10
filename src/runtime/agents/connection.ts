@@ -72,20 +72,22 @@ export function connectAgent(
       const message = await interruptible(Promise.resolve(inbox.next()));
       if (message.done || disposed || signal.aborted) return;
 
-      delivery = (async () => {
-        let consumed = false;
-        if (active && agent.steer) {
-          consumed = await interruptible(
-            Promise.resolve()
+      // Queue steering immediately. A receipt may wait for the next agent turn;
+      // it must not prevent later user messages from reaching that same turn.
+      const consumed =
+        active && agent.steer
+          ? Promise.resolve()
               .then(() => agent.steer!(message.value))
-              .catch(() => false),
-          );
-        }
+              .catch(() => false)
+          : Promise.resolve(false);
 
+      // Keep acknowledgement callbacks ordered even if receipts settle out of order.
+      delivery = delivery.then(async () => {
+        const delivered = await interruptible(consumed);
         signal.throwIfAborted();
-        await options.onDelivery?.(message.value, consumed);
-      })();
-      await interruptible(delivery);
+        await options.onDelivery?.(message.value, delivered);
+      });
+      void delivery.catch((reason) => controller.abort(reason));
     }
   }
 

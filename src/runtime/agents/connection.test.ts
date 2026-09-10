@@ -439,3 +439,24 @@ test("waits for a pending delivery callback before completing the turn", async (
   await run;
   expect(settled).toHaveBeenCalledOnce();
 });
+
+test("forwards later messages while an earlier consumption acknowledgement is pending", async () => {
+  const f = fixture();
+  await using connection = f.connection;
+  const first = Promise.withResolvers<boolean>();
+  f.worker.steer.mockImplementationOnce(() => first.promise);
+  const run = connection.runOutcome("Go");
+  void run.catch(() => {});
+  await f.inbox.send("first");
+  await vi.waitFor(() => expect(f.worker.steer).toHaveBeenCalledOnce());
+  await f.inbox.send("second");
+  await vi.waitFor(() => expect(f.worker.steer).toHaveBeenCalledTimes(2));
+
+  first.resolve(true);
+  f.done.resolve(report);
+  await run;
+  expect(f.onDelivery.mock.calls).toEqual([
+    ["first", true],
+    ["second", true],
+  ]);
+});

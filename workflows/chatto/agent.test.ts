@@ -98,7 +98,7 @@ test("overflow remains in the host backlog and can be delivered on a later turn"
   f.agent.steer.mockImplementationOnce(() => gate.promise);
   const run = f.run();
   for (let i = 0; i < 100; i++) f.inbox.push(String(i));
-  await vi.waitFor(() => expect(f.agent.steer).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(f.agent.steer).toHaveBeenCalledTimes(65));
   gate.resolve(true);
   await vi.waitFor(() => expect(f.agent.steer).toHaveBeenCalledTimes(65));
   f.finish();

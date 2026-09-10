@@ -40,7 +40,9 @@ automatically. The callbacks can instead post to a host or collect test results.
 A connection owns one inbox iterator across sequential turns. Call
 `connection.runOutcome(prompt)` again for a repair or follow-up. Overlapping
 turns are rejected. Input starts draining after the first interaction starts.
-Closing input does not end the interaction.
+Closing input does not end the interaction. Pending consumption acknowledgements
+do not prevent later messages from being forwarded. Delivery callbacks retain
+the original message order.
 
 `onDelivery` reports whether the agent consumed a message. Idle, rejected, or
 unsupported steering reports `false`. The sender must retain or reroute missed
