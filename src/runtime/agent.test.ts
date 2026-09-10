@@ -858,6 +858,38 @@ describe("runAgent", () => {
     expect(sessionOptions.tools).not.toContain("web_fetch");
   });
 
+  test("enables only explicit web tools with resource discovery disabled", async () => {
+    const { default: webFetchExtension } = await import("../../extensions/web-fetch.ts");
+    const extension = { name: "runling-web-fetch", factory: webFetchExtension };
+    promptImplementation = async () => {
+      await reportOutcome({ outcome: "completed", summary: "Fetched" });
+    };
+
+    await runAgent(createWorkflowContext(), "Read a public URL", {
+      cwd: "/project",
+      model: "anthropic/claude-opus-4-5",
+      tools: ["web_fetch"],
+      extensions: [extension],
+      resources: {
+        extensions: false,
+        skills: false,
+        promptTemplates: false,
+        themes: false,
+        contextFiles: false,
+      },
+    });
+
+    expect(sessionOptions.tools).toEqual(["web_fetch", "report_outcome"]);
+    expect(resourceOptions).toMatchObject({
+      extensionFactories: [extension],
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
+      noContextFiles: true,
+    });
+  });
+
   test("applies execution and resource boundaries", async () => {
     promptImplementation = async () => {
       await reportOutcome({ outcome: "completed", summary: "Reviewed" });
@@ -1350,4 +1382,82 @@ test("retains earlier findings when a later report refers back to them, without 
   };
   const next = await worker.runOutcome(createWorkflowContext(), "Other");
   expect(next.details).toBeUndefined();
+});
+
+test("text mode delivers a natural response once without report tools or retries", async () => {
+  const text = vi.fn();
+  promptImplementation = async () => {
+    emitAssistantText("Hello!");
+  };
+  const bot = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5", tools: [], output: "text" });
+  try {
+    const result = await bot.run(createWorkflowContext(), "Hi", { onText: text });
+    expect(result).toMatchObject({ outcome: "completed", summary: "Hello!" });
+    expect(text.mock.calls).toEqual([["Hello!"]]);
+    expect(promptCalls).toBe(1);
+    expect(sessionOptions.customTools).toEqual([]);
+    expect(sessionOptions.tools).toEqual([]);
+    expect(resourceOptions.appendSystemPromptOverride(["Base"])).toEqual(["Base"]);
+  } finally {
+    bot.dispose();
+  }
+});
+
+test("text mode keeps progress delivery but returns only the final response", async () => {
+  const text = vi.fn();
+  promptImplementation = async () => {
+    emitAssistantText("Checking the page.");
+    emitAssistantText("Here is the answer.");
+  };
+  const bot = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5", output: "text" });
+  try {
+    expect((await bot.run(createWorkflowContext(), "Look it up", { onText: text })).summary).toBe("Here is the answer.");
+    expect(text.mock.calls).toEqual([["Checking the page."], ["Here is the answer."]]);
+  } finally {
+    bot.dispose();
+  }
+});
+
+test.each(["error", "aborted", "empty"])("text mode does not report success after %s", async reason => {
+  promptImplementation = async () => {
+    eventHandler?.({
+      type: "message_end",
+      message: {
+        role: "assistant", content: reason === "empty" ? [] : [{ type: "text", text: "Partial" }],
+        stopReason: reason === "empty" ? "stop" : reason,
+        errorMessage: reason === "empty" ? undefined : "Provider failed",
+      },
+    });
+  };
+  const result = await runAgent(createWorkflowContext(), "Hi", {
+    cwd: "/project", model: "anthropic/claude-opus-4-5", output: "text",
+  });
+  expect(result.outcome).toBe("failed");
+  expect(promptCalls).toBe(1);
+});
+
+test("text mode retains usage accounting and resets response state between turns", async () => {
+  const ctx = createWorkflowContext();
+  const bot = await agent({ cwd: "/project", model: "anthropic/claude-opus-4-5", output: "text" });
+  promptImplementation = async () => {
+    eventHandler?.({
+      type: "message_end",
+      message: {
+        role: "assistant", content: [{ type: "text", text: "First" }],
+        usage: { input: 10, output: 2, cacheRead: 0, cacheWrite: 0 },
+        stopReason: "stop",
+      },
+    });
+  };
+  try {
+    const first = await bot.run(ctx, "Hi");
+    expect(first.usage.input).toBe(10);
+    expect(ctx.usage.input).toBe(10);
+
+    promptImplementation = async () => {};
+    expect((await bot.runOutcome(ctx, "Again")).outcome).toBe("failed");
+    expect(ctx.usage.input).toBe(10);
+  } finally {
+    bot.dispose();
+  }
 });

@@ -202,6 +202,15 @@
           height={height * 0.6}
           data-kind={node.kind}
         />
+        {#each node.segments ?? [] as segment}
+          <rect
+            class={segment.kind === "input" ? "fill-warning" : "fill-secondary"}
+            x={(segment.startedAt / total) * 1000}
+            y={top + height * 0.2}
+            width={Math.max(1, ((segment.durationMs ?? Math.max(0, elapsed - segment.startedAt)) / total) * 1000)}
+            height={height * 0.6}
+          />
+        {/each}
       {/each}
     </svg>
     <span

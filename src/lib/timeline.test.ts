@@ -304,3 +304,28 @@ test("message markers resolve delayed task links and distinguish queue, read, an
   expect(messages[0]).toMatchObject({ from: "Coordinator", to: "Investigator" });
   expect(messages[3]).toMatchObject({ from: "Investigator", to: "Coordinator" });
 });
+
+test("conversation turns and waits share one lane without doubling usage", () => {
+  const usage = { input: 10, output: 2, cacheRead: 0, cacheWrite: 0 };
+  const events: RunlingEvent[] = [
+    { type: "step.started", id: "chat", label: "Conversation", timestamp: 0 },
+    { type: "conversation.started", activityId: "chat", timestamp: 0 },
+    { type: "agent.started", agentId: "bot", model: "luna", color: "purple", activityId: "chat", timestamp: 1 },
+    { type: "agent.finished", agentId: "bot", outcome: "completed", usage, activityId: "chat", timestamp: 5 },
+    { type: "input.requested", id: "wait", message: "Next message", activityId: "chat", timestamp: 5 },
+    { type: "input.finished", id: "wait", status: "answered", value: "Hello", durationMs: 5, activityId: "chat", timestamp: 10 },
+    { type: "agent.started", agentId: "bot", model: "luna", color: "purple", activityId: "chat", timestamp: 10 },
+    { type: "agent.finished", agentId: "bot", outcome: "completed", usage, activityId: "chat", timestamp: 15 },
+    { type: "input.requested", id: "waiting", message: "Next message", activityId: "chat", timestamp: 15 },
+  ];
+  const [chat] = buildTimeline(events, "running");
+  expect(chat!.children).toEqual([]);
+  expect(chat!.segments?.map(segment => segment.kind)).toEqual(["agent", "input", "agent", "input"]);
+  expect(chat!.usage?.input).toBe(20);
+  expect(isActivityActive(chat!)).toBe(false);
+  expect(chat!.logs).toContain("Hello");
+
+  const ordinary = buildTimeline(events.filter(event => event.type !== "conversation.started"), "running")[0]!;
+  expect(ordinary.children).toHaveLength(4);
+  expect(ordinary.segments).toBeUndefined();
+});
