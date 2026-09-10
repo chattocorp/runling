@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import ConversationSegments from "./ConversationSegments.svelte";
   import ColumnResizer from "./ColumnResizer.svelte";
   import Usage from "./Usage.svelte";
   import AnsiText from "./AnsiText.svelte";
@@ -536,6 +537,9 @@
                   onclick={() => onselect(node.id)}
                   title={`${node.label}\n${activityStatus(node)} · ${duration(end - node.startedAt)}\nStart: ${duration(node.startedAt)}${node.preview ? `\n${node.preview}` : ""}`}
                 >
+                  {#if node.segments}
+                    <ConversationSegments segments={node.segments} start={node.startedAt} {end} {elapsed} {view} width={plotWidth} />
+                  {/if}
                   {#if isActivityActive(node)}
                     <span class="relative ml-2 flex shrink-0 items-center" title="Active task">
                       <ActivityIndicator />
@@ -547,6 +551,7 @@
                       aria-hidden="true">‹‹</span
                     >
                   {/if}
+                  {#if !node.segments}
                   <span
                     class="relative z-1 text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis min-w-0 flex-1"
                     class:pl-2={!isActivityActive(node)}
@@ -566,6 +571,7 @@
                       class="absolute top-0 bottom-0 w-5 grid place-items-center bg-black/20 text-lg leading-none tracking-tighter pointer-events-none z-1 right-0 border-l border-l-current/40 border-dashed"
                       aria-hidden="true">››</span
                     >
+                  {/if}
                   {/if}
                 </button>
               {/if}

@@ -30,10 +30,13 @@ export interface Activity {
   usage?: TokenUsage;
   preview?: string;
   messages?: TaskMessage[];
+  /** Model turns and input waits displayed on this conversation lane. */
+  segments?: Activity[];
 }
 
 /** Running leaf work is our best signal; parent/child work can still overlap. */
 export function isActivityActive(activity: Activity): boolean {
+  if (activity.segments?.some(segment => segment.kind === "input" && segment.status === "running")) return false;
   const hasRunningDescendant = (node: Activity): boolean =>
     node.children.some(
       (child) => child.status === "running" || hasRunningDescendant(child),
@@ -50,6 +53,7 @@ export function buildTimeline(
   runStatus: RunStatus,
 ): Activity[] {
   const nodes = new Map<string, Activity>();
+  const conversations = new Set<string>();
   const agents = new Map<string, string>();
   const progressAgents = new Set<string>();
   const actionLogs = new Map<string, string[]>();
@@ -67,6 +71,7 @@ export function buildTimeline(
       logs: [],
       children: [],
     };
+    if (event.type === "conversation.started" && event.activityId) conversations.add(event.activityId);
     if (event.type === "step.started")
       add({ ...base, id: event.id, kind: "step", label: event.label });
     if (event.type === "command.started")
@@ -199,11 +204,23 @@ export function buildTimeline(
       if (node.status === "running") node.status = "interrupted";
     }
   }
+  // Only explicitly marked conversation tasks combine turns and waits. Ordinary
+  // workflows and historical journals retain their existing activity layout.
+  for (const id of conversations) {
+    const node = nodes.get(id);
+    if (!node) continue;
+    node.segments = node.children.filter(child => child.kind === "agent" || child.kind === "input");
+    node.children = node.children.filter(child => !node.segments!.includes(child));
+    for (const segment of node.segments) {
+      node.logs.push(`[${segment.startedAt.toFixed(0)}ms] ${segment.label}`, ...segment.logs);
+    }
+  }
+
   const aggregate = (node: Activity): void => {
     node.children.forEach(aggregate);
     if (node.kind === "step")
       node.usage = mergeUsage(
-        node.children.flatMap((child) => (child.usage ? [child.usage] : [])),
+        [...node.children, ...(node.segments ?? [])].flatMap((child) => (child.usage ? [child.usage] : [])),
       );
   };
   roots.forEach(aggregate);
@@ -223,6 +240,9 @@ export function findActivity(
 
 /** Input waits are activities, not a paused workflow. */
 export function activityStatus(activity: Activity): string {
+  if (activity.segments?.some(segment => segment.kind === "input" && segment.status === "running")) {
+    return "waiting for input";
+  }
   if (activity.kind !== "input") return activity.status;
   if (activity.status === "running") return "waiting for input";
   if (activity.status === "completed") return "answered";

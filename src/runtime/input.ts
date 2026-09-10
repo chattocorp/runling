@@ -92,7 +92,7 @@ export const createInput = (handleInput?: InputHandler): Input =>
 
 /** Ask through the handler supplied by this context. */
 export const input = (
-  ctx: WorkflowContext,
+  ctx: WorkflowContext<unknown, never>,
   message: string,
   options: InputOptions = {},
 ): Promise<string> => createInput(ctx.onInput)(message, {

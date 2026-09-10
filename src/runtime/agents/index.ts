@@ -20,3 +20,5 @@ export {
   type AgentConnectionOptions,
 } from "./connection.ts";
 export { taskTool } from "./task-tool.ts";
+
+export { runAgentConversation } from "./conversation.ts";

@@ -122,7 +122,9 @@ export interface RunAgentOptions {
   thinkingLevel?: ThinkingLevel;
   instructions?: readonly string[];
   cwd: string;
-  /** Built-in and extension tools to expose. `report_outcome` is always added. */
+  /** Text agents finish naturally; report agents must call report_outcome (default). */
+  output?: "text" | "report";
+  /** Built-in and extension tools to expose. `report_outcome` is added in report mode. */
   tools?: readonly string[];
   resources?: AgentResourceOptions;
   /** Extensions instantiated only for this agent session. */
@@ -274,6 +276,7 @@ async function createRunlingAgent(
     },
   });
 
+  const textOutput = options.output === "text";
   const cwd = requireDirectory(options.cwd);
   const agentDir = options.resources?.agentDir ?? getAgentDir();
   const modelRuntime = await ModelRuntime.create();
@@ -315,7 +318,7 @@ async function createRunlingAgent(
     noContextFiles: resources?.contextFiles === false,
     appendSystemPromptOverride: (base) => [
       ...base,
-      RUNLING_SYSTEM_PROMPT,
+      ...(textOutput ? [] : [RUNLING_SYSTEM_PROMPT]),
       ...(additionalInstructions === undefined ? [] : [additionalInstructions]),
     ],
   });
@@ -335,7 +338,7 @@ async function createRunlingAgent(
     resourceLoader,
     sessionManager,
     settingsManager,
-    customTools: [reportOutcome],
+    customTools: textOutput ? [] : [reportOutcome],
     tools: [
       ...new Set([
         ...(options.tools ?? [
@@ -345,7 +348,7 @@ async function createRunlingAgent(
           "write",
           ...(extensionsEnabled ? ["web_fetch"] : []),
         ]),
-        "report_outcome",
+        ...(textOutput ? [] : ["report_outcome"]),
       ]),
     ],
   });
@@ -391,6 +394,7 @@ async function createRunlingAgent(
     activeReport = undefined;
     reports = [];
     let finalText: string | undefined;
+    let finalTextError: string | undefined;
     const usage = emptyTokenUsage();
     let turn = 0;
     let lastTextUpdate = -Infinity;
@@ -555,6 +559,9 @@ async function createRunlingAgent(
         event.type === "message_end" &&
         event.message.role === "assistant"
       ) {
+        finalTextError = event.message.stopReason === "error" || event.message.stopReason === "aborted"
+          ? event.message.errorMessage || "Agent response failed"
+          : undefined;
         finalText = event.message.content
           .filter((part) => part.type === "text")
           .map((part) => part.text)
@@ -580,6 +587,16 @@ async function createRunlingAgent(
         signal?.throwIfAborted();
         await session.prompt(prompt);
         signal?.throwIfAborted();
+
+        if (textOutput) {
+          // Text delivery happens through onText. The result is for the caller,
+          // not a second message to send to the user.
+          if (finalTextError) return { outcome: "failed", summary: finalTextError, usage };
+          if (!finalText?.trim()) {
+            return { outcome: "failed", summary: "Agent finished without a text response", usage };
+          }
+          return { outcome: "completed", summary: finalText, usage };
+        }
 
         if (activeReport === undefined) {
           agentLog.info(

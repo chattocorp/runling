@@ -59,9 +59,10 @@ try {
   await writeFile(resolve(project, "channels.mjs"), `
 import assert from "node:assert/strict";
 import { createWorkflowContext, createChannel, spawn, task, Type, agent as rootAgent } from "runling";
-import { connectAgent, agent, taskTool } from "runling/agents";
+import { connectAgent, agent, taskTool, runAgentConversation } from "runling/agents";
 assert.equal(agent, rootAgent);
 const echo = task({ name: "Echo", input: Type.String(), output: Type.String() }, (_ctx, input) => input);
+assert.equal(typeof runAgentConversation, "function");
 const echoTool = taskTool(createWorkflowContext(), {
   name: "echo", label: "Echo", description: "Echo input", parameters: echo.input,
 }, echo);

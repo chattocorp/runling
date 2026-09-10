@@ -4,6 +4,23 @@ Import agent APIs from `runling/agents`. This entrypoint exports `agent`,
 `runAgent`, `defineAgentExtension`, their types, `connectAgent`, and `taskTool`. Existing
 agent exports from `runling` remain available.
 
+Choose `output: "text"` for conversational agents:
+
+```ts
+const bot = await agent({ cwd: directory, model, output: "text" });
+const result = await bot.run(ctx, "Hello", { onText: text => console.log(text) });
+```
+
+Text mode delivers assistant messages through `onText` and finishes naturally.
+It does not register `report_outcome`, add Runling's report instructions, or retry
+for a missing report. The result keeps the usual usage and outcome fields, with
+the final response in `summary`. An empty response or provider error produces a
+failed outcome; `run()` throws for that outcome. If `onText` already sends replies
+to the user, do not send the returned summary again.
+
+The default, `output: "report"`, retains structured outcome reporting for coding
+and specialist tasks. Both modes support steering, cancellation, and connections.
+
 Use a connection when a task needs live input and asynchronous output:
 
 ```ts
@@ -107,3 +124,22 @@ invoking the callback. Running work must cooperate with the signal. Errors
 propagate unchanged. The task still validates its input and output; the adapter
 does not add validation or convert schemas. For a Standard Schema task, supply
 a matching JSON schema in `parameters` and call the task in the callback.
+
+## Conversations
+
+`runAgentConversation(ctx, agent, initialMessage, { timeout: 900 })` keeps one
+connection open inside a task with `WorkflowContext<string, string>`. Incoming
+`ctx.inbox` messages steer an active interaction or start another turn when idle.
+Assistant text leaves through `ctx.emit`. Use a text-mode agent for chat replies.
+
+Spawn the task and send messages through its handle while consuming `updates`.
+The helper returns the last summary after the idle timeout (seconds), which
+restarts after each interaction. It throws on agent failure or cancellation.
+The caller owns and disposes the agent. Optional `onBusy(boolean)` reports work
+versus idle state, for example to control a typing indicator. Closing the input
+stream stops delivery; timeout or cancellation still controls conversation exit.
+
+The helper emits a conversation marker so its model turns and input waits share
+one timeline lane. Working and waiting intervals retain their events and logs;
+other task types keep their existing layout. Channels provide queued delivery,
+not acknowledgement that the external chat service has posted an update.

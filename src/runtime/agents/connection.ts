@@ -12,6 +12,8 @@ export interface AgentConnectionOptions {
 }
 
 export interface AgentConnection extends AsyncDisposable {
+  /** Cancellation or background inbox failure for the connection lifetime. */
+  readonly signal: AbortSignal;
   runOutcome(
     prompt: string,
     options?: Pick<AgentRunOptions, "signal">,
@@ -161,5 +163,5 @@ export function connectAgent(
     return disposal;
   }
 
-  return { runOutcome, dispose, [Symbol.asyncDispose]: dispose };
+  return { signal, runOutcome, dispose, [Symbol.asyncDispose]: dispose };
 }
