@@ -3,15 +3,16 @@ import { task, Type } from "runling";
 import { progressInstructions, type SpecialistContext } from "./agent-text.ts";
 import type { ChattoAgentFactory } from "./agent-text.ts";
 
+export const investigationInput = Type.Object({
+  question: Type.String({ minLength: 1 }),
+});
+
 /** Create focused, read-only research tasks with their own agent lifetime. */
 export function createChattoInvestigation({ directory, model, createAgent }: {
   directory: string;
   model: string;
   createAgent: ChattoAgentFactory;
 }) {
-  const investigationInput = Type.Object({
-    question: Type.String({ minLength: 1 }),
-  });
 
   return (question: string) =>
     task(

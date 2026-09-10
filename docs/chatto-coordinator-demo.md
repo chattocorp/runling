@@ -16,8 +16,8 @@ agents. Each investigation shows its assigned question in the timeline. This is
 prompt guidance, not a hard concurrency limit. The
 specialist sees its assigned question; the coordinator keeps the conversation.
 All agents record usage in the same workflow context. Child tasks appear in
-the Runling timeline. There is no task-as-tool abstraction in Runling core: the
-tool handlers simply call tasks with explicit context and input.
+the Runling timeline. The `taskTool()` adapter wraps explicit task calls as agent
+tools; spawning and consuming child updates remain coordinator decisions.
 
 ## Try it
 

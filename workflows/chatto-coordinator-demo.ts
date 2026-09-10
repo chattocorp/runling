@@ -1,4 +1,4 @@
-import { createChattoInvestigation } from "./chatto/investigate.ts";
+import { createChattoInvestigation, investigationInput } from "./chatto/investigate.ts";
 import { createChattoApproval } from "./chatto/approve-implementation.ts";
 import { createChattoConversation } from "./chatto/conversation.ts";
 import {
@@ -97,7 +97,7 @@ export function createChattoCoordinatorDemo({
           name: "investigate",
           label: "Investigate Chatto",
           description: "Ask one read-only specialist a focused repository question. Each call starts a new agent with its own cost. Reuse returned findings; combine related questions in one call. Returns findings to you, not the user.",
-          parameters: Type.Object({ question: Type.String({ minLength: 1 }) }),
+          parameters: investigationInput,
         }, (toolCtx, args) => delegate(spawn(toolCtx, investigate(args.question), args))));
 
         pi.registerTool(taskTool(ctx, {
