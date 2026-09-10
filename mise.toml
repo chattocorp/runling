@@ -1,4 +1,4 @@
 [tools]
 node = "22.19.0"
 pnpm = "10.33.0"
-pi = "0.84.4"
+pi = "latest"
